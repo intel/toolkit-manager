@@ -6,7 +6,11 @@
 # =============================================================================
 
 kata_runtime: "kata-fc"  # kata-fc | kata-qemu | both
-kata_version: "3.32.0"   # kata-deploy chart version
+kata_version: "4.2.0"    # kata-deploy chart version (CoCo 0.23.0 baseline)
+
+# Confidential runtime installed alongside kata_runtime (options: "", kata-qemu-coco-dev, kata-qemu-tdx).
+# kata-qemu-coco-dev runs the same CoCo flow in a normal VM, for testing without TDX hardware.
+kata_confidential_runtime: ""
 
 kata_namespace: "kube-system"
 kata_release_name: "kata-deploy"
@@ -16,6 +20,8 @@ kata_wait_timeout: "900s"  # kata-deploy restarts containerd on each node
 # Label set on nodes that pass the preflight
 kata_node_label_key: "ei-kata-eligible"
 kata_node_label_value: "true"
+# Applied to nodes whose kvm_intel module has TDX enabled; kata-qemu-tdx pods are scheduled only there.
+kata_tdx_node_label_key: "ei-tdx-eligible"
 
 kata_fc_runtime_class: "kata-fc"
 kata_qemu_runtime_class: "kata-qemu"

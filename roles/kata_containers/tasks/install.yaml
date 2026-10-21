@@ -29,6 +29,15 @@
       config and re-run.
   when: kata_runtime | default('kata-fc') not in ['kata-fc', 'kata-qemu', 'both']
 
+# Fails rather than warns: workloads that require a confidential runtime must not run without one.
+- name: "kata_containers | Fail on invalid kata_confidential_runtime value"
+  ansible.builtin.fail:
+    msg: >-
+      kata_confidential_runtime='{{ kata_confidential_runtime | default('') }}' is not valid
+      (expected '', kata-qemu-coco-dev or kata-qemu-tdx). Fix it in the environment's
+      config and re-run.
+  when: kata_confidential_runtime | default('') not in ['', 'kata-qemu-coco-dev', 'kata-qemu-tdx']
+
 - name: "kata_containers | Compute cluster node list"
   ansible.builtin.set_fact:
     _kata_all_nodes: >-
@@ -61,6 +70,7 @@
     kata_kvm_hosts: "{{ _kata_node_results | dict2items | selectattr('value.kvm_ok') | map(attribute='key') | list }}"
     kata_devmapper_hosts: "{{ _kata_node_results | dict2items | selectattr('value.devmapper_ok') | map(attribute='key') | list }}"
     _kata_preflight_summary: "{{ _kata_node_results | dict2items | map(attribute='value.summary') | list }}"
+    kata_tdx_hosts: "{{ _kata_node_results | dict2items | selectattr('value.kvm_ok') | selectattr('value.tdx_ok') | map(attribute='key') | list }}"
 
 - name: "kata_containers | Fail when no node has hardware virtualisation"
   ansible.builtin.fail:
@@ -128,6 +138,20 @@
   ansible.builtin.set_fact:
     kata_enable_fc: "{{ (kata_runtime | default('kata-fc') in ['kata-fc', 'both'] and kata_devmapper_hosts | length > 0) | bool }}"
     kata_enable_qemu: "{{ (kata_runtime | default('kata-fc') in ['kata-qemu', 'both']) | bool }}"
+    kata_confidential_shim: "{{ kata_confidential_runtime | default('') | regex_replace('^kata-', '') }}"
+    kata_enable_confidential: >-
+      {{ (kata_confidential_runtime | default('') == 'kata-qemu-coco-dev'
+          or (kata_confidential_runtime | default('') == 'kata-qemu-tdx' and kata_tdx_hosts | length > 0)) | bool }}
+
+- name: "kata_containers | Warn when kata-qemu-tdx was requested but no node has TDX enabled"
+  ansible.builtin.debug:
+    msg:
+      - "WARNING: kata-qemu-tdx requested but no KVM node reports kvm_intel tdx=Y — skipping the TDX shim."
+      - "Enable TDX (and TME-MK) in BIOS and boot a TDX host kernel, then re-run."
+      - "Verify on a node with: cat /sys/module/kvm_intel/parameters/tdx"
+  when:
+    - kata_confidential_runtime | default('') == 'kata-qemu-tdx'
+    - not kata_enable_confidential
 
 - name: "kata_containers | Fail when Firecracker was requested but devmapper is unavailable"
   ansible.builtin.fail:
@@ -151,7 +175,8 @@
   ansible.builtin.set_fact:
     kata_expected_runtime_classes: >-
       {{ ([kata_fc_runtime_class] if kata_enable_fc else [])
-         + ([kata_qemu_runtime_class] if kata_enable_qemu else []) }}
+         + ([kata_qemu_runtime_class] if kata_enable_qemu else [])
+         + ([kata_confidential_runtime] if kata_enable_confidential else []) }}
 
 - name: "kata_containers | Get node list from Kubernetes cluster"
   kubernetes.core.k8s_info:
@@ -165,14 +190,21 @@
     name: "{{ item.metadata.name }}"
     definition:
       metadata:
-        labels: "{{ { kata_node_label_key: kata_node_label_value } }}"
+        # Build the dict so the runtime label key is templated (a Jinja
+        # expression cannot be used directly as a YAML mapping key).
+        labels: >-
+          {{ { kata_node_label_key: kata_node_label_value }
+             | combine({ kata_tdx_node_label_key: 'true' } if _tdx | bool else {}) }}
   loop: "{{ k8s_nodes.resources }}"
   loop_control:
     label: "{{ item.metadata.name }}"
-  when: >
-    item.metadata.name in kata_kvm_hosts or
-    (item.metadata.labels['kubernetes.io/hostname'] | default('')) in kata_kvm_hosts or
-    (k8s_nodes.resources | length == 1 and kata_kvm_hosts | length > 0)
+  vars:
+    _ids: "{{ [item.metadata.name, item.metadata.labels['kubernetes.io/hostname'] | default('')] }}"
+    _single: "{{ k8s_nodes.resources | length == 1 }}"
+    _tdx: >-
+      {{ kata_enable_confidential and kata_confidential_runtime == 'kata-qemu-tdx'
+         and (_ids | intersect(kata_tdx_hosts) | length > 0 or (_single and kata_tdx_hosts | length > 0)) }}
+  when: _ids | intersect(kata_kvm_hosts) | length > 0 or (_single and kata_kvm_hosts | length > 0)
 
 # helm upgrade --install cannot recover a failed first release
 - name: "kata_containers | Check for an existing kata-deploy release"
@@ -201,10 +233,22 @@
          | combine({'nodeSelector': {kata_node_label_key: kata_node_label_value | string},
                     'shims': {'fc': {'enabled': kata_enable_fc | bool},
                               'qemu': {'enabled': kata_enable_qemu | bool}},
-                    'defaultShim': {'amd64': 'fc' if kata_enable_fc | bool else 'qemu'}},
-                   recursive=True) }}
+                    'defaultShim': {'amd64': 'fc' if kata_enable_fc | bool
+                                    else ('qemu' if kata_enable_qemu | bool else kata_confidential_shim)}},
+                   recursive=True)
+         | combine(_kata_confidential_values, recursive=True) }}
     wait: "{{ helm_wait }}"
     timeout: "{{ kata_wait_timeout }}"
+  vars:
+    # Confidential shim: TDX nodes only for qemu-tdx; the guest agent pulls images through the proxy.
+    _kata_confidential_values: >-
+      {{ {} if not kata_enable_confidential | bool else
+         {'shims': {kata_confidential_shim:
+           {'enabled': true}
+           | combine({'runtimeClass': {'nodeSelector': {kata_tdx_node_label_key: 'true'}}}
+                     if kata_confidential_shim == 'qemu-tdx' else {})
+           | combine({'agent': {'httpsProxy': https_proxy, 'noProxy': no_proxy | default('')}}
+                     if https_proxy | default('') | length > 0 else {})}} }}
   register: helm_install_result
   until: helm_install_result is succeeded
   retries: "{{ helm_retries }}"
@@ -235,7 +279,7 @@
       - "  Kata Containers deployed successfully!"
       - "  Version       : {{ kata_version }}"
       - "  Namespace     : {{ kata_namespace }}"
-      - "  Shims         : {{ ((['fc'] if kata_enable_fc else []) + (['qemu'] if kata_enable_qemu else [])) | join(', ') }}"
+      - "  Shims         : {{ ((['fc'] if kata_enable_fc else []) + (['qemu'] if kata_enable_qemu else []) + ([kata_confidential_shim] if kata_enable_confidential else [])) | join(', ') }}"
       - "  RuntimeClasses: {{ kata_expected_runtime_classes | join(', ') }}"
       - "  Kata nodes    : {{ kata_kvm_hosts | join(', ') }} (label {{ kata_node_label_key }}={{ kata_node_label_value }})"
       - "  Sandbox template + warm pool: applied by agent_sandbox (agent-toolkit layer)"
