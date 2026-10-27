@@ -237,6 +237,15 @@
   failed_when: false
   changed_when: false
 
+# The containerd config version decides the CRI plugin ID used by the annotation drop-in.
+- name: "kata_containers | {{ kata_node }} | Read containerd config version"
+  ansible.builtin.command: grep -m1 -oP '^version\s*=\s*\K[0-9]+' /etc/containerd/config.toml
+  become: true
+  delegate_to: "{{ kata_node }}"
+  register: containerd_config_version
+  failed_when: false
+  changed_when: false
+
 - name: "kata_containers | {{ kata_node }} | Check whether kvm_intel has TDX enabled"
   ansible.builtin.slurp:
     src: /sys/module/kvm_intel/parameters/tdx
@@ -275,6 +284,7 @@
            'kernel': _kernel if _kernel else 'unknown',
            'fc_amx_blocked': ((_amx | bool) and (_kernel_minor | length > 0)
                               and (_kernel_minor is version('5.17', '<'))) | bool,
+           'containerd_config_version': containerd_config_version.stdout | default('') | trim,
            'tdx_enabled': ((kvm_tdx_param.content | default('') | b64decode | trim) == 'Y') | bool,
            'tdx_ok': ((kvm_tdx_vm_type.stdout | default('') | trim) == '1') | bool }}) }}
 

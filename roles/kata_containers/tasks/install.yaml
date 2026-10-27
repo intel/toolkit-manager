@@ -190,6 +190,25 @@
          + ([kata_qemu_runtime_class] if kata_enable_qemu else [])
          + ([kata_confidential_runtime] if kata_enable_confidential else []) }}
 
+- name: "kata_containers | Collect containerd config versions of Kata nodes"
+  ansible.builtin.set_fact:
+    _kata_containerd_versions: >-
+      {{ _kata_node_results | dict2items | selectattr('key', 'in', kata_kvm_hosts)
+         | map(attribute='value.containerd_config_version') | unique | list }}
+
+- name: "kata_containers | Check Kata nodes share one containerd config version"
+  ansible.builtin.assert:
+    that: _kata_containerd_versions | length == 1
+    fail_msg: >-
+      Kata nodes use different containerd config versions ({{ _kata_containerd_versions | join(', ') }});
+      the pod-annotation drop-in needs one CRI plugin ID for all of them.
+    quiet: true
+
+- name: "kata_containers | Resolve containerd CRI plugin ID for the pod-annotation drop-in"
+  ansible.builtin.set_fact:
+    kata_cri_plugin_id: >-
+      {{ {'3': 'io.containerd.cri.v1.runtime', '2': 'io.containerd.grpc.v1.cri'}.get(_kata_containerd_versions | first | string, 'cri') }}
+
 - name: "kata_containers | Get node list from Kubernetes cluster"
   kubernetes.core.k8s_info:
     kind: Node
@@ -248,10 +267,13 @@
                     'defaultShim': {'amd64': 'fc' if kata_enable_fc | bool
                                     else ('qemu' if kata_enable_qemu | bool else kata_confidential_shim)}},
                    recursive=True)
-         | combine(_kata_confidential_values, recursive=True) }}
+         | combine(_kata_confidential_values, recursive=True)
+         | combine({'containerd': {'userDropIn': lookup('ansible.builtin.template', 'containerd-pod-annotations.toml.j2')}},
+                   recursive=True) }}
     wait: "{{ helm_wait }}"
     timeout: "{{ kata_wait_timeout }}"
   vars:
+    # Pod-annotation allowlist (GHSA-37rf-pj8c-g5g3): kata-deploy imports this drop-in after its own.
     # Confidential shim: TDX nodes only for qemu-tdx; the guest agent pulls images through the proxy.
     _kata_confidential_values: >-
       {{ {} if not kata_enable_confidential | bool else
