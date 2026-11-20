@@ -580,7 +580,7 @@
 
 # Under STRICT mTLS ztunnel refuses plain TCP. The user-workload Prometheus and the
 # Grafana Operator run outside the mesh: only the ports they call accept plain TCP,
-# and the NetworkPolicy lets in only their namespaces. Meshed traffic arrives on
+# and the NetworkPolicy lets in only their namespaces (from), or pods (from_pods). Meshed traffic arrives on
 # HBONE (15008). The kubelet's probes: ztunnel lets them in as plain TCP and refuses
 # anything else that is not mTLS, so probe_ports are open to any source; a `probed`
 # caller port, which accepts plain TCP, admits only their address besides its callers.
@@ -604,6 +604,15 @@
         port: 3000
         from: {kubernetes.io/metadata.name: "{{ observability_openshift_grafana_operator_namespace }}"}
         probed: true
+      # Tempo exits on its first failed object-store call. Without CNI chaining
+      # istio-cni captures a pod only through a running process, so a Tempo that has
+      # not been captured yet is refused by S3 under STRICT and never stays up long
+      # enough to be captured. Its plain TCP to S3 is let in; once captured it uses mTLS.
+      - name: "{{ seaweedfs_release_name }}-seaweedfs-s3"
+        pods: {app.kubernetes.io/instance: "{{ seaweedfs_release_name }}", app.kubernetes.io/name: seaweedfs, app.kubernetes.io/component: s3}
+        port: 8333
+        from_pods: {app.kubernetes.io/instance: tempo, app.kubernetes.io/managed-by: tempo-operator}
+        probed: true
     _obs_mesh_objects: >-
       {%- set out = [] -%}
       {%- for o in _obs_mesh_open -%}
@@ -619,7 +628,8 @@
             'metadata': {'name': o.name ~ '-ingress', 'namespace': observability_namespace},
             'spec': {'podSelector': {'matchLabels': o.pods}, 'policyTypes': ['Ingress'],
                      'ingress': [{'ports': any},
-                                 {'from': [{'namespaceSelector': {'matchLabels': o.from}}]
+                                 {'from': [{'namespaceSelector': {'matchLabels': o.from}} if o.from is defined
+                                           else {'podSelector': {'matchLabels': o.from_pods}}]
                                           + ([{'ipBlock': {'cidr': _observability_probe_address}}]
                                              if o.probed | default(false) else []),
                                   'ports': [{'port': o.port, 'protocol': 'TCP'}]}]}}) -%}
