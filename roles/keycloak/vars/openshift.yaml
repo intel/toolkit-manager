@@ -9,5 +9,5 @@ _keycloak_from_olm: true
 # Connectivity Link) reads the inference realm's keys, the user-workload Prometheus
 # scrapes the management port.
 _keycloak_out_of_mesh_callers:
-  - {port: 8080, namespace_labels: {kubernetes.io/metadata.name: kuadrant-system}}
+  - {port: 8080, namespace_labels: {kubernetes.io/metadata.name: "{{ keycloak_authorino_namespace }}"}}
   - {port: 9000, namespace_labels: {network.openshift.io/policy-group: monitoring}}
