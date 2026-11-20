@@ -1,0 +1,191 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# SPACE node — prepare one worker (space_node)
+# Runs the upstream node layer (infra/space/kind/node) on a real host: the same
+# units a SPACE node image enables, minus the Kind-only devices/vsock-jails.
+# =============================================================================
+
+- name: "space_node | {{ space_node }} | KVM preflight"
+  ansible.builtin.include_role:
+    name: kata_containers
+    tasks_from: kvm_preflight.yaml
+  vars:
+    kvm_node: "{{ space_node }}"
+
+- name: "space_node | {{ space_node }} | Start with no containerd edit recorded"
+  ansible.builtin.set_fact:
+    _space_containerd_cfg: {}
+    _space_prepared: false
+
+- name: "space_node | {{ space_node }} | Prepare the host"
+  when: _kvm_result.kvm_ok | bool and _kvm_result.vsock_ok | bool
+  become: true
+  delegate_to: "{{ space_node }}"
+  block:
+    - name: "space_node | {{ space_node }} | Ensure btrfs-progs is installed"
+      ansible.builtin.shell: |
+        command -v mkfs.btrfs >/dev/null 2>&1 && { echo present; exit 0; }
+        if command -v apt-get >/dev/null 2>&1; then
+          DEBIAN_FRONTEND=noninteractive apt-get install -y btrfs-progs
+        else
+          dnf install -y btrfs-progs
+        fi
+      args:
+        executable: /bin/bash
+      register: _space_btrfs
+      changed_when: "'present' not in _space_btrfs.stdout"
+
+    - name: "space_node | {{ space_node }} | Create node layer directories"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      loop:
+        - "{{ space_node_lib_dir }}"
+        - "{{ space_node_host_vendor_dir }}"
+        - /etc/space
+
+    - name: "space_node | {{ space_node }} | Install the upstream node layer scripts"
+      ansible.builtin.copy:
+        src: "{{ space_src_dir }}/{{ item.src }}"
+        dest: "{{ space_node_lib_dir }}/{{ item.dest }}"
+        owner: root
+        group: root
+        mode: "{{ item.mode }}"
+      loop:
+        - {src: infra/space/kind/node/space-kind-node.sh, dest: space-kind-node.sh, mode: "0755"}
+        - {src: scripts/lib/space-loop-devices.sh, dest: space-loop-devices.sh, mode: "0644"}
+        - {src: infra/space/identity/node-identities.sh, dest: node-identities.sh, mode: "0644"}
+      loop_control:
+        label: "{{ item.dest }}"
+
+    # layout copies this tree once into a root-owned /space/vendor
+    - name: "space_node | {{ space_node }} | Copy Firecracker and the guest kernel"
+      ansible.builtin.copy:
+        src: "{{ space_vendor_dir }}/"
+        dest: "{{ space_node_host_vendor_dir }}/"
+        owner: root
+        group: root
+        mode: preserve
+
+    - name: "space_node | {{ space_node }} | Set the btrfs cache size"
+      ansible.builtin.copy:
+        dest: /etc/space/kind-node.env
+        content: "SPACE_CACHE_SIZE_MB={{ (space_cache_size_gb | int) * 1024 }}\n"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: "space_node | {{ space_node }} | Install the node layer units"
+      ansible.builtin.copy:
+        src: "{{ space_src_dir }}/infra/space/kind/node/systemd/{{ item }}.service"
+        dest: "/etc/systemd/system/{{ item }}.service"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: "{{ space_node_units }}"
+
+    # TODO(spike): confirm the Kind node layer runs unchanged on a real host
+    - name: "space_node | {{ space_node }} | Enable and start the node layer units"
+      ansible.builtin.systemd:
+        name: "{{ item }}.service"
+        enabled: true
+        state: started
+        daemon_reload: true
+      loop: "{{ space_node_units }}"
+
+    - name: "space_node | {{ space_node }} | Read the containerd config version"
+      ansible.builtin.command: grep -m1 -E '^version *= *[0-9]+' /etc/containerd/config.toml
+      register: _space_containerd_version
+      failed_when: false
+      changed_when: false
+
+    # A duplicate TOML table would stop containerd
+    - name: "space_node | {{ space_node }} | Check whether the space runtime is already configured"
+      ansible.builtin.command: grep -q 'containerd.runtimes.space\]' /etc/containerd/config.toml
+      register: _space_runtime_present
+      failed_when: false
+      changed_when: false
+
+    # Upstream space-runtime.toml (version 2); containerd 2 config (version 3) names the CRI plugin differently
+    - name: "space_node | {{ space_node }} | Register the space runtime in containerd config"
+      vars:
+        _cri: >-
+          {{ "plugins.'io.containerd.cri.v1.runtime'.containerd"
+             if (_space_containerd_version.stdout | regex_search('[0-9]+') | default('2', true) | int) >= 3
+             else 'plugins."io.containerd.grpc.v1.cri".containerd' }}
+      ansible.builtin.blockinfile:
+        path: /etc/containerd/config.toml
+        marker: "# {mark} space runtime (managed)"
+        backup: true
+        block: |
+          [{{ _cri }}.runtimes.space]
+            runtime_type = "io.containerd.space.v2"
+            pod_annotations = ["space.pplx.net/*"]
+            [{{ _cri }}.runtimes.space.options]
+              CniConfDir = "/etc/cni/net.d"
+      register: _space_containerd_cfg
+      when: _space_runtime_present.rc != 0
+
+    - name: "space_node | {{ space_node }} | Restart containerd to load the space runtime"  # noqa: no-handler
+      ansible.builtin.systemd:
+        name: containerd
+        state: restarted
+      when: _space_containerd_cfg is changed
+
+    - name: "space_node | {{ space_node }} | Check containerd is running with the edited config"  # noqa: no-handler
+      ansible.builtin.systemd:
+        name: containerd
+      register: _space_containerd_state
+      until: _space_containerd_state.status.ActiveState | default('') == 'active'
+      retries: 6
+      delay: 5
+      when: _space_containerd_cfg is changed
+
+    - name: "space_node | {{ space_node }} | Check btrfs /space/cache is mounted"
+      ansible.builtin.command: findmnt -n -t btrfs --mountpoint /space/cache
+      changed_when: false
+
+    - name: "space_node | {{ space_node }} | Record the node as prepared"
+      ansible.builtin.set_fact:
+        _space_prepared: true
+
+  rescue:
+    - name: "space_node | {{ space_node }} | Restore the containerd config from before the SPACE edit"
+      ansible.builtin.copy:
+        src: "{{ _space_containerd_cfg.backup_file }}"
+        dest: /etc/containerd/config.toml
+        remote_src: true
+        mode: preserve
+      register: _space_toml_restored
+      when: _space_containerd_cfg.backup_file | default('') | length > 0
+
+    - name: "space_node | {{ space_node }} | Restart containerd with the restored config"
+      ansible.builtin.systemd:
+        name: containerd
+        state: restarted
+      when: _space_toml_restored is not skipped
+
+    - name: "space_node | {{ space_node }} | SPACE setup failed on this node"
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: SPACE host setup failed on {{ space_node }}
+          ({{ ansible_failed_result.msg | default('see task output above') }}).
+          The node is excluded from SPACE.
+
+- name: "space_node | {{ space_node }} | Record node result"
+  ansible.builtin.set_fact:
+    _space_node_results: >-
+      {{ _space_node_results | combine({space_node: {
+           'ready': _space_prepared | bool,
+           'summary': space_node ~ ': kernel=' ~ (_kvm_result.kernel or 'unknown')
+                      ~ ' kvm=' ~ _kvm_result.kvm_ok ~ ' vsock=' ~ _kvm_result.vsock_ok
+                      ~ ' prepared=' ~ _space_prepared}}) }}
+
+- name: "space_node | {{ space_node }} | Display node result"
+  ansible.builtin.debug:
+    msg: "{{ _space_node_results[space_node].summary }}"

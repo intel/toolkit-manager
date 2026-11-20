@@ -1,0 +1,133 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# SPACE node — Install
+# Prepares KVM workers for SPACE microVMs; the agent-toolkit space role builds
+# and installs SPACE itself.
+# =============================================================================
+
+# The node preparation runs over SSH, so the nodes must be in the inventory.
+- name: "space_node | Fail when the cluster nodes are not in the inventory"
+  ansible.builtin.fail:
+    msg: >-
+      space_enabled is set, but this is
+      {{ 'an OpenShift cluster' if (cluster_distribution | default('kubernetes')) == 'openshift'
+         else 'a BYO cluster (existing_kubernetes)' }}. SPACE host preparation (KVM,
+      the btrfs /space layout, Firecracker and the containerd space runtime) runs
+      over SSH on the cluster nodes listed in the inventory. Set space_enabled: false
+      for this environment, or deploy SPACE on a cluster this installer provisions.
+  when: >-
+    (existing_kubernetes | default('') | trim | length > 0) or
+    ((cluster_distribution | default('kubernetes')) == 'openshift')
+
+- name: "space_node | Compute cluster node lists"
+  ansible.builtin.set_fact:
+    _space_workers: "{{ groups['kube_node'] | default([]) | unique }}"
+    _space_node_results: {}
+
+- name: "space_node | Fail when the inventory lists no worker nodes"
+  ansible.builtin.fail:
+    msg: >-
+      No hosts in the kube_node inventory group, so no node can run SPACE
+      microVMs. Add the worker nodes to the inventory, or set space_enabled: false.
+  when: _space_workers | length == 0
+
+- name: "space_node | Check out SPACE {{ space_rev }}"
+  ansible.builtin.git:
+    repo: "{{ space_repo_url }}"
+    dest: "{{ space_src_dir }}"
+    version: "{{ space_rev }}"
+    force: true
+  register: _space_src
+  until: _space_src is succeeded
+  retries: 3
+  delay: 15
+
+- name: "space_node | Stage Firecracker and the guest kernel on the installer host"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export SPACE_VENDOR_ROOT={{ space_vendor_dir | quote }}
+    if bash infra/space/kind/scripts/install-fc-vendor.sh --check >/dev/null 2>&1; then
+      echo present
+    else
+      bash infra/space/kind/scripts/install-fc-vendor.sh
+    fi
+  args:
+    chdir: "{{ space_src_dir }}"
+    executable: /bin/bash
+  register: _space_vendor
+  changed_when: "'present' not in _space_vendor.stdout"
+
+- name: "space_node | Node preparation"
+  ansible.builtin.include_tasks: node_prepare.yaml
+  loop: "{{ _space_workers }}"
+  loop_control:
+    loop_var: space_node
+
+- name: "space_node | Build eligible host list"
+  ansible.builtin.set_fact:
+    space_node_hosts: "{{ _space_node_results | dict2items | selectattr('value.ready') | map(attribute='key') | list }}"
+    _space_node_summary: "{{ _space_node_results | dict2items | map(attribute='value.summary') | list }}"
+
+- name: "space_node | Fail when no worker can run SPACE microVMs"
+  ansible.builtin.fail:
+    msg: |-
+      space_enabled is set but no worker node is ready for SPACE. SPACE needs
+      /dev/kvm (Intel VT-x on bare metal, or nested virtualisation on a VM),
+      /dev/vhost-vsock, btrfs and the containerd space runtime.
+      Enable VT-x, or set space_enabled: false, then re-run.
+      Node results:
+      {% for line in _space_node_summary %}
+        {{ line }}
+      {% endfor %}
+  when: space_node_hosts | length == 0
+
+- name: "space_node | Get node list from Kubernetes cluster"
+  kubernetes.core.k8s_info:
+    kind: Node
+  register: _space_k8s_nodes
+
+# Nodes that no longer pass lose their labels, so SPACE stops scheduling there.
+# The SPACE control plane runs on the prepared workers too (infra label): with
+# separate workers, kubespray taints the control-plane nodes NoSchedule.
+- name: "space_node | Label SPACE workers"
+  vars:
+    _name: "{{ item.metadata.name }}"
+    _host: "{{ item.metadata.labels['kubernetes.io/hostname'] | default(_name) }}"
+    _ready: "{{ _name in space_node_hosts or _host in space_node_hosts }}"
+  kubernetes.core.k8s:
+    state: patched
+    kind: Node
+    name: "{{ _name }}"
+    definition:
+      metadata:
+        labels: >-
+          {{ {space_node_label_key: (space_node_label_value if _ready | bool else none),
+              space_node_pool_label_key: ('sandbox' if _ready | bool else none),
+              space_infra_label_key: ('true' if _ready | bool else none)} }}
+  loop: "{{ _space_k8s_nodes.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+
+- name: "space_node | Apply the space RuntimeClass and PriorityClasses"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ item }}"
+  loop: >-
+    {{ [lookup('file', space_src_dir ~ '/infra/space/kind/manifests/runtimeclass.yaml') | from_yaml
+         | combine({'scheduling': {'nodeSelector': {space_node_label_key: space_node_label_value}}})]
+       + (lookup('file', space_src_dir ~ '/infra/space/kind/manifests/priorityclasses.yaml')
+          | from_yaml_all | select | list) }}
+  loop_control:
+    label: "{{ item.kind }}/{{ item.metadata.name }}"
+
+- name: "space_node | Summary"
+  ansible.builtin.debug:
+    msg:
+      - "============================================================"
+      - "  SPACE nodes prepared (SPACE {{ space_rev[:12] }})"
+      - "  Workers     : {{ space_node_hosts | join(', ') }} (label {{ space_node_label_key }}={{ space_node_label_value }})"
+      - "  RuntimeClass: space"
+      - "  Next        : the agent-toolkit space component builds and installs SPACE"
+      - "============================================================"

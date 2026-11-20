@@ -1,0 +1,33 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# SPACE node role defaults
+# space_rev and space_src_dir are owned by config.agent-toolkit.yaml; these
+# copies apply only when that file does not set them.
+# =============================================================================
+
+space_repo_url: "https://github.com/perplexityai/SPACE.git"
+space_rev: "a08174bc17a9b8205691ec7d8fe7ba1f90ee3f97"
+space_src_dir: "{{ lookup('env', 'HOME') }}/.cache/ai-solutions/space/src"
+# Firecracker binaries and guest kernel, staged on the installer host and copied to each node
+space_vendor_dir: "{{ space_src_dir }}/../vendor"
+
+# Label SPACE schedules sandbox pods with (upstream k8s.sandboxNodeSelectorKey)
+space_node_label_key: "node.kubernetes.io/space-enabled"
+space_node_label_value: "true"
+# Upstream node-pool and control-plane labels the SPACE charts select
+space_node_pool_label_key: "space.pplx.net/node-pool"
+space_infra_label_key: "space.pplx.net/infra"
+
+# Sparse loop-backed btrfs /space/cache per node, reformatted on every boot
+space_cache_size_gb: 100
+
+# Where the upstream node scripts and units are installed on each node
+space_node_lib_dir: "/usr/local/lib/space/kind-node"
+space_node_host_vendor_dir: "/opt/space-kind/host-vendor"
+space_node_units:
+  - space-loop-nodes
+  - space-cgroup
+  - space-layout
+  - space-cache

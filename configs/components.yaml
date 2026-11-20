@@ -79,6 +79,14 @@ components:
     enabled: "{{ kata_containers_enabled | default(false) | bool }}"
     depends_on: [kubernetes]
 
+  # SPACE microVM hosts (agent-toolkit's space component): KVM, the /space layout,
+  # Firecracker and the containerd `space` runtime. After Kata, so the two
+  # containerd edits never run at once. space_enabled is set in config.agent-toolkit.yaml.
+  - name: space_node
+    layer: infrastructure
+    enabled: "{{ space_enabled | default(false) | bool }}"
+    depends_on: [kubernetes, kata_containers]
+
   # --- Platform ---
   # --- Node features and GPU ---
   # The cluster's one NFD, on every cluster: the Helm chart on Kubernetes, a check of
@@ -175,7 +183,7 @@ components:
     layer: platform
     enabled: "{{ (object_store_backend | default('seaweedfs')) == 'seaweedfs' }}"
     depends_on: [object_store]
-    used_by: [observability, langfuse]
+    used_by: [observability, langfuse, space]
 
   # On OpenShift: instances of the operators the admin installed from OperatorHub
   # (Loki, Logging, Tempo, OpenTelemetry, Grafana), metrics from user-workload

@@ -248,6 +248,32 @@
           with dmsetup ls.
       when: _incomplete | length > 0
 
+# ─── Stop SPACE microVMs left on the nodes ─────────────────────────────
+# The runtime supervisor is a host unit, so its Firecracker VMs outlive the reset.
+- name: "kubernetes | teardown | Stop SPACE runtime supervisor and microVMs"
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      systemctl stop space-runtime-supervisor.service 2>/dev/null || true
+      pattern='^/space/bin/(firecracker|jailer|runtime/)'
+      pgrep -f "$pattern" >/dev/null || exit 0
+      pkill -KILL -f "$pattern" || true
+      echo "stopped"
+    executable: /bin/bash
+  become: true
+  delegate_to: "{{ item }}"
+  loop: "{{ _k8s_inventory_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+  register: _space_purge_procs
+  changed_when: "'stopped' in _space_purge_procs.stdout"
+  failed_when: false
+  ignore_errors: true
+  ignore_unreachable: true
+  when:
+    - space_enabled | default(false) | bool
+    - _cluster_alive.rc != 0
+
 # Kubespray reset.yml already removes ~/.kube, /etc/kubernetes, and the
 # {{ bin_dir }}/{kubectl,helm} binaries on every node. We do NOT reinstall
 # host tooling here — teardown must not mutate the host beyond removing the

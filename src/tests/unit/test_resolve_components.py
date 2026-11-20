@@ -114,3 +114,15 @@ def test_install_platform_runs_nri_cpu_balloons_before_the_platform_services():
     order = [n for n in resolve_registry("platform", "install")
              if n in {c["name"] for c in _REGISTRY["components"] if c["layer"] == "platform"}]
     assert set(order[:order.index("nri_cpu_balloons")]) == {"node_feature_discovery", "nvidia_gpu_operator"}
+
+
+def test_install_infrastructure_prepares_space_nodes_after_kata():
+    order = resolve_registry("infrastructure", "install")
+    assert order.index("kata_containers") < order.index("space_node")
+
+
+@pytest.mark.parametrize("variables, expected", [({}, False), ({"space_enabled": True}, True)])
+def test_space_node_follows_space_enabled(variables, expected):
+    from ansible_render import render
+    entry = next(c for c in _REGISTRY["components"] if c["name"] == "space_node")
+    assert render(entry["enabled"], variables) is expected
