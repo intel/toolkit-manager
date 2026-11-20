@@ -199,20 +199,20 @@ def test_ambient_needs_local_gateway_mode(gateway_config, level):
     assert op.openshift_prereq_report([req], instances={"results": [result]})[0]["level"] == level
 
 
-@pytest.mark.parametrize("policies, status", [
-    ([{"mtls": {"mode": "STRICT"}}], None),
-    ([{"mtls": {"mode": "PERMISSIVE"}}], "NOT READY"),
-    ([{}], "NOT READY"),                  # no mode inherits PERMISSIVE, the Istio default
-    ([], "MISSING"),
+@pytest.mark.parametrize("policies, level, status", [
+    ([{"mtls": {"mode": "STRICT"}}], op.OK, None),
+    ([{"mtls": {"mode": "PERMISSIVE"}}], op.FAIL, "NOT READY"),
+    ([{}], op.FAIL, "NOT READY"),         # no mode inherits PERMISSIVE, the Istio default
+    ([], op.FAIL, "MISSING"),
 ])
-def test_mesh_needs_strict_mtls(policies, status):
+def test_mesh_needs_strict_mtls(policies, level, status):
     spec = {"kind": "PeerAuthentication", "name": "default", "namespace": "istio-system",
             "fields": {"spec.mtls.mode": "STRICT"}}
     req = {"name": "mesh_strict_mtls", "instances": [spec]}
     found = [{"metadata": {"name": "default", "namespace": "istio-system"}, "spec": p} for p in policies]
     row = op.openshift_prereq_report([req], instances={"results": [{"item": [req, spec], "resources": found}]})[0]
-    assert row["level"] == (op.OK if status is None else op.FAIL)
-    if status:
+    assert row["level"] == level
+    if status is not None:
         assert row["status"] == status
 
 
