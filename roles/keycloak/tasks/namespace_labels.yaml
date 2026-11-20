@@ -28,4 +28,3 @@
           pod-security.kubernetes.io/audit: "restricted"
           pod-security.kubernetes.io/warn: "restricted"
   when: _keycloak_pss_labels | bool
-

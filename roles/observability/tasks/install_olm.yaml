@@ -581,7 +581,7 @@
 # Under STRICT mTLS ztunnel refuses plain TCP. The user-workload Prometheus and the
 # Grafana Operator run outside the mesh: only the ports they call accept plain TCP,
 # and the NetworkPolicy lets in only their namespaces. Meshed traffic arrives on
-# HBONE (15008); 169.254.7.127 is the address ztunnel gives the kubelet's probes.
+# HBONE (15008).
 - name: "observability | olm | Open the ports out-of-mesh callers use"
   kubernetes.core.k8s:
     state: present
@@ -610,7 +610,6 @@
             'metadata': {'name': o.name ~ '-ingress', 'namespace': observability_namespace},
             'spec': {'podSelector': {'matchLabels': o.pods}, 'policyTypes': ['Ingress'],
                      'ingress': [{'ports': [{'port': 15008, 'protocol': 'TCP'}]},
-                                 {'from': [{'ipBlock': {'cidr': '169.254.7.127/32'}}]},
                                  {'from': [{'namespaceSelector': {'matchLabels': o.from}}],
                                   'ports': [{'port': o.port, 'protocol': 'TCP'}]}]}}) -%}
       {%- endfor -%}
@@ -619,7 +618,7 @@
 
 # The OpenTelemetry Operator's own NetworkPolicy admits only the OTLP and metrics
 # ports, so meshed senders, which arrive on HBONE, are dropped. Policies add up:
-# this one admits HBONE and the probes.
+# this one admits HBONE.
 - name: "observability | olm | Let meshed senders reach the OTel Collector"
   kubernetes.core.k8s:
     state: present
@@ -637,7 +636,6 @@
         policyTypes: [Ingress]
         ingress:
           - ports: [{port: 15008, protocol: TCP}]
-          - from: [{ipBlock: {cidr: 169.254.7.127/32}}]
   when: istio_enabled | default(false) | bool
 
 - name: "observability | olm | Wait for the instances"
