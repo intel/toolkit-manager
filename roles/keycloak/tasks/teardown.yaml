@@ -40,7 +40,7 @@
         namespace: "{{ keycloak_namespace }}"
         state: absent
 
-    # The admin's namespace stays on OpenShift: remove what namespace_labels.yaml added.
+    # The admin's namespace stays on OpenShift: remove the out-of-mesh exceptions.
     - name: "keycloak | Delete the out-of-mesh exceptions"
       kubernetes.core.k8s:
         api_version: "{{ item.api_version }}"
