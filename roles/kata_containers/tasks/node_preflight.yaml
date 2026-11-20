@@ -5,77 +5,15 @@
 # Kata Containers — Node preflight (one node: kata_node)
 # =============================================================================
 
-- name: "kata_containers | {{ kata_node }} | Check for /dev/kvm"
-  ansible.builtin.stat:
-    path: /dev/kvm
-  register: kvm_device
-  delegate_to: "{{ kata_node }}"
-
-# Facts come from the installer host, so read these on the node
-- name: "kata_containers | {{ kata_node }} | Read CPU flags"
-  ansible.builtin.command: grep -m1 '^flags' /proc/cpuinfo
-  register: _kata_cpu_flags_raw
-  delegate_to: "{{ kata_node }}"
-  failed_when: false
-  changed_when: false
-
-- name: "kata_containers | {{ kata_node }} | Read kernel release"
-  ansible.builtin.command: uname -r
-  register: _kata_node_kernel
-  delegate_to: "{{ kata_node }}"
-  failed_when: false
-  changed_when: false
-
-- name: "kata_containers | {{ kata_node }} | Record CPU flags"
-  ansible.builtin.set_fact:
-    _kata_cpu_flags: "{{ ((_kata_cpu_flags_raw.stdout | default('')).split(':', 1) | last).split() }}"
-
-- name: "kata_containers | {{ kata_node }} | Load KVM kernel modules when /dev/kvm is absent"
-  community.general.modprobe:
-    name: "{{ item }}"
-    state: present
-  become: true
-  delegate_to: "{{ kata_node }}"
-  loop: "{{ ['kvm'] + _kvm_vendor_module }}"
+- name: "kata_containers | {{ kata_node }} | KVM preflight"
+  ansible.builtin.include_tasks: kvm_preflight.yaml
   vars:
-    _kvm_vendor_module: "{{ ['kvm_intel'] if 'vmx' in _kata_cpu_flags else [] }}"
-  when: not kvm_device.stat.exists
-  failed_when: false
-
-- name: "kata_containers | {{ kata_node }} | Re-check /dev/kvm after loading modules"
-  ansible.builtin.stat:
-    path: /dev/kvm
-  register: kvm_device_retry
-  delegate_to: "{{ kata_node }}"
-  when: not kvm_device.stat.exists
-
-- name: "kata_containers | {{ kata_node }} | Ensure vhost_vsock is loaded and persisted"
-  when: kvm_device.stat.exists or (kvm_device_retry.stat.exists | default(false))
-  become: true
-  delegate_to: "{{ kata_node }}"
-  block:
-    - name: "kata_containers | {{ kata_node }} | Load vhost_vsock kernel module"
-      community.general.modprobe:
-        name: vhost_vsock
-        state: present
-      failed_when: false
-
-    - name: "kata_containers | {{ kata_node }} | Persist vhost_vsock across reboots"
-      ansible.builtin.copy:
-        dest: /etc/modules-load.d/vhost_vsock.conf
-        content: "vhost_vsock\n"
-        mode: "0644"
-
-- name: "kata_containers | {{ kata_node }} | Check for /dev/vhost-vsock"
-  ansible.builtin.stat:
-    path: /dev/vhost-vsock
-  register: _kata_vsock_device
-  delegate_to: "{{ kata_node }}"
+    kvm_node: "{{ kata_node }}"
 
 # Firecracker needs devmapper; kubespray rewrites config.toml, so apply it on every run
 - name: "kata_containers | {{ kata_node }} | Set up containerd devmapper snapshotter for Firecracker"
   when:
-    - (kvm_device.stat.exists or (kvm_device_retry.stat.exists | default(false)))
+    - _kvm_result.kvm_ok | bool
     - (kata_runtime | default('kata-fc')) in ['kata-fc', 'both']
   become: true
   delegate_to: "{{ kata_node }}"
@@ -240,15 +178,15 @@
 # Firecracker on AMX CPUs needs kernel >= 5.17
 - name: "kata_containers | {{ kata_node }} | Record node capabilities"
   vars:
-    _kernel: "{{ _kata_node_kernel.stdout | default('') | trim }}"
+    _kernel: "{{ _kvm_result.kernel }}"
     _kernel_minor: "{{ _kernel | regex_search('^[0-9]+[.][0-9]+') | default('', true) }}"
-    _amx: "{{ 'amx_tile' in _kata_cpu_flags }}"
+    _amx: "{{ 'amx_tile' in _kvm_result.cpu_flags }}"
   ansible.builtin.set_fact:
     _kata_node_results: >-
       {{ _kata_node_results | default({}) | combine({kata_node: {
-           'kvm_ok': (kvm_device.stat.exists or (kvm_device_retry.stat.exists | default(false))) | bool,
+           'kvm_ok': _kvm_result.kvm_ok | bool,
            'devmapper_ok': ((devmapper_check.stdout | default('0') | trim) == '1') | bool,
-           'vsock_ok': (_kata_vsock_device.stat.exists | default(false)) | bool,
+           'vsock_ok': _kvm_result.vsock_ok | bool,
            'amx': _amx | bool,
            'kernel': _kernel if _kernel else 'unknown',
            'fc_amx_blocked': ((_amx | bool) and (_kernel_minor | length > 0)

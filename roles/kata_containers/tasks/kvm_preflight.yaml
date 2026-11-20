@@ -1,0 +1,86 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# KVM preflight (one node: kvm_node), shared by Kata and SPACE
+# Sets _kvm_result: {kvm_ok, vsock_ok, cpu_flags, kernel}
+# =============================================================================
+
+- name: "kvm_preflight | {{ kvm_node }} | Check for /dev/kvm"
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: _kvm_device
+  delegate_to: "{{ kvm_node }}"
+
+# Facts come from the installer host, so read these on the node
+- name: "kvm_preflight | {{ kvm_node }} | Read CPU flags"
+  ansible.builtin.command: grep -m1 '^flags' /proc/cpuinfo
+  register: _kvm_cpu_flags_raw
+  delegate_to: "{{ kvm_node }}"
+  failed_when: false
+  changed_when: false
+
+- name: "kvm_preflight | {{ kvm_node }} | Read kernel release"
+  ansible.builtin.command: uname -r
+  register: _kvm_node_kernel
+  delegate_to: "{{ kvm_node }}"
+  failed_when: false
+  changed_when: false
+
+- name: "kvm_preflight | {{ kvm_node }} | Record CPU flags"
+  ansible.builtin.set_fact:
+    _kvm_cpu_flags: "{{ ((_kvm_cpu_flags_raw.stdout | default('')).split(':', 1) | last).split() }}"
+
+- name: "kvm_preflight | {{ kvm_node }} | Load KVM kernel modules when /dev/kvm is absent"
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  become: true
+  delegate_to: "{{ kvm_node }}"
+  loop: "{{ ['kvm'] + _kvm_vendor_module }}"
+  vars:
+    _kvm_vendor_module: "{{ ['kvm_intel'] if 'vmx' in _kvm_cpu_flags else [] }}"
+  when: not _kvm_device.stat.exists
+  failed_when: false
+
+- name: "kvm_preflight | {{ kvm_node }} | Re-check /dev/kvm after loading modules"
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: _kvm_device_retry
+  delegate_to: "{{ kvm_node }}"
+  when: not _kvm_device.stat.exists
+
+- name: "kvm_preflight | {{ kvm_node }} | Record KVM availability"
+  ansible.builtin.set_fact:
+    _kvm_ok: "{{ (_kvm_device.stat.exists or (_kvm_device_retry.stat.exists | default(false))) | bool }}"
+
+- name: "kvm_preflight | {{ kvm_node }} | Ensure vhost_vsock is loaded and persisted"
+  when: _kvm_ok | bool
+  become: true
+  delegate_to: "{{ kvm_node }}"
+  block:
+    - name: "kvm_preflight | {{ kvm_node }} | Load vhost_vsock kernel module"
+      community.general.modprobe:
+        name: vhost_vsock
+        state: present
+      failed_when: false
+
+    - name: "kvm_preflight | {{ kvm_node }} | Persist vhost_vsock across reboots"
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/vhost_vsock.conf
+        content: "vhost_vsock\n"
+        mode: "0644"
+
+- name: "kvm_preflight | {{ kvm_node }} | Check for /dev/vhost-vsock"
+  ansible.builtin.stat:
+    path: /dev/vhost-vsock
+  register: _kvm_vsock_device
+  delegate_to: "{{ kvm_node }}"
+
+- name: "kvm_preflight | {{ kvm_node }} | Record KVM preflight result"
+  ansible.builtin.set_fact:
+    _kvm_result:
+      kvm_ok: "{{ _kvm_ok | bool }}"
+      vsock_ok: "{{ (_kvm_vsock_device.stat.exists | default(false)) | bool }}"
+      cpu_flags: "{{ _kvm_cpu_flags }}"
+      kernel: "{{ _kvm_node_kernel.stdout | default('') | trim }}"
