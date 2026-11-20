@@ -51,7 +51,7 @@ The workflow is always: **edit `nodes.yaml`, then run the action**. The installe
 | Star racks (`topology: star`) | The spokes reach each other through the hub, so a spoke added or removed changes the hub's fabric and every spoke's routes. Both refuse a star rack before doing anything |
 | On a rack: control-plane, etcd or storage nodes, and an edit that changes the nodes that stay | See [Rack-scale](#rack-scale) |
 | `add-node` with `storage_backend: local-path`, or `custom` with `storage_custom_rwx: false` | Both serve a single node: the storage check refuses them on more than one, so every later install, validate and teardown would stop. `add-node` refuses them up front; move the env to NFS or Ceph first |
-| Per-node setup of other components on a new node | `add-node` runs only the kubernetes component (plus NFS exports and NRI balloons; on a rack also the node's fabric, BGP peers, labels and GPU stack, see [Rack-scale](#rack-scale)). A new node is not made a Ceph OSD node, does not get NetApp Trident's NFS client packages, and is not marked eligible for Kata. Re-run `install` for `rook_ceph_storage`, `netapp_trident_csi` or `kata_containers` if the new node needs them |
+| Per-node setup of other components on a new node | `add-node` runs only the kubernetes component (plus NFS exports and NRI balloons; on a rack also the node's fabric, BGP peers, labels and GPU stack, see [Rack-scale](#rack-scale)). A new node is not made a Ceph OSD node, does not get NetApp Trident's NFS client packages, and is not marked eligible for Kata or SPACE. Re-run `install` for `rook_ceph_storage`, `netapp_trident_csi`, `kata_containers` or `space_node` if the new node needs them |
 
 
 ## Adding worker nodes

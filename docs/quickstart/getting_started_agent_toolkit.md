@@ -56,6 +56,7 @@ curl -sk https://litellm.$DOMAIN/v1/models -H "Authorization: Bearer $MK"
 | Agent Sandbox (warm pools, sandbox router) | on | `agent_sandbox_enabled` |
 | Kata microVM sandboxes | off | `kata_containers_enabled`, `kata_runtime` in `global_config.yaml` |
 | OpenShell | off | `openshell_enabled` |
+| SPACE microVM sandboxes (evaluation, needs KVM workers) | off | `space_enabled` |
 | KubeRay | off | `kuberay_enabled` |
 | vLLM Semantic Router | off | `vllm_sr_enabled` in `config.inference.yaml` |
 

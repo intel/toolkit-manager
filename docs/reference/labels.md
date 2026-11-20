@@ -93,6 +93,7 @@ The namespaces below only exist once `install erag` has run. They are not create
 | `metallb-system` | MetalLB L2 speaker uses raw ARP sockets at host level — not a mesh participant. |
 | `system` (GMC) | Internal pipeline orchestration; east-west mTLS not required between co-located components. |
 | `nri-balloons-controller` | Host-level CPU pinning daemon; not a service mesh participant. |
+| `sandboxes` (SPACE) | SPACE sandbox pods (Firecracker microVMs); the upstream sandbox NetworkPolicy must apply, so they stay outside the mesh. The `space` control plane is ambient with a PERMISSIVE policy for its host-network node services. |
 
 ---
 

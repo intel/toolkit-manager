@@ -450,6 +450,31 @@ install stops there. Teardown removes the kata-deploy release and the node
 label; the thin-pool unit, the containerd config entry and the `vhost_vsock`
 module entry stay on the nodes.
 
+## SPACE nodes
+
+Host preparation for the agent toolkit's optional SPACE sandboxes
+(Firecracker microVMs, evaluation only; see the toolkit's `docs/space.md`).
+The `space_node` infrastructure component runs when `space_enabled: true` is
+set in `config.agent-toolkit.yaml`. It is independent of Kata, and the two
+can share nodes.
+
+| Setting | Default | Description |
+|---|---|---|
+| `space_enabled` | `false` | In `config.agent-toolkit.yaml`. Prepares the workers (`space_node`) and installs SPACE (`space`) |
+| `space_cache_size_gb` | `100` | Virtual size of each worker's sparse btrfs `/space/cache` image |
+
+On every worker, `space_node`:
+- checks `/dev/kvm` and `/dev/vhost-vsock`, as for Kata;
+- installs `btrfs-progs`;
+- runs SPACE's node layer as systemd units: the `/space` layout and the btrfs cache;
+- stages Firecracker;
+- adds a `space runtime (managed)` block to the containerd config, re-applied on every install.
+
+Workers that pass are labelled `node.kubernetes.io/space-enabled=true`. Like
+Kata, `space_node` is not supported on a BYO cluster or on OpenShift. Teardown
+removes the RuntimeClass, the PriorityClasses and the labels, and leaves the host
+setup in place.
+
 ---
 
 ## Version pinning
