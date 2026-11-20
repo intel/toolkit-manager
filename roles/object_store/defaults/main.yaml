@@ -29,7 +29,7 @@ object_store_endpoint: ""           # e.g. http://telemetry-seaweedfs-s3.monitor
 #
 # The Secret holds the endpoint and one key pair per consumer:
 #   endpoint, <consumer>AccessKey, <consumer>SecretKey
-#   (e.g. lokiAccessKey/lokiSecretKey, langfuseAccessKey/langfuseSecretKey)
+#   (e.g. lokiAccessKey/lokiSecretKey, langfuseAccessKey/langfuseSecretKey, spaceAccessKey/spaceSecretKey)
 object_store_namespace: "monitoring"
 object_store_credentials_secret: "object-store-credentials"  # checkov:skip=CKV_SECRET_6: Secret name, not a value
 
@@ -57,6 +57,14 @@ object_store_langfuse_secret_key: ""
 object_store_langfuse_buckets:
   - langfuse
 
+# SPACE (sandbox snapshots + template artifacts). Registered even when SPACE is
+# disabled, as for Langfuse.
+object_store_space_access_key: "space"
+object_store_space_secret_key: ""
+object_store_space_buckets:
+  - space-snapshots
+  - space-templates
+
 # =============================================================================
 # Consumer registry — read by the active backend to create users + buckets.
 # Add a new consumer by appending an entry here. No changes to the backend
@@ -77,3 +85,8 @@ object_store_consumers:
     access_key: "{{ object_store_langfuse_access_key }}"
     secret_key: "{{ object_store_langfuse_secret_key }}"
     buckets: "{{ object_store_langfuse_buckets }}"
+
+  - name: space
+    access_key: "{{ object_store_space_access_key }}"
+    secret_key: "{{ object_store_space_secret_key }}"
+    buckets: "{{ object_store_space_buckets }}"

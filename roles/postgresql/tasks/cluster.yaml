@@ -137,6 +137,9 @@
                 '{{ item.resources[0].data.password | b64decode }}');
             END IF;
           END $$;
+          {% if item.item.createrole | default(false) | bool %}
+          ALTER USER "{{ item.item.user }}" CREATEROLE;
+          {% endif %}
   loop: "{{ _pg_cred_secrets.results }}"
   loop_control:
     label: "{{ item.item.name }}"
@@ -212,6 +215,7 @@
           {{ item.item.user }}
           {{ postgresql_admin_user }}
           {{ item.resources[0].data.password }}
+          {{ 'createrole' if item.item.createrole | default(false) | bool else '' }}
       loop: "{{ _pg_cred_secrets.results }}"
       loop_control:
         label: "{{ item.item.name }}"
@@ -292,7 +296,9 @@
   loop: "{{ __postgresql_consumer_databases | default(__postgresql_effective_databases) }}"
   loop_control:
     label: "{{ item.target_namespace | default(item.name) }}"
-  when: istio_enabled | default(false) | bool
+  when:
+    - istio_enabled | default(false) | bool
+    - item.namespace_labels | default(true) | bool
 
 - name: "postgresql | Label consumer namespaces — PSS"
   kubernetes.core.k8s:
@@ -306,7 +312,9 @@
           pod-security.kubernetes.io/enforce: "restricted"
           pod-security.kubernetes.io/audit: "restricted"
           pod-security.kubernetes.io/warn: "restricted"
-  when: _postgresql_pss_labels | bool
+  when:
+    - _postgresql_pss_labels | bool
+    - item.namespace_labels | default(true) | bool
   loop: "{{ __postgresql_consumer_databases | default(__postgresql_effective_databases) }}"
   loop_control:
     label: "{{ item.target_namespace | default(item.name) }}"
