@@ -164,7 +164,8 @@
     - istio_enabled | default(false) | bool
 
 # With a NetworkPolicy the controller admits only its out-of-mesh callers' ports, from
-# their namespaces. Meshed traffic arrives on HBONE (15008). An existing controller
+# their namespaces. Meshed traffic arrives on HBONE (15008) and the kubelet's probes on
+# _envoy_gateway_ctrl_probe_ports, both from any source. An existing controller
 # keeps the policies its owner gave it.
 - name: "envoy_gateway | Admit only the controller's out-of-mesh callers"
   kubernetes.core.k8s:
@@ -181,7 +182,11 @@
             control-plane: envoy-gateway
         policyTypes: [Ingress]
         ingress: >-
-          {%- set out = [{'ports': [{'port': 15008, 'protocol': 'TCP'}]}] -%}
+          {%- set any = [] -%}
+          {%- for p in [15008] + _envoy_gateway_ctrl_probe_ports -%}
+          {%- set _ = any.append({'port': p, 'protocol': 'TCP'}) -%}
+          {%- endfor -%}
+          {%- set out = [{'ports': any}] -%}
           {%- for c in _envoy_gateway_ctrl_out_of_mesh -%}
           {%- set _ = out.append({'from': [{'namespaceSelector': {'matchLabels': c.namespace_labels}}],
                                   'ports': [{'port': c.port, 'protocol': 'TCP'}]}) -%}

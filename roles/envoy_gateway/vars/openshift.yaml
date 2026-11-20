@@ -24,3 +24,6 @@ _envoy_gateway_ctrl_out_of_mesh:
   - {port: 9443, namespace_labels: {policy-group.network.openshift.io/host-network: ""}}
   - {port: 19001, namespace_labels: {network.openshift.io/policy-group: monitoring}}
 _envoy_gateway_ctrl_network_policy: true
+# The kubelet's probes. ztunnel lets them in as plain TCP and refuses anything else
+# that is not mTLS, so the NetworkPolicy admits these ports from any source.
+_envoy_gateway_ctrl_probe_ports: [8081]

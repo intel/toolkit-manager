@@ -19,3 +19,4 @@ _envoy_gateway_pss_labels: "{{ enforce_pss | default(false) | bool }}"
 _envoy_gateway_ctrl_out_of_mesh:
   - {port: 9443}
 _envoy_gateway_ctrl_network_policy: false
+_envoy_gateway_ctrl_probe_ports: []

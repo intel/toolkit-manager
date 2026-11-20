@@ -53,8 +53,8 @@
 
 # The marketplace operator, outside the mesh, polls each instance's status port (8000);
 # under STRICT ztunnel refuses it and the Cluster never becomes ready. Only that port
-# accepts plain TCP, and the NetworkPolicy lets in only the operator's namespace.
-# Meshed traffic arrives on HBONE (15008).
+# accepts plain TCP, and the NetworkPolicy lets in only the operator's namespace and
+# the kubelet's probes, which call the same port. Meshed traffic arrives on HBONE (15008).
 - name: "postgresql | Open the instance status port to the marketplace operator"
   kubernetes.core.k8s:
     state: present
@@ -79,7 +79,9 @@
         policyTypes: [Ingress]
         ingress:
           - ports: [{port: 15008, protocol: TCP}]
-          - from: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: "{{ cnpg_olm_namespace }}"}}}]
+          - from:
+              - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: "{{ cnpg_olm_namespace }}"}}
+              - ipBlock: {cidr: "{{ _postgresql_probe_address }}"}
             ports: [{port: 8000, protocol: TCP}]
   loop_control:
     label: "{{ item.kind }}/{{ item.metadata.name }}"

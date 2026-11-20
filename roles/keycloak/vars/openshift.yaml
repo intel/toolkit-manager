@@ -7,7 +7,10 @@ _keycloak_pss_labels: false
 _keycloak_from_olm: true
 # Out-of-mesh callers the STRICT mesh must let in, port by port: Authorino (Red Hat
 # Connectivity Link) reads the inference realm's keys, the user-workload Prometheus
-# scrapes the management port.
+# scrapes the management port. `probed`: the kubelet's probes call the port too.
 _keycloak_out_of_mesh_callers:
   - {port: 8080, namespace_labels: {kubernetes.io/metadata.name: "{{ keycloak_authorino_namespace }}"}}
-  - {port: 9000, namespace_labels: {network.openshift.io/policy-group: monitoring}}
+  - {port: 9000, namespace_labels: {network.openshift.io/policy-group: monitoring}, probed: true}
+# Istio's fixed source address for the kubelet's probes: istio-cni SNATs them to it
+# on the node, so they reach the pod from this address, not the node's.
+_keycloak_probe_address: 169.254.7.127/32

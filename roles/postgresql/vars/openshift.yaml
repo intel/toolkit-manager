@@ -3,3 +3,6 @@
 _postgresql_pss_labels: false
 # CNPG operator installed by the admin from OperatorHub (OLM): the role checks it.
 _postgresql_from_olm: true
+# Istio's fixed source address for the kubelet's probes: istio-cni SNATs them to it
+# on the node. The instances' probes call the status port (8000), so it admits them.
+_postgresql_probe_address: 169.254.7.127/32
