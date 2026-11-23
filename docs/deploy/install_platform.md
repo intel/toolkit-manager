@@ -12,12 +12,29 @@ The installer sets up these layers automatically, in dependency order:
 
 ```
 1. Infrastructure                — Kubernetes (via Kubespray), storage (local-path / NFS / Ceph)
-2. Platform                      — NRI CPU Balloons, cert-manager, Istio, MetalLB, Envoy Gateway, PostgreSQL, Keycloak, SeaweedFS, Observability
+2. Platform                      — Node Feature Discovery, NRI CPU Balloons, Intel GPU device plugin (only on nodes with an
+                                   Intel GPU), cert-manager, Istio, MetalLB, Envoy Gateway, PostgreSQL, Keycloak, SeaweedFS, Observability
 3. Intel® Inference Toolkit     — components from the ext inference repo (KServe, LiteLLM, vLLM, etc.)
 4. Intel® Chatbot Toolkit   — opt-in (vector DB, ingestion, chat, UI) — requires init erag + install erag
 ```
 
 You run **one command** and everything is installed.
+
+**Intel GPUs (Arc Pro B-Series / B70 and other Xe GPUs).** The `intel_gpu_plugin` platform
+component installs the [Intel GPU device plugin](https://github.com/intel/intel-device-plugins-for-kubernetes)
+(v0.37.1) when Node Feature Discovery labels a node with an Intel GPU
+(`feature.node.kubernetes.io/pci-0300_8086.present` or `pci-0380_8086.present`). It runs
+only on those nodes (in its own `intel-gpu-plugin` namespace, tolerating their taints), waits until they advertise
+`gpu.intel.com/xe`, and is skipped on CPU-only clusters — so the inference layer's GPU runtimes
+(SGLang, vLLM XPU) can schedule right after. Set `intel_gpu_plugin_enabled: false` to turn it off.
+
+- It waits for NFD only on the nodes its worker runs on, so tainted control-plane nodes add no delay.
+- A plugin already installed in another namespace (by hand or through the Intel Device Plugins
+  Operator) stops the install: two plugins on one node fight over the kubelet's socket.
+- The GPU runtimes request `gpu.intel.com/xe`. A node that advertises only `gpu.intel.com/i915`,
+  or nothing (an integrated GPU, no driver), gets a warning at install and fails `validate`.
+- No driver install is involved: the `xe` kernel driver is in the Linux kernel, and the
+  userspace stack ships in the model runtime's image.
 
 ---
 
@@ -29,7 +46,7 @@ You run **one command** and everything is installed.
 - Internet access (proxy is fine — see Step 2)
 - Python 3.11+ (installer will check and install if needed)
 
-**Tooling installed by `configure`.** `./es_auto_installer.sh configure`
+**Tooling installed by `configure`.** `./toolkit_manager.sh configure`
 installs these pinned versions into `/usr/local/bin` (and skips any that are
 already present). You can install them manually instead:
 
@@ -66,10 +83,10 @@ git clone https://github.com/intel/enterprise-ai-solutions.git
 cd enterprise-ai-solutions
 
 # Configure your machine (installs Python 3.11+, yq, kubectl, helm, sets up venv)
-./es_auto_installer.sh configure
+./toolkit_manager.sh configure
 
 # Create a new environment named "local" for inference
-./es_auto_installer.sh init inference
+./toolkit_manager.sh init inference
 ```
 
 This creates an environment at `env/local/` with:
@@ -128,7 +145,7 @@ Everything runs on one machine. No SSH setup needed.
 **Install:**
 
 ```bash
-./es_auto_installer.sh install inference --env local
+./toolkit_manager.sh install inference --env local
 ```
 
 Wait 15–20 minutes. When it finishes, check:
@@ -312,7 +329,7 @@ all:
 #### B.3 — Install
 
 ```bash
-./es_auto_installer.sh install inference --env local
+./toolkit_manager.sh install inference --env local
 ```
 
 Wait 15–25 minutes. When done:
@@ -347,8 +364,8 @@ git clone https://github.com/intel/enterprise-ai-solutions.git
 cd enterprise-ai-solutions
 
 # Configure machine and create environment
-./es_auto_installer.sh configure
-./es_auto_installer.sh init inference
+./toolkit_manager.sh configure
+./toolkit_manager.sh init inference
 
 # Create SSH key and copy to all cluster machines
 ssh-keygen -t ed25519 -f ~/.ssh/cluster_key -N ""
@@ -408,13 +425,13 @@ Most of the time you won't need this — only if there's a double-hop.
 **With a double hop, the bastion must still reach the API server** at `https://<control-plane-ip>:6443`: after Kubespray, the installer checks the cluster and applies the node labels from the bastion. If it reaches the nodes only through the extra jump host, Kubespray succeeds over SSH, that check times out, and a re-run sees a live cluster and skips the post-install phase. Forward the API port through the jump host, point `env/local/kubeconfig.yaml` at the forwarded port, and run the post-install phase on its own:
 
 ```bash
-./es_auto_installer.sh install --env local kubernetes --only -- -e _kubespray_skip_cluster_yml=true
+./toolkit_manager.sh install --env local kubernetes --only -- -e _kubespray_skip_cluster_yml=true
 ```
 
 #### C.3 — Install
 
 ```bash
-./es_auto_installer.sh install inference --env local
+./toolkit_manager.sh install inference --env local
 ```
 
 #### C.4 — Get kubectl working on the bastion
@@ -447,7 +464,7 @@ kubectl get pods -A
 Or use the built-in validate command:
 
 ```bash
-./es_auto_installer.sh validate inference --env local
+./toolkit_manager.sh validate inference --env local
 ```
 
 ---
@@ -500,7 +517,7 @@ Already have a running cluster and want to add workers? Easy.
 3. Re-run the installer — it detects new nodes and adds them:
 
    ```bash
-   ./es_auto_installer.sh install inference --env local
+   ./toolkit_manager.sh install inference --env local
    ```
 
 The installer is idempotent. Existing nodes are untouched; only new machines are provisioned.
@@ -511,11 +528,11 @@ The installer is idempotent. Existing nodes are untouched; only new machines are
 
 ```bash
 # Remove the full stack (infrastructure + platform + inference)
-./es_auto_installer.sh teardown infrastructure --env local
+./toolkit_manager.sh teardown infrastructure --env local
 
 # Remove just one component
-./es_auto_installer.sh teardown llm_services --env local
-./es_auto_installer.sh teardown kserve --env local
+./toolkit_manager.sh teardown llm_services --env local
+./toolkit_manager.sh teardown kserve --env local
 ```
 
 ---
@@ -543,7 +560,7 @@ tail -50 env/local/logs/install.log
 Then just re-run — the installer is safe to run multiple times:
 
 ```bash
-./es_auto_installer.sh install inference --env local
+./toolkit_manager.sh install inference --env local
 ```
 
 ### Pods stuck in "ImagePullBackOff"
@@ -555,7 +572,7 @@ This usually means the proxy settings are wrong. Double-check `http_proxy` and `
 If you want to install only a specific component without pulling its entire layer dependency chain:
 
 ```bash
-./es_auto_installer.sh install metallb --env local --only
+./toolkit_manager.sh install metallb --env local --only
 ```
 
 This runs only the named target without traversing the dependency tree.
@@ -563,7 +580,7 @@ This runs only the named target without traversing the dependency tree.
 ### Pass Ansible flags for more details
 
 ```bash
-./es_auto_installer.sh install inference --env local -- -vvv
+./toolkit_manager.sh install inference --env local -- -vvv
 ```
 
 The `--` separates installer flags from Ansible flags.
@@ -588,7 +605,7 @@ Each environment is isolated. Always specify `--env <name>` and use the correct 
 ```bash
 # For environment "prod"
 export KUBECONFIG=$(pwd)/env/prod/kubeconfig.yaml
-./es_auto_installer.sh install inference --env prod
+./toolkit_manager.sh install inference --env prod
 ```
 
 ---
@@ -609,19 +626,19 @@ env/<name>/logs/validate-all-20260817-151500.log
 
 ```bash
 # Environment setup
-./es_auto_installer.sh configure                          # one-time machine prep
-./es_auto_installer.sh init <layer> --env <name>          # create new environment (layer: inference or erag)
-./es_auto_installer.sh show                               # list layers/components
+./toolkit_manager.sh configure                          # one-time machine prep
+./toolkit_manager.sh init <layer> --env <name>          # create new environment (layer: inference or erag)
+./toolkit_manager.sh show                               # list layers/components
 
 # Installation
-./es_auto_installer.sh install inference --env <name>           # install infrastructure + platform + inference
-./es_auto_installer.sh install kubernetes --env <name>          # install just Kubernetes
-./es_auto_installer.sh install metallb --env <name> --only      # single component, skip deps
-./es_auto_installer.sh install inference --env <name> -- -vvv   # pass Ansible flags
+./toolkit_manager.sh install inference --env <name>           # install infrastructure + platform + inference
+./toolkit_manager.sh install kubernetes --env <name>          # install just Kubernetes
+./toolkit_manager.sh install metallb --env <name> --only      # single component, skip deps
+./toolkit_manager.sh install inference --env <name> -- -vvv   # pass Ansible flags
 
 # Operations
-./es_auto_installer.sh validate inference --env <name>  # check health
-./es_auto_installer.sh teardown infrastructure --env <name>  # remove everything
+./toolkit_manager.sh validate inference --env <name>  # check health
+./toolkit_manager.sh teardown infrastructure --env <name>  # remove everything
 
 # Kubeconfig
 export KUBECONFIG=$(pwd)/env/<name>/kubeconfig.yaml
@@ -991,8 +1008,8 @@ Intel® Chatbot Toolkit adds document ingestion, vector search, RAG pipelines, a
 **Quick path:**
 
 ```bash
-./es_auto_installer.sh init erag --env <name>
-./es_auto_installer.sh install erag --env <name>
+./toolkit_manager.sh init erag --env <name>
+./toolkit_manager.sh install erag --env <name>
 ```
 
 The `init erag` command clones the inference and Intel® Chatbot Toolkit repositories (dependencies first), seeds `env/<name>/config.erag.yaml` from the selected pipeline flavour (default: `chatqna`), and records the provisioned layer in `env/<name>/.solutions.yaml`. The `install erag` command automatically pulls all dependencies (infrastructure → platform → inference) if not already deployed, then installs the RAG application layer.
