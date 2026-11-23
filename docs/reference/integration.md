@@ -23,7 +23,7 @@ The stack is built on open standards. Anything that speaks them works:
 | **Bearer token auth** | Keycloak OIDC JWT (`auth_type: jwt`) or LiteLLM keys (`auth_type: litellm_vkey`) | A standard `Authorization: Bearer <token>` header works with any HTTP client |
 | **Gateway API + Kubernetes CRDs** | Envoy Gateway, KServe, cert-manager, Istio ambient | Add models, routes and policies declaratively, with no stack edits |
 
-`auth_type` is set in `env/<env>/config.inference.yaml`. See [Accessing Models](../../ext/enterprise.ai-inference/docs/deploy/accessing_models.md) in the inference repo for both modes in full.
+`auth_type` is set in `env/<env>/config.inference.yaml`. See [Accessing Models](https://github.com/intel/inference-toolkit/blob/main/docs/getting-started/accessing-models.md) in the inference repo for both modes in full.
 
 ---
 
@@ -58,7 +58,7 @@ TOKEN=$(kubectl get secret litellm-master-key -n litellm \
   -o jsonpath='{.data.master_key}' | base64 -d)
 ```
 
-To create a scoped virtual key (its own models, budget and expiry), see [Virtual keys](../../ext/enterprise.ai-inference/docs/deploy/accessing_models.md#virtual-keys).
+To create a scoped virtual key (its own models, budget and expiry), see [Virtual keys](https://github.com/intel/inference-toolkit/blob/main/docs/getting-started/accessing-models.md#virtual-keys).
 
 #### With `auth_type=jwt` (default)
 

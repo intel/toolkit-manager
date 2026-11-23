@@ -280,7 +280,7 @@ oc whoami && oc get dsc                       # sanity check: right cluster, Ope
 ./toolkit_manager.sh install platform --env ocp
 ```
 
-The inference layer (`install inference`) is described in the [inference layer on OpenShift](../../ext/enterprise.ai-inference/docs/deploy/openshift.md).
+The inference layer (`install inference`) is described in the [inference layer on OpenShift](https://github.com/intel/inference-toolkit/blob/main/docs/deployment/openshift.md).
 
 **What the installer deploys on OpenShift.** Everything it creates gets the ownership labels. In the platform layer it deploys:
 

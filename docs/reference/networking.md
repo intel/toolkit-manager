@@ -218,7 +218,7 @@ In `litellm_vkey` mode `inference.<domain>` is not published at all (requests th
 
 **KServe** runs each model as its own workload in the `llm-inference` namespace. For an `LLMInferenceService` the AI gateway's backend is an `InferencePool`: a scheduler picks the least-loaded replica. Other models are reached through their Service on port 8000.
 
-For every resource name and the full detail, see the inference repo's request flow guide (after `init`: `ext/enterprise.ai-inference/docs/reference/request_flow.md`) and its [Accessing Models](../../ext/enterprise.ai-inference/docs/deploy/accessing_models.md) guide.
+For every resource name and the full detail, see the inference repo's [request flow guide](https://github.com/intel/inference-toolkit/blob/main/docs/reference/request-flow.md) and its [Accessing Models](https://github.com/intel/inference-toolkit/blob/main/docs/getting-started/accessing-models.md) guide.
 
 ---
 
