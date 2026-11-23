@@ -21,6 +21,8 @@ A production AI stack needs more than a model endpoint: LLM inference, RAG and a
 
 Toolkit Manager wires these together in a pre-integrated, customizable Kubernetes stack optimized for Intel® platforms. One installer, `toolkit_manager.sh`, takes bare-metal machines through Kubernetes, platform services, model serving and the AI gateway, and ends with secured, OpenAI-compatible endpoints. Start with the defaults, then configure or extend as needed.
 
+> Want the full picture? See [Meet Toolkit Manager](docs/overview/meet.md) and [Architecture](docs/reference/architecture.md).
+
 ## Architecture
 
 The stack is built in **layers**, each on top of the one before. You pick a **target** (the top layer you want), and the installer adds every layer below it for you.
@@ -41,6 +43,8 @@ The stack is built in **layers**, each on top of the one before. You pick a **ta
 <p align="center">
   <img src="docs/assets/toolkit-manager-architecture.png" alt="Toolkit Manager architecture: Toolkit Manager is the core repository and one installer (git clone, then the installer, then the solutions). It auto-deploys a platform with inference, RAG, and agents. Four blocks stack upward: Infrastructure (Kubernetes, Intel infrastructure, OS and drivers, bring-your-own cluster) at the base; Platform (gateway, auth, routing, observability, serving, storage) builds on infrastructure; Model Inference (Intel® Inference Toolkit and Intel® Inference Microservices) builds on the platform; Solutions requires inference. The solutions are Chatbot/RAG (Intel® Chatbot Toolkit) and Agents (Intel® Agent Toolkit)." />
 </p>
+
+> See the [Architecture deep-dive](docs/reference/architecture.md) for the full component list, execution flow, and cross-repo layering.
 
 ---
 
@@ -251,5 +255,17 @@ Everything beyond the Quick Start, grouped by task. The [Documentation Index](do
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
+
+## Links
+
+- [Documentation Index](docs/README.md)
+- [GitHub Repository](https://github.com/intel/toolkit-manager)
+- [Intel® Inference Toolkit](https://github.com/intel/inference-toolkit)
+- [Intel® Chatbot Toolkit](https://github.com/intel/chatbot-toolkit)
+- [Intel® Agent Toolkit](https://github.com/intel/agent-toolkit)
+- [Meet Toolkit Manager](docs/overview/meet.md)
+- [Architecture](docs/reference/architecture.md)
+
+---
 
 *Intel® and Intel® Arc™ are registered trademarks of Intel Corporation or its subsidiaries.*
