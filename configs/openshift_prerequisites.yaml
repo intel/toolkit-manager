@@ -247,4 +247,6 @@ openshift_prerequisites:
     package: grafana-operator
     channel: v5
     version: "5.25.0"
+    # Watches only its own namespace, so it is in the mesh with the Grafana it configures.
+    namespace: "{{ observability_namespace | default('monitoring') }}"
     apis: [grafana.integreatly.org/v1beta1]

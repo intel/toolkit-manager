@@ -22,9 +22,10 @@
     - object_store_namespace == observability_namespace
     - "'seaweedfs' not in (_active_components | default([]) | map(attribute='name'))"
 
-- name: "observability | Keep the namespace for the telemetry SeaweedFS"
+# On OpenShift the admin's Grafana Operator lives in the namespace: it stays too.
+- name: "observability | Keep the namespace for the telemetry SeaweedFS or the Grafana Operator"
   ansible.builtin.set_fact:
-    _obs_keep_namespace: "{{ _obs_td_object_store.resources | default([]) | length > 0 }}"
+    _obs_keep_namespace: "{{ _observability_from_olm | bool or _obs_td_object_store.resources | default([]) | length > 0 }}"
 
 - name: "observability | Check if any release exists"
   kubernetes.core.helm_info:
@@ -331,7 +332,7 @@
 
     - name: "observability | Keep the namespace"
       ansible.builtin.debug:
-        msg: "Namespace {{ observability_namespace }} stays: the telemetry SeaweedFS in it is still used."
+        msg: "Namespace {{ observability_namespace }} stays: {{ 'the Grafana Operator is installed in it' if _observability_from_olm | bool else 'the telemetry SeaweedFS in it is still used' }}."
       when: _obs_keep_namespace | bool
 
     - name: "observability | Delete namespace"

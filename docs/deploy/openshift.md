@@ -92,7 +92,7 @@ The guide's prerequisites include OVN-Kubernetes in local gateway mode (`routing
 oc get network.operator cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}'   # true
 ```
 
-Enforce mTLS across the whole mesh with the `PeerAuthentication` from [Enabling strict mTLS across the whole service mesh](https://docs.redhat.com/en/documentation/red_hat_openshift_service_mesh/3.4/html/installing/ossm-enabling-mtls#ossm-enabling-strict-mtls-whole-service-mesh_ossm-enabling-mtls), as the installer does on Kubernetes. The guide's `DestinationRule` for the API server applies to sidecars only; ambient mode does not need it. Callers outside the mesh still reach the meshed workloads they need: the API server calls the admission webhooks (9443), the user-workload Prometheus scrapes the metrics ports, the Grafana Operator configures Grafana (3000), Connectivity Link's Authorino reads Keycloak's keys (8080), and the CloudNativePG operator reads the database instances' status (8000). For each, the installer accepts plain TCP on that port only, from any source. SeaweedFS S3 (8333) also accepts plain TCP from any pod: istio-cni captures a pod only once it runs, and Tempo exits on its first refused object-store call, before it is captured.
+Enforce mTLS across the whole mesh with the `PeerAuthentication` from [Enabling strict mTLS across the whole service mesh](https://docs.redhat.com/en/documentation/red_hat_openshift_service_mesh/3.4/html/installing/ossm-enabling-mtls#ossm-enabling-strict-mtls-whole-service-mesh_ossm-enabling-mtls), as the installer does on Kubernetes. The guide's `DestinationRule` for the API server applies to sidecars only; ambient mode does not need it. Callers outside the mesh still reach the meshed workloads they need: the API server calls the admission webhooks (9443), the user-workload Prometheus scrapes the metrics ports, Connectivity Link's Authorino reads Keycloak's keys (8080), and the CloudNativePG operator reads the database instances' status (8000). For each, the installer accepts plain TCP on that port only, from any source. SeaweedFS S3 (8333) also accepts plain TCP from any pod: istio-cni captures a pod only once it runs, and Tempo exits on its first refused object-store call, before it is captured.
 
 ```bash
 oc get peerauthentication default -n istio-system -o jsonpath='{.spec.mtls.mode}'   # STRICT
@@ -197,7 +197,9 @@ Install the Loki, Logging, Tempo, OpenTelemetry and Grafana operators in all nam
 | Red Hat OpenShift Logging | `cluster-logging` | `openshift-logging` |
 | Tempo Operator | `tempo-product` | `openshift-tempo-operator` |
 | Red Hat build of OpenTelemetry | `opentelemetry-product` | `openshift-opentelemetry-operator` |
-| Grafana Operator | `grafana-operator` (community-operators) | `openshift-operators` |
+| Grafana Operator | `grafana-operator` (community-operators) | `monitoring`, for this namespace only (OwnNamespace) |
+
+Install the Grafana Operator **into `monitoring`**, the namespace where the installer creates Grafana (`observability_namespace`), watching only that namespace. It then runs in the mesh with Grafana, so it reaches Grafana under STRICT mTLS without an exception. Preflight fails if it is installed anywhere else. Teardown leaves the namespace and the operator in place. To manage Grafana instances in other namespaces, install a second copy of the operator.
 
 Do **not** create a `LokiStack`, `ClusterLogForwarder`, `TempoMonolithic`, `OpenTelemetryCollector` or `Grafana`: the installer creates its own instances in `monitoring`, and leaves any the cluster already has alone. The Logging console plugin (the Cluster Observability Operator's `UIPlugin`) is not needed.
 
@@ -326,7 +328,7 @@ On OpenShift, `install` and `validate` check the [Prerequisites](#prerequisites)
 | What | Passes when |
 |---|---|
 | OpenShift | `ClusterVersion` is at least the tested 4.22 |
-| Operator | its Subscription (or OLM v1 `ClusterExtension`) has an installed CSV that is `Succeeded`, at least the tested version, and in the required namespace (`keycloak` for RHBK) |
+| Operator | its Subscription (or OLM v1 `ClusterExtension`) has an installed CSV that is `Succeeded`, at least the tested version, and in the required namespace (`keycloak` for RHBK, `monitoring` for the Grafana Operator) |
 | APIs | the cluster serves the operator's group/versions, for example `gateway.networking.k8s.io/v1` |
 | Instances | `Istio`/`IstioCNI`/`ZTunnel` `default` Ready, a `NodeFeatureDiscovery` Available, `LeaderWorkerSetOperator` `cluster` Available, a `Kuadrant` Ready, a `DataScienceCluster` with phase `Ready`, KServe `Managed` and `KserveLLMInferenceServiceDependencies=True`, and the `user-workload` `Prometheus` Available (it exists only with `enableUserWorkload: true`) |
 | Storage | exactly one default StorageClass, or the `storage_custom_storageclass` exists when `storage_backend: custom` |
