@@ -4,7 +4,7 @@ The technical documentation for deploying and operating the platform. Start with
 **Meet** for the what and why, **Get started** to stand it up, use the **Deploy**
 guides to take it further, then configure and look things up as needed.
 
-> Looking for the three-step quick start? It's in the [project README](../README.md#quick-start).
+> Looking for the quick start? The [project README](../README.md#quick-start) walks through installing each layer on one machine.
 
 ## Meet
 

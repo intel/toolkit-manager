@@ -2,23 +2,25 @@
 
 [← Docs Index](../README.md)
 
-This guide walks you through installing Toolkit Manager on-premises, step by step, from bare metal to a running self-hosted AI stack. No Kubernetes experience needed.
+This guide walks you through installing Toolkit Manager on your own machines, step by step, from plain servers to a running self-hosted AI stack. No Kubernetes experience needed.
 
 ---
 
 ## What Gets Installed
 
-The installer sets up these layers automatically, in dependency order:
+The installer sets up these layers automatically, each on top of the one before:
 
 ```
-1. Infrastructure                — Kubernetes (via Kubespray), storage (local-path / NFS / Ceph)
-2. Platform                      — Node Feature Discovery, NRI CPU Balloons, Intel GPU device plugin (only on nodes with an
-                                   Intel GPU), cert-manager, Istio, MetalLB, Envoy Gateway, PostgreSQL, Keycloak, SeaweedFS, Observability
-3. Intel® Inference Toolkit     — components from the ext inference repo (KServe, LiteLLM, vLLM, etc.)
+1. Infrastructure                — Kubernetes (built with Kubespray), storage (local-path / NFS / Ceph / NetApp)
+2. Platform                      — cert-manager, Istio, MetalLB, Envoy Gateway, PostgreSQL, Keycloak, SeaweedFS, Observability
+                                   (Grafana, Prometheus, Loki, Tempo), NRI CPU Balloons, Node Feature Discovery, metrics-server,
+                                   Intel GPU device plugin (only on nodes with an Intel GPU); optional: Headlamp, KEDA, Velero
+3. Intel® Inference Toolkit     — from the inference repository: KServe, the Envoy AI Gateway and the model services
+                                   (LiteLLM and Langfuse too in LiteLLM mode)
 4. Intel® Chatbot Toolkit   — opt-in (vector DB, ingestion, chat, UI) — requires init erag + install erag
 ```
 
-You run **one command** and everything is installed.
+You run **one command** and it installs every layer the target needs. `./toolkit_manager.sh show` lists every layer and component.
 
 **Intel GPUs (Arc Pro B-Series / B70 and other Xe GPUs).** The `intel_gpu_plugin` platform
 component installs the [Intel GPU device plugin](https://github.com/intel/intel-device-plugins-for-kubernetes)
@@ -26,7 +28,8 @@ component installs the [Intel GPU device plugin](https://github.com/intel/intel-
 (`feature.node.kubernetes.io/pci-0300_8086.present` or `pci-0380_8086.present`). It runs
 only on those nodes (in its own `intel-gpu-plugin` namespace, tolerating their taints), waits until they advertise
 `gpu.intel.com/xe`, and is skipped on CPU-only clusters — so the inference layer's GPU runtimes
-(SGLang, vLLM XPU) can schedule right after. Set `intel_gpu_plugin_enabled: false` to turn it off.
+(SGLang, vLLM XPU) can schedule right after. It is never installed on OpenShift.
+Set `intel_gpu_plugin_enabled: false` to turn it off.
 
 - It waits for NFD only on the nodes its worker runs on, so tainted control-plane nodes add no delay.
 - A plugin already installed in another namespace (by hand or through the Intel Device Plugins
@@ -42,26 +45,25 @@ only on those nodes (in its own `intel-gpu-plugin` namespace, tolerating their t
 
 **Your machine needs:**
 
-- Ubuntu 22.04 (or newer) or RHEL/Rocky 8+
-- Internet access (proxy is fine — see Step 2)
-- Python 3.11+ (installer will check and install if needed)
+- Ubuntu 22.04 or 24.04, or a RHEL-family system (RHEL, Rocky). `configure` refuses other Ubuntu versions.
+- Internet access (a proxy is fine — see [Step 2](#step-2-edit-your-settings))
+- `git`, and `sudo` rights (passwordless is easiest; otherwise you are asked for the password)
+- No Docker on the machines that become the cluster: Kubespray removes it ([Prerequisites](../quickstart/prerequisites.md#operating-system))
 
-**Tooling installed by `configure`.** `./toolkit_manager.sh configure`
-installs these pinned versions into `/usr/local/bin` (and skips any that are
-already present). You can install them manually instead:
+**Tooling installed by `configure`.** `./toolkit_manager.sh configure` lists what it will change, asks before going ahead, and installs these pinned versions (it skips any tool already on your `PATH`). It also creates the installer's Python environment in `.venv/`. You can install the tools yourself instead:
 
 | Tool | Version | Notes |
 |------|---------|-------|
-| Python | ≥ 3.11 | plus the matching `python<ver>-venv` package |
+| Python | ≥ 3.11 | plus its `venv` package (Ubuntu 22.04 gets it from the deadsnakes PPA) |
 | yq | v4.53.2 | [mikefarah/yq](https://github.com/mikefarah/yq) |
 | kubectl | v1.35.4 | |
 | helm | v3.20.2 | |
-| git | any | required to clone the external repos |
+| git | any | must already be installed; used to clone the external repos |
 
-> **Multi-node / remote setups:** configure an NTP server (or
-> `chrony`/`systemd-timesyncd`) on **every** node before installing. Kubernetes,
+> **Multi-node / remote setups:** run an NTP service (`chrony` or
+> `systemd-timesyncd`) on **every** node before installing. Kubernetes,
 > etcd, TLS certificates, and token auth all depend on synchronized clocks —
-> clock skew between nodes surfaces as intermittent, hard-to-diagnose cert and
+> clock skew between nodes shows up as intermittent, hard-to-diagnose certificate and
 > etcd errors. Not required for a single localhost node.
 
 **Minimum hardware requirements:**
@@ -72,28 +74,33 @@ already present). You can install them manually instead:
 | Inference with 3B model | 64 GB | 300 GB |
 | Inference with 8B model | 128 GB | 400 GB |
 
-> More CPU cores = faster model inference. Intel Xeon recommended for CPU-based vLLM workloads.
+> More CPU cores = faster model inference. Intel® Xeon® recommended for CPU-based vLLM workloads. CPU core counts are in [Prerequisites](../quickstart/prerequisites.md#hardware-minimums).
 
 ---
 
 ## Step 1: Get the Code and Configure
 
 ```bash
-git clone https://github.com/intel/enterprise-ai-solutions.git
-cd enterprise-ai-solutions
+git clone https://github.com/intel/toolkit-manager.git
+cd toolkit-manager
 
-# Configure your machine (installs Python 3.11+, yq, kubectl, helm, sets up venv)
+# Prepare your machine, once (installs Python 3.11+, yq, kubectl, helm and the .venv; asks first)
 ./toolkit_manager.sh configure
 
-# Create a new environment named "local" for inference
+# Create an environment named "local" for the inference layer (add --env <name> for another name)
 ./toolkit_manager.sh init inference
 ```
 
-This creates an environment at `env/local/` with:
-- `global_config.yaml` — your settings
-- `inventory/hosts.yaml` — where your machines are
-- `kubeconfig.yaml` — cluster credentials (generated during install)
+An **environment** is a folder under `env/` that holds the settings for one cluster. `init` also downloads the inference repository into `ext/`, and creates `env/local/` with:
+- `global_config.yaml` — your settings for the whole platform (domain, TLS, proxy, storage)
+- `nodes.yaml` — which machines form the cluster; left as is, the cluster is this machine
+- `inventory/hosts.yaml` — the machine list in Kubespray format, generated from `nodes.yaml` (or written by hand)
+- `config.inference.yaml` — settings for the inference layer, such as `auth_type`
+- `models.yaml` — the model catalog `model-manager` deploys from
+- `.solutions.yaml` — the record of which layers this environment was set up for; do not edit
 - `logs/` — installer logs
+
+`kubeconfig.yaml` (cluster credentials) appears in `env/local/` during the install.
 
 ---
 
@@ -105,15 +112,17 @@ Open your environment's config:
 nano env/local/global_config.yaml
 ```
 
-**If you're behind a corporate proxy**, scroll to the bottom and update:
+**If you're behind a corporate proxy**, uncomment and fill in these lines in section 2, *Networking and proxy*:
 
 ```yaml
 http_proxy: "http://your-proxy:8080"
 https_proxy: "http://your-proxy:8080"
-no_proxy: "localhost,127.0.0.1,.svc,.cluster.local,.monitoring"
+no_proxy: "localhost,127.0.0.1,.svc,.cluster.local,.monitoring,10.233.0.0/18,10.233.64.0/18,<node-subnet>"
 ```
 
-**If you have your own TLS certificates and domain**, find the TLS section and update:
+Keep the two cluster address ranges shown in `no_proxy` and add your machines' subnet (shown by `ip route`), or traffic inside the cluster goes to the proxy.
+
+**If you have your own TLS certificates and domain**, update section 3, *Domain and access*:
 
 ```yaml
 gateway_tls_mode: "custom"
@@ -122,15 +131,15 @@ gateway_tls_cert_file: "/path/to/your/cert.pem"
 gateway_tls_key_file: "/path/to/your/key.pem"
 ```
 
-Otherwise, leave the defaults — a self-signed certificate is generated automatically.
+Otherwise, leave the defaults — the domain `inteltoolkits.ai` and a self-signed certificate the installer creates.
 
-**Everything else can stay as-is for now.** Save and close the file.
+**Everything else can stay as-is for now.** Save and close the file. Every setting is described in the [Configuration Reference](../customize/configuration.md).
 
 ---
 
 ## Step 3: Choose Your Deployment Mode
 
-The installer reads machine details from `env/local/inventory/hosts.yaml`. Pick one of the three options below based on how many machines you have.
+The installer reads the machines from `env/local/nodes.yaml` and writes `env/local/inventory/hosts.yaml` from it on every run. Pick one of the three options below based on how many machines you have.
 
 ---
 
@@ -140,7 +149,7 @@ The installer reads machine details from `env/local/inventory/hosts.yaml`. Pick 
 
 Everything runs on one machine. No SSH setup needed.
 
-**Nothing to configure** — the default inventory created by `init` already does this (localhost deployment).
+**Nothing to configure** — the files `init` created already describe this machine (localhost deployment).
 
 **Install:**
 
@@ -148,18 +157,18 @@ Everything runs on one machine. No SSH setup needed.
 ./toolkit_manager.sh install inference --env local
 ```
 
-Wait 15–20 minutes. When it finishes, check:
+A first install usually takes 30 to 60 minutes, mostly for downloading container images. It ends with an **INSTALLATION COMPLETE** box that names the log file. Then check:
 
 ```bash
 export KUBECONFIG=$(pwd)/env/local/kubeconfig.yaml
 kubectl get nodes
 ```
 
-You should see:
+You should see one node with `STATUS` `Ready` and `ROLES` `control-plane`:
 
 ```
-NAME      STATUS   ROLES           AGE   VERSION
-master1   Ready    control-plane   10m   v1.35.4
+NAME       STATUS   ROLES           AGE   VERSION
+<node>     Ready    control-plane   10m   v1.35.4
 ```
 
 Done. Skip to [Step 4](#step-4-verify-everything-works).
@@ -168,11 +177,12 @@ Done. Skip to [Step 4](#step-4-verify-everything-works).
 
 ### Option B: Multiple Machines
 
-**Best for:** Production deployments with separate master and worker machines.
+**Best for:** Production deployments with separate control-plane and worker machines.
 
 **What you need:**
 - 2 or more machines that can reach each other over the network
-- You'll run the installer from one of them (usually the first master)
+- You'll run the installer from one of them (usually the first control-plane machine)
+- Shared storage for model weights: set `storage_backend` to `nfs` or `ceph` in `global_config.yaml` (the default, `local-path`, is for one machine only)
 
 #### B.1 — Set up SSH access
 
@@ -182,12 +192,12 @@ Pick one machine to run the installer from. On that machine, run:
 # Create an SSH key (press Enter for all prompts)
 ssh-keygen -t ed25519 -f ~/.ssh/cluster_key -N ""
 
-# Copy it to every other machine (replace IPs with yours)
+# Copy it to every other machine (replace user and IPs with yours)
 ssh-copy-id -i ~/.ssh/cluster_key ubuntu@10.0.1.10
 ssh-copy-id -i ~/.ssh/cluster_key ubuntu@10.0.1.20
 ssh-copy-id -i ~/.ssh/cluster_key ubuntu@10.0.1.21
 
-# Test — each should print the hostname
+# Test — each should print the machine's name
 ssh -i ~/.ssh/cluster_key ubuntu@10.0.1.10 "hostname"
 ssh -i ~/.ssh/cluster_key ubuntu@10.0.1.20 "hostname"
 ssh -i ~/.ssh/cluster_key ubuntu@10.0.1.21 "hostname"
@@ -201,130 +211,77 @@ echo "ubuntu ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/ubuntu
 
 #### B.2 — Edit your inventory
 
-Open `env/local/inventory/hosts.yaml`. The template has three examples pre-commented. Uncomment and customize the **multi-node** section:
+Open `env/local/nodes.yaml`. The file has commented examples. Uncomment and customize the **multi-node** example:
 
 ```yaml
-all:
-  hosts:
-    master1:
-      ansible_host: 10.0.1.10
-      ip: 10.0.1.10
-      access_ip: 10.0.1.10
-    worker1:
-      ansible_host: 10.0.1.20
-      ip: 10.0.1.20
-      access_ip: 10.0.1.20
-    worker2:
-      ansible_host: 10.0.1.21
-      ip: 10.0.1.21
-      access_ip: 10.0.1.21
-  children:
-    kube_control_plane:
-      hosts:
-        master1:
-    kube_node:
-      hosts:
-        master1:
-        worker1:
-        worker2:
-    etcd:
-      hosts:
-        master1:
-    k8s_cluster:
-      children:
-        kube_control_plane:
-        kube_node:
-  vars:
-    ansible_user: ubuntu
-    ansible_ssh_private_key_file: ~/.ssh/cluster_key
+nodes_control_plane:
+  - ip: 10.0.1.10
+    hostname: cp1
+
+nodes_workers:
+  - ip: 10.0.1.20
+    hostname: worker1
+  - ip: 10.0.1.21
+    hostname: worker2
+
+nodes_ssh_user: "ubuntu"
+nodes_ssh_key: "~/.ssh/cluster_key"
 ```
 
-**What do the groups mean?**
+The installer generates `inventory/hosts.yaml` (Kubespray's format) from this file on every run, so do not edit `hosts.yaml` while `nodes.yaml` lists machines.
 
-| Group | What it does | How many do I need? |
+**What do the settings mean?**
+
+| Setting | What it does | How many do I need? |
 |------|-------------|---------------------|
-| `kube_control_plane` | Manages the cluster | At least 1. Use 3 for high-availability. |
-| `etcd` | Stores cluster data | Same as control_plane hosts (or separate). |
-| `kube_node` | Runs your actual workloads | At least 1. Add more for capacity. |
+| `nodes_control_plane` | Machines that manage the cluster; they also run etcd (the cluster's database) | At least 1. Use 3 for high-availability. |
+| `nodes_workers` | Machines that run your actual workloads | Optional. Leave it out and the control-plane machines run the workloads. |
+| `hostname` | The node's name in Kubernetes | One per machine, in lower case |
+| `nodes_ssh_user` / `nodes_ssh_key` | How the installer logs in to every machine | Once; a machine can override them with its own `ssh_user` / `ssh_key` |
 
 **Example: just 2 machines (smallest multi-node)**
 
-```yaml
-all:
-  hosts:
-    master1:
-      ansible_host: 10.0.1.10
-      ip: 10.0.1.10
-    worker1:
-      ansible_host: 10.0.1.20
-      ip: 10.0.1.20
-  children:
-    kube_control_plane:
-      hosts:
-        master1:
-    kube_node:
-      hosts:
-        master1:    # master also runs workloads
-        worker1:
-    etcd:
-      hosts:
-        master1:
-    k8s_cluster:
-      children:
-        kube_control_plane:
-        kube_node:
-  vars:
-    ansible_user: ubuntu
-    ansible_ssh_private_key_file: ~/.ssh/cluster_key
-```
-
-**Example: 3 masters + 3 workers (production HA)**
+The control-plane machine also runs workloads, so it is listed under both, with identical entries:
 
 ```yaml
-all:
-  hosts:
-    master1:
-      ansible_host: 10.0.1.10
-      ip: 10.0.1.10
-    master2:
-      ansible_host: 10.0.1.11
-      ip: 10.0.1.11
-    master3:
-      ansible_host: 10.0.1.12
-      ip: 10.0.1.12
-    worker1:
-      ansible_host: 10.0.1.20
-      ip: 10.0.1.20
-    worker2:
-      ansible_host: 10.0.1.21
-      ip: 10.0.1.21
-    worker3:
-      ansible_host: 10.0.1.22
-      ip: 10.0.1.22
-  children:
-    kube_control_plane:
-      hosts:
-        master1:
-        master2:
-        master3:
-    kube_node:
-      hosts:
-        worker1:
-        worker2:
-        worker3:
-    etcd:
-      hosts:
-        master1:
-        master2:
-        master3:
-    k8s_cluster:
-      children:
-        kube_control_plane:
-        kube_node:
-  vars:
-    ansible_user: ubuntu
-    ansible_ssh_private_key_file: ~/.ssh/cluster_key
+nodes_control_plane:
+  - ip: 10.0.1.10
+    hostname: cp1
+
+nodes_workers:
+  - ip: 10.0.1.10       # cp1 also runs workloads
+    hostname: cp1
+  - ip: 10.0.1.20
+    hostname: worker1
+
+nodes_ssh_user: "ubuntu"
+nodes_ssh_key: "~/.ssh/cluster_key"
 ```
+
+**Example: 3 control-plane machines + 3 workers (production HA)**
+
+```yaml
+nodes_control_plane:
+  - ip: 10.0.1.10
+    hostname: cp1
+  - ip: 10.0.1.11
+    hostname: cp2
+  - ip: 10.0.1.12
+    hostname: cp3
+
+nodes_workers:
+  - ip: 10.0.1.20
+    hostname: worker1
+  - ip: 10.0.1.21
+    hostname: worker2
+  - ip: 10.0.1.22
+    hostname: worker3
+
+nodes_ssh_user: "ubuntu"
+nodes_ssh_key: "~/.ssh/cluster_key"
+```
+
+More layouts, including a hand-written inventory, are in [Multi-Node & BYO Cluster](topologies.md).
 
 #### B.3 — Install
 
@@ -332,7 +289,7 @@ all:
 ./toolkit_manager.sh install inference --env local
 ```
 
-Wait 15–25 minutes. When done:
+Wait for the **INSTALLATION COMPLETE** box. When done:
 
 ```bash
 export KUBECONFIG=$(pwd)/env/local/kubeconfig.yaml
@@ -352,7 +309,7 @@ Done. Skip to [Step 4](#step-4-verify-everything-works).
 This is the same as Option B, except you run the installer on the bastion (gateway) machine — which does NOT become part of the cluster.
 
 ```
- You → SSH → [Bastion] → SSH → [master1, worker1, worker2, ...]
+ You → SSH → [Bastion] → SSH → [cp1, worker1, worker2, ...]
               (runs installer)    (become the cluster)
 ```
 
@@ -360,14 +317,14 @@ This is the same as Option B, except you run the installer on the bastion (gatew
 
 ```bash
 # Get the code
-git clone https://github.com/intel/enterprise-ai-solutions.git
-cd enterprise-ai-solutions
+git clone https://github.com/intel/toolkit-manager.git
+cd toolkit-manager
 
-# Configure machine and create environment
+# Prepare the machine and create the environment
 ./toolkit_manager.sh configure
 ./toolkit_manager.sh init inference
 
-# Create SSH key and copy to all cluster machines
+# Create an SSH key and copy it to all cluster machines
 ssh-keygen -t ed25519 -f ~/.ssh/cluster_key -N ""
 ssh-copy-id -i ~/.ssh/cluster_key ubuntu@10.0.1.10
 ssh-copy-id -i ~/.ssh/cluster_key ubuntu@10.0.1.20
@@ -376,42 +333,26 @@ ssh-copy-id -i ~/.ssh/cluster_key ubuntu@10.0.1.21
 
 #### C.2 — Configure
 
-Edit `env/local/inventory/hosts.yaml` — same structure as Option B. For example:
+Edit `env/local/nodes.yaml` — same as Option B. For example:
 
 ```yaml
-all:
-  hosts:
-    master1:
-      ansible_host: 10.0.1.10
-      ip: 10.0.1.10
-    worker1:
-      ansible_host: 10.0.1.20
-      ip: 10.0.1.20
-    worker2:
-      ansible_host: 10.0.1.21
-      ip: 10.0.1.21
-  children:
-    kube_control_plane:
-      hosts:
-        master1:
-    kube_node:
-      hosts:
-        master1:
-        worker1:
-        worker2:
-    etcd:
-      hosts:
-        master1:
-    k8s_cluster:
-      children:
-        kube_control_plane:
-        kube_node:
-  vars:
-    ansible_user: ubuntu
-    ansible_ssh_private_key_file: ~/.ssh/cluster_key
+nodes_control_plane:
+  - ip: 10.0.1.10
+    hostname: cp1
+
+nodes_workers:
+  - ip: 10.0.1.10
+    hostname: cp1
+  - ip: 10.0.1.20
+    hostname: worker1
+  - ip: 10.0.1.21
+    hostname: worker2
+
+nodes_ssh_user: "ubuntu"
+nodes_ssh_key: "~/.ssh/cluster_key"
 ```
 
-**If there's another jump host between your bastion and the nodes**, add to the `vars` section:
+**If there's another jump host between your bastion and the nodes**, `nodes.yaml` cannot express it. Leave `nodes_control_plane` empty in `nodes.yaml`, write `env/local/inventory/hosts.yaml` yourself (Kubespray format, see [Multi-Node & BYO Cluster](topologies.md)), and add the extra hop to its `vars` section:
 
 ```yaml
   vars:
@@ -457,21 +398,25 @@ export KUBECONFIG=$(pwd)/env/local/kubeconfig.yaml
 # All nodes should say "Ready"
 kubectl get nodes
 
-# All pods should say "Running"
+# All pods should say "Running" (or "Completed" for one-off jobs)
 kubectl get pods -A
 ```
 
-Or use the built-in validate command:
+Or use the built-in commands:
 
 ```bash
-./toolkit_manager.sh validate inference --env local
+./toolkit_manager.sh validate inference --env local   # each component checks itself and reports what is wrong
+./toolkit_manager.sh status --env local               # what is installed, namespace health, service URLs
+./toolkit_manager.sh status --env local --health      # just a pass/fail verdict
 ```
+
+The web UIs live under your domain, for example `https://grafana.inteltoolkits.ai`. The domain is usually not in your DNS: point the host names at the gateway IP in your DNS or `/etc/hosts` (finding the gateway IP and trusting the self-signed certificate: [Common Setup](#1-common-setup)).
 
 ---
 
 ## Scaling: Adding More Machines Later
 
-Already have a running cluster and want to add workers? Easy.
+Already have a running cluster and want to add workers? Edit `nodes.yaml` and run `add-node` (not `install`):
 
 1. Set up SSH to the new machine (same as before):
 
@@ -479,58 +424,40 @@ Already have a running cluster and want to add workers? Easy.
    ssh-copy-id -i ~/.ssh/cluster_key ubuntu@10.0.1.22
    ```
 
-2. Add the new machine to `env/local/inventory/hosts.yaml`:
+2. Add the new machine under `nodes_workers` in `env/local/nodes.yaml`:
 
    ```yaml
-   all:
-     hosts:
-       master1:
-         ansible_host: 10.0.1.10
-         ip: 10.0.1.10
-       worker1:
-         ansible_host: 10.0.1.20
-         ip: 10.0.1.20
-       worker2:                       # ← add this
-         ansible_host: 10.0.1.22
-         ip: 10.0.1.22
-     children:
-       kube_control_plane:
-         hosts:
-           master1:
-       kube_node:
-         hosts:
-           master1:
-           worker1:
-           worker2:                   # ← and add here
-       etcd:
-         hosts:
-           master1:
-       k8s_cluster:
-         children:
-           kube_control_plane:
-           kube_node:
-     vars:
-       ansible_user: ubuntu
-       ansible_ssh_private_key_file: ~/.ssh/cluster_key
+   nodes_control_plane:
+     - ip: 10.0.1.10
+       hostname: cp1
+
+   nodes_workers:
+     - ip: 10.0.1.20
+       hostname: worker1
+     - ip: 10.0.1.22            # ← add this
+       hostname: worker2
    ```
 
-3. Re-run the installer — it detects new nodes and adds them:
+3. Add it to the cluster — `--dry-run` first shows what would change:
 
    ```bash
-   ./toolkit_manager.sh install inference --env local
+   ./toolkit_manager.sh add-node --env local --dry-run
+   ./toolkit_manager.sh add-node --env local
    ```
 
-The installer is idempotent. Existing nodes are untouched; only new machines are provisioned.
+Existing nodes are untouched; only the new machines are set up. `remove-node` works the same way for a worker you delete from `nodes.yaml`. Only workers can be added or removed, and the cluster must have been installed from `nodes.yaml`; all the rules are in [Node Scaling](../customize/node_scaling.md).
 
 ---
 
 ## Teardown: Removing Everything
 
+`teardown <target>` removes the target **and everything installed on top of it**. It asks before it starts (`--force` skips the question). Your config files in `env/<name>/` are kept.
+
 ```bash
-# Remove the full stack (infrastructure + platform + inference)
+# Remove the full stack (inference + platform, then the Kubernetes cluster itself)
 ./toolkit_manager.sh teardown infrastructure --env local
 
-# Remove just one component
+# Remove just one component (and whatever depends on it)
 ./toolkit_manager.sh teardown llm_services --env local
 ./toolkit_manager.sh teardown kserve --env local
 ```
@@ -551,13 +478,14 @@ If this doesn't work, the installer won't work either. Fix SSH access first.
 
 ### Install fails partway through
 
-Check the log:
+Check the newest log (the error, or the **INSTALLATION COMPLETE** box, names the file):
 
 ```bash
-tail -50 env/local/logs/install.log
+ls -t env/local/logs/ | head -3
+tail -50 env/local/logs/install-inference-<timestamp>.log
 ```
 
-Then just re-run — the installer is safe to run multiple times:
+Then fix the cause and re-run — the installer is safe to run multiple times; what is already installed is left as it is:
 
 ```bash
 ./toolkit_manager.sh install inference --env local
@@ -565,7 +493,7 @@ Then just re-run — the installer is safe to run multiple times:
 
 ### Pods stuck in "ImagePullBackOff"
 
-This usually means the proxy settings are wrong. Double-check `http_proxy` and `https_proxy` in `env/local/global_config.yaml`.
+The node cannot download images. This usually means the proxy settings are wrong. Double-check `http_proxy`, `https_proxy` and `no_proxy` in `env/local/global_config.yaml`.
 
 ### Skip dependency auto-inclusion (expert mode)
 
@@ -583,7 +511,11 @@ This runs only the named target without traversing the dependency tree.
 ./toolkit_manager.sh install inference --env local -- -vvv
 ```
 
-The `--` separates installer flags from Ansible flags.
+The `--` separates installer flags from Ansible flags. For more installer output, set `TKM_LOG_LEVEL=debug` (adds Ansible's `-vvv`) or `trace`:
+
+```bash
+TKM_LOG_LEVEL=debug ./toolkit_manager.sh install inference --env local
+```
 
 ---
 
@@ -612,12 +544,13 @@ export KUBECONFIG=$(pwd)/env/prod/kubeconfig.yaml
 
 ## Logs
 
-All logs are stored per-environment under `env/<name>/logs/`, named with action, target, and timestamp:
+Each run writes one log under `env/<name>/logs/`, named with the action, the target (`cluster` for `status`, `add-node` and `remove-node`) and the time. The 30 newest are kept:
 
 ```
-env/<name>/logs/install-all-20260817-143022.log
-env/<name>/logs/teardown-all-20260817-150100.log
-env/<name>/logs/validate-all-20260817-151500.log
+env/<name>/logs/install-inference-20260817-143022.log
+env/<name>/logs/teardown-infrastructure-20260817-150100.log
+env/<name>/logs/validate-inference-20260817-151500.log
+env/<name>/logs/status-cluster-20260817-152000.log
 ```
 
 ---
@@ -627,7 +560,7 @@ env/<name>/logs/validate-all-20260817-151500.log
 ```bash
 # Environment setup
 ./toolkit_manager.sh configure                          # one-time machine prep
-./toolkit_manager.sh init <layer> --env <name>          # create new environment (layer: inference or erag)
+./toolkit_manager.sh init <layer> --env <name>          # create new environment (layer: inference, erag, agent-toolkit)
 ./toolkit_manager.sh show                               # list layers/components
 
 # Installation
@@ -637,7 +570,9 @@ env/<name>/logs/validate-all-20260817-151500.log
 ./toolkit_manager.sh install inference --env <name> -- -vvv   # pass Ansible flags
 
 # Operations
-./toolkit_manager.sh validate inference --env <name>  # check health
+./toolkit_manager.sh validate inference --env <name>       # check health
+./toolkit_manager.sh status --env <name>                   # what is installed
+./toolkit_manager.sh add-node --env <name>                 # add workers listed in nodes.yaml
 ./toolkit_manager.sh teardown infrastructure --env <name>  # remove everything
 
 # Kubeconfig
@@ -645,37 +580,43 @@ export KUBECONFIG=$(pwd)/env/<name>/kubeconfig.yaml
 kubectl get nodes
 ```
 
+Every command and flag: [CLI Reference](../customize/cli.md).
+
 ---
 
 ## Deploying and Accessing Models
 
-Once the platform is installed, deploy models and access them via the AI gateway. The access pattern depends on the **`auth_type`** set in `env/<env>/config.inference.yaml`. Keycloak is deployed in both modes and handles sign-in to the web UIs; `auth_type` only selects the credential API clients send.
+Once the platform is installed, deploy models and access them through the gateway. The access pattern depends on the **`auth_type`** set in `env/<env>/config.inference.yaml`. Keycloak is deployed in both modes and handles sign-in to the web UIs; `auth_type` only selects the credential API clients send.
 
 ### Auth Modes at a Glance
 
-| | **Keycloak** (`auth_type: jwt`) | **LiteLLM** (`auth_type: litellm_vkey`) |
+| | **Keycloak** (`auth_type: jwt`, default) | **LiteLLM** (`auth_type: litellm_vkey`) |
 |---|---|---|
-| **What's deployed** | Keycloak OIDC + Envoy AI Gateway (LiteLLM + Langfuse optional, `litellm_enabled: true`) | Keycloak OIDC + LiteLLM proxy + Langfuse + Valkey |
-| **Auth mechanism** | JWT via client credentials flow | Virtual API keys (or master key) |
-| **Request path** | Client → Envoy AI Gateway (validates JWT) → vLLM pod | Client → Envoy Gateway → LiteLLM (validates virtual key) → KServe |
-| **Model endpoint** | `https://inference.<domain>/v1/chat/completions` | `https://litellm.<domain>/v1/chat/completions` |
+| **What's deployed** | Keycloak + Envoy AI Gateway (LiteLLM + Langfuse optional, `litellm_enabled: true`) | Keycloak + LiteLLM proxy + Langfuse + Valkey |
+| **Auth mechanism** | Short-lived token (JWT) from the client credentials flow | LiteLLM virtual API keys (or the master key) |
+| **Request path** | Client → Envoy Gateway (checks the JWT) → Envoy AI Gateway → model pod | Client → Envoy Gateway → LiteLLM (checks the key) → model pod |
+| **Model endpoint** (subdomain mode) | `https://inference.<domain>/v1/chat/completions` | `https://litellm.<domain>/v1/chat/completions` |
+| **Model endpoint** (path mode) | `https://<domain>/inference/v1/chat/completions` | `https://<domain>/litellm/v1/chat/completions` |
 | **Model selection** | Via `"model"` field in request body (AI Gateway routes) | Via `"model"` field in request body (LiteLLM routes) |
-| **Best for** | Production SSO, per-user RBAC, audit trail | Multi-tenant, per-key budgets, simpler setup |
+| **Best for** | Production SSO, per-user access rules | Multi-tenant, per-key budgets and spend tracking |
+
+The examples below use subdomain mode, the default.
 
 ### 1. Common Setup
 
-Set your kubeconfig and get the gateway IP (replace `<env>` with your environment name, e.g. `prod`):
+Set your kubeconfig, and get the gateway IP and your domain (replace `<env>` with your environment name, e.g. `local`):
 
 ```bash
 export KUBECONFIG=$(pwd)/env/<env>/kubeconfig.yaml
 
 GATEWAY_IP=$(kubectl get svc -n envoy-gateway-system \
-  -l gateway.envoyproxy.io/owning-gateway-name \
-  --field-selector spec.type=LoadBalancer \
+  -l gateway.envoyproxy.io/owning-gateway-name=eg-gateway \
   -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
 
 DOMAIN=$(yq '.base_domain_name' env/<env>/global_config.yaml)
 ```
+
+The domain (default `inteltoolkits.ai`) is usually not in your DNS. That is why the `curl` commands below use `--resolve <host>:443:<gateway IP>`: it sends the request to the gateway while keeping the right host name.
 
 **TLS certificate:** When using self-signed TLS (the default), the installer exports a CA certificate to:
 
@@ -683,7 +624,11 @@ DOMAIN=$(yq '.base_domain_name' env/<env>/global_config.yaml)
 env/<name>/logs/ai-solutions-ca.crt
 ```
 
-Import this into your browser or OS trust store to access web UIs (Keycloak, Grafana, Langfuse) without certificate warnings. For programmatic access, use `--cacert env/local/logs/ai-solutions-ca.crt` with curl instead of `-k`, or set `SSL_CERT_FILE` for Python/SDK clients.
+Import this into your browser or OS trust store to open the web UIs (Keycloak, Grafana, Langfuse) without certificate warnings. The `curl` commands below pass it with `--cacert`; for Python/SDK clients, set `SSL_CERT_FILE` to it:
+
+```bash
+CA=$(pwd)/env/<env>/logs/ai-solutions-ca.crt
+```
 
 ### 2. Deploy a Model
 
@@ -693,16 +638,16 @@ Deploy a model — this works the same regardless of auth mode:
 # Deploy from the model catalog (downloads weights + creates serving pod)
 ./model-manager deploy qwen3-0-6b --wait
 
-# Gated models (Llama, Mistral, …) need a Hugging Face token:
+# Gated models (Llama, some Mistral models) need a Hugging Face token:
 export HF_TOKEN="hf_your_token_here"
 ./model-manager deploy llama3-8b-awq --wait
 
 # Verify
+./model-manager list --deployed
 kubectl get pods -n llm-inference
-kubectl get llminferenceservices -n llm-inference
 ```
 
-The `--wait` flag blocks until the model is ready to serve requests (typically 2–5 minutes depending on model size and download speed).
+The `--wait` flag blocks until the model is ready to serve requests, or until `--wait-timeout` (default 900 seconds) runs out. The first deploy of a model also downloads its weights. More options: [Deploy a Model](deploy_models.md).
 
 ### 3. Authenticate and Access
 
@@ -710,26 +655,22 @@ Choose the section matching your `auth_type`.
 
 #### Option A — Keycloak JWT (`auth_type: jwt`, default)
 
-When `auth_type=jwt` (the default), API clients authenticate with Keycloak JWTs. Models are accessed through the Envoy AI Gateway at a single inference endpoint. Authentication uses the **client credentials** flow (no user passwords needed).
+When `auth_type=jwt` (the default), API clients authenticate with Keycloak tokens (JWTs). Models are accessed through the Envoy AI Gateway at a single inference endpoint. Authentication uses the **client credentials** flow (no user passwords needed).
 
 **Quick method — use the helper script:**
 
 ```bash
 source ./ext/enterprise.ai-inference/model_manager/scripts/get-keycloak-token.sh
-# Exports: TOKEN, GATEWAY_IP, GATEWAY_DOMAIN
-# Auto-discovers gateway IP, Keycloak domain, and client credentials from the cluster
+# Exports: TOKEN, GATEWAY_IP, GATEWAY_DOMAIN, GATEWAY_URL
+# Finds the gateway IP, Keycloak domain, and client credentials in the cluster
 ```
 
-The token is valid for 15 minutes. For longer sessions, pass `--lifespan 3600` (1 hour).
+The token is valid for 15 minutes. For longer sessions, pass `--lifespan 3600` (1 hour; this changes the Keycloak client's token lifetime).
 
 **Manual method — step by step:**
 
 ```bash
-# 1. Get the gateway IP
-GATEWAY_IP=$(kubectl get svc -n envoy-gateway-system \
-  -l gateway.envoyproxy.io/owning-gateway-name \
-  --field-selector spec.type=LoadBalancer \
-  -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
+# 1. Get the gateway IP and CA file (see Common Setup)
 
 # 2. Get the Keycloak domain
 KEYCLOAK_DOMAIN=$(kubectl get keycloaks -n keycloak \
@@ -742,7 +683,7 @@ CLIENT_SECRET=$(kubectl get secret keycloak-client-secret -n keycloak \
   -o jsonpath='{.data.client-secret}' | base64 -d)
 
 # 4. Request a JWT token
-TOKEN=$(curl -sk --noproxy '*' \
+TOKEN=$(curl -s --cacert "$CA" --noproxy '*' \
   --resolve "${KEYCLOAK_DOMAIN}:443:${GATEWAY_IP}" \
   "https://${KEYCLOAK_DOMAIN}/realms/inference/protocol/openid-connect/token" \
   -d "grant_type=client_credentials" \
@@ -756,9 +697,9 @@ echo "Token: ${TOKEN:0:20}..."
 **Call the model:**
 
 ```bash
-GATEWAY_DOMAIN="inference.$(yq '.base_domain_name' env/<env>/global_config.yaml)"
+GATEWAY_DOMAIN="inference.${DOMAIN}"
 
-curl -sk --noproxy '*' \
+curl -s --cacert "$CA" --noproxy '*' \
   --resolve "${GATEWAY_DOMAIN}:443:${GATEWAY_IP}" \
   "https://${GATEWAY_DOMAIN}/v1/chat/completions" \
   -H "Authorization: Bearer ${TOKEN}" \
@@ -766,10 +707,10 @@ curl -sk --noproxy '*' \
   -d '{"model":"qwen3-0-6b","messages":[{"role":"user","content":"Hello!"}],"max_tokens":64}'
 ```
 
-List available models:
+A JSON answer with `"choices"` means it works. List available models:
 
 ```bash
-curl -sk --noproxy '*' \
+curl -s --cacert "$CA" --noproxy '*' \
   --resolve "${GATEWAY_DOMAIN}:443:${GATEWAY_IP}" \
   "https://${GATEWAY_DOMAIN}/v1/models" \
   -H "Authorization: Bearer ${TOKEN}"
@@ -779,24 +720,24 @@ A request with a missing, malformed, or expired JWT is rejected with `401` at th
 
 #### Option B — LiteLLM virtual keys (`auth_type: litellm_vkey`)
 
-When `auth_type=litellm_vkey`, API clients use LiteLLM virtual keys; Keycloak still handles sign-in to the web UIs. LiteLLM validates the key itself and acts as the model proxy. All models are auto-registered with LiteLLM at deploy time — you access them through a single endpoint and specify the model name in the request body.
+When `auth_type=litellm_vkey`, API clients use LiteLLM API keys; Keycloak still handles sign-in to the web UIs. LiteLLM checks the key itself and acts as the model proxy. `model-manager deploy` registers every model with LiteLLM — you access them through a single endpoint and name the model in the request body.
 
-**1. Get the master key:**
+**1. Get the master key** (full admin rights; keep it secret):
 
 ```bash
 MASTER_KEY=$(kubectl get secret litellm-master-key -n litellm \
   -o jsonpath='{.data.master_key}' | base64 -d)
 
-LITELLM_DOMAIN="litellm.$(yq '.base_domain_name' env/<env>/global_config.yaml)"
+LITELLM_DOMAIN="litellm.${DOMAIN}"
 ```
 
-**2. Get a token** — use the master key directly, or mint a scoped virtual key (recommended for applications):
+**2. Get a token** — use the master key directly, or mint a scoped virtual key (recommended for applications). The key API is not on the public `litellm.<domain>` address, so reach LiteLLM through a port-forward:
 
 ```bash
+kubectl port-forward -n litellm svc/litellm 4000:4000 &
+
 # Create a virtual key with a model allow-list, budget cap, and expiry
-VIRTUAL_KEY=$(curl -sk --noproxy '*' \
-  --resolve "${LITELLM_DOMAIN}:443:${GATEWAY_IP}" \
-  "https://${LITELLM_DOMAIN}/key/generate" \
+VIRTUAL_KEY=$(curl -s http://localhost:4000/key/generate \
   -H "Authorization: Bearer ${MASTER_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"models":["qwen3-0-6b"],"key_alias":"team-a","max_budget":5,"duration":"24h"}' \
@@ -808,7 +749,7 @@ TOKEN="${VIRTUAL_KEY}"   # or TOKEN="${MASTER_KEY}" to skip key creation
 **3. Call the model:**
 
 ```bash
-curl -sk --noproxy '*' \
+curl -s --cacert "$CA" --noproxy '*' \
   --resolve "${LITELLM_DOMAIN}:443:${GATEWAY_IP}" \
   "https://${LITELLM_DOMAIN}/v1/chat/completions" \
   -H "Authorization: Bearer ${TOKEN}" \
@@ -816,35 +757,29 @@ curl -sk --noproxy '*' \
   -d '{"model":"qwen3-0-6b","messages":[{"role":"user","content":"Hello!"}],"max_tokens":64}'
 ```
 
-A missing or revoked key is rejected with `401` before anything reaches the model. A key used outside its model allow-list is also rejected.
+A missing or revoked key is rejected with `401` before anything reaches the model. A key used outside its model allow-list is also rejected. The public `litellm.<domain>` address only answers `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`, `/v1/models` and `/health/liveliness`.
 
-**4. Manage keys:**
+**4. Manage keys** (through the same port-forward):
 
 ```bash
 # List (alias, allow-list, budget, spend to date)
-curl -sk --noproxy '*' \
-  --resolve "${LITELLM_DOMAIN}:443:${GATEWAY_IP}" \
-  "https://${LITELLM_DOMAIN}/key/list?return_full_object=true" \
+curl -s "http://localhost:4000/key/list?return_full_object=true" \
   -H "Authorization: Bearer ${MASTER_KEY}"
 
 # Update (e.g. extend budget)
-curl -sk --noproxy '*' \
-  --resolve "${LITELLM_DOMAIN}:443:${GATEWAY_IP}" \
-  "https://${LITELLM_DOMAIN}/key/update" \
+curl -s http://localhost:4000/key/update \
   -H "Authorization: Bearer ${MASTER_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"key":"sk-...","max_budget":20}'
 
 # Revoke
-curl -sk --noproxy '*' \
-  --resolve "${LITELLM_DOMAIN}:443:${GATEWAY_IP}" \
-  "https://${LITELLM_DOMAIN}/key/delete" \
+curl -s http://localhost:4000/key/delete \
   -H "Authorization: Bearer ${MASTER_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"keys":["sk-..."]}'
 ```
 
-Keys can also be managed in the LiteLLM UI at `https://${LITELLM_DOMAIN}/ui/` (trailing slash required — bare `/ui` 307-redirects to `http://`). Log in with username `admin` and the master key as the password. Request traces land in Langfuse at `https://langfuse.<domain>`.
+Keys can also be managed in the LiteLLM admin UI at `https://litellm-ui.<domain>/ui/` (path mode: `https://<domain>/litellm/ui/`; the trailing slash is required). You sign in with Keycloak; only the groups in `litellm_ui_groups` get in (default: the `platform-admins` group), and username/password login is off. Request traces land in Langfuse at `https://langfuse.<domain>`.
 
 <p align="center">
   <img src="../assets/screenshots/litellm-langfuse.png" alt="LiteLLM virtual keys and Langfuse traces" />
@@ -865,7 +800,7 @@ All models are served through a single inference gateway endpoint. Select the mo
 # Otherwise, derive the inference domain:
 GATEWAY_DOMAIN="inference.$(yq '.base_domain_name' env/<env>/global_config.yaml)"
 
-curl -sk --noproxy '*' \
+curl -s --cacert "$CA" --noproxy '*' \
   --resolve "${GATEWAY_DOMAIN}:443:${GATEWAY_IP}" \
   "https://${GATEWAY_DOMAIN}/v1/chat/completions" \
   -H "Authorization: Bearer ${TOKEN}" \
@@ -882,7 +817,7 @@ curl -sk --noproxy '*' \
 **List available models:**
 
 ```bash
-curl -sk --noproxy '*' \
+curl -s --cacert "$CA" --noproxy '*' \
   --resolve "${GATEWAY_DOMAIN}:443:${GATEWAY_IP}" \
   "https://${GATEWAY_DOMAIN}/v1/models" \
   -H "Authorization: Bearer ${TOKEN}"
@@ -892,8 +827,10 @@ curl -sk --noproxy '*' \
 
 ```bash
 source ./ext/enterprise.ai-inference/model_manager/scripts/get-keycloak-token.sh
-# Exports: TOKEN, GATEWAY_IP, GATEWAY_DOMAIN
+# Exports: TOKEN, GATEWAY_IP, GATEWAY_DOMAIN, GATEWAY_URL
 ```
+
+In path mode, call `${GATEWAY_URL}/v1/...` instead (`GATEWAY_URL` ends in `/inference` there).
 
 #### With `auth_type: litellm_vkey`
 
@@ -902,7 +839,7 @@ Single endpoint, model selected via request body:
 ```bash
 LITELLM_DOMAIN="litellm.$(yq '.base_domain_name' env/<env>/global_config.yaml)"
 
-curl -sk --noproxy '*' \
+curl -s --cacert "$CA" --noproxy '*' \
   --resolve "${LITELLM_DOMAIN}:443:${GATEWAY_IP}" \
   "https://${LITELLM_DOMAIN}/v1/chat/completions" \
   -H "Authorization: Bearer ${TOKEN}" \
@@ -923,7 +860,7 @@ key is rejected with `401` by LiteLLM before anything reaches the model.
 appears here:
 
 ```bash
-curl -sk --noproxy '*' \
+curl -s --cacert "$CA" --noproxy '*' \
   --resolve "${LITELLM_DOMAIN}:443:${GATEWAY_IP}" \
   "https://${LITELLM_DOMAIN}/v1/models" \
   -H "Authorization: Bearer ${TOKEN}"
@@ -931,19 +868,19 @@ curl -sk --noproxy '*' \
 
 ### 5. Access the Model — Python (OpenAI Client)
 
+Run these with `SSL_CERT_FILE=env/<env>/logs/ai-solutions-ca.crt` so Python trusts the self-signed certificate. Your machine must also resolve the host name to the gateway IP (DNS or `/etc/hosts`); Python has no `--resolve`.
+
 #### With `auth_type: jwt` (default)
 
 ```python
 import os
-import httpx
 from openai import OpenAI
 
-# GATEWAY_DOMAIN and TOKEN are set by the helper script
+# GATEWAY_URL and TOKEN are set by the helper script
 # source ./ext/enterprise.ai-inference/model_manager/scripts/get-keycloak-token.sh
 client = OpenAI(
-    base_url=f"https://{os.environ['GATEWAY_DOMAIN']}/v1",
+    base_url=os.environ["GATEWAY_URL"] + "/v1",   # https://inference.<domain>/v1
     api_key=os.environ["TOKEN"],
-    http_client=httpx.Client(verify=False),  # for self-signed certs
 )
 
 response = client.chat.completions.create(
@@ -962,14 +899,12 @@ for model in client.models.list():
 
 ```python
 import os
-import httpx
 from openai import OpenAI
 
 # TOKEN = master key or virtual key
 client = OpenAI(
     base_url=f"https://{os.environ['LITELLM_DOMAIN']}/v1",
     api_key=os.environ["TOKEN"],
-    http_client=httpx.Client(verify=False),  # for self-signed certs
 )
 
 response = client.chat.completions.create(
@@ -984,8 +919,8 @@ print(response.choices[0].message.content)
 
 | `auth_type` | Token Lifetime | Refresh |
 |-----------|---------------|---------|
-| `litellm_vkey` | Configurable per key (default: no expiry, or set `duration` at creation) | Create a new virtual key |
-| `jwt` | 15 minutes (configurable via `--lifespan`) | Re-run the helper script |
+| `litellm_vkey` | A virtual key lasts until its `duration` runs out (none set: no expiry) | Create a new virtual key |
+| `jwt` | 15 minutes (change with `--lifespan`) | Re-run the helper script |
 
 **Keycloak — re-source the helper to get a fresh token:**
 
@@ -1012,7 +947,7 @@ Intel® Chatbot Toolkit adds document ingestion, vector search, RAG pipelines, a
 ./toolkit_manager.sh install erag --env <name>
 ```
 
-The `init erag` command clones the inference and Intel® Chatbot Toolkit repositories (dependencies first), seeds `env/<name>/config.erag.yaml` from the selected pipeline flavour (default: `chatqna`), and records the provisioned layer in `env/<name>/.solutions.yaml`. The `install erag` command automatically pulls all dependencies (infrastructure → platform → inference) if not already deployed, then installs the RAG application layer.
+The `init erag` command downloads the inference and Intel® Chatbot Toolkit repositories (dependencies first), creates `env/<name>/config.erag.yaml` from the selected pipeline flavour (default: `chatqna`; pick another with `--flavour`), and records the layer in `env/<name>/.solutions.yaml`. The `install erag` command first installs whatever it needs that is missing (infrastructure → platform → inference), then installs the RAG application layer.
 
 **See the full guide:** [Getting Started with Intel® Chatbot Toolkit](../quickstart/getting_started_rag.md) covers prerequisites, flavour selection, per-layer install and teardown, configuration, and troubleshooting.
 
