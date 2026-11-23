@@ -70,6 +70,7 @@ observability_enabled: true            # Grafana, Prometheus, Loki, Tempo
 headlamp_enabled: true                 # Kubernetes cluster dashboard
 # http_proxy: "http://your-proxy:8080" # behind a proxy: uncomment http_proxy, https_proxy and no_proxy
 # auth_type: "jwt"                     # API sign-in: jwt | litellm_vkey
+# llm_services_deploy_models: false    # true: deploy the catalog models marked autodeploy during the install
 ```
 
 **Each toolkit layer adds its own settings file** when you `init` it, with that layer's detailed options: `config.inference.yaml`, `config.agent-toolkit.yaml` or `config.erag.yaml`, next to `global_config.yaml`. A key set in both wins in `global_config.yaml`. All options and the full order → [Configuration Reference](docs/customize/configuration.md#changing-values).
@@ -132,7 +133,7 @@ kubectl -n keycloak get secret platform-bootstrap-admin -o jsonpath='{.data.valu
    ./toolkit_manager.sh init inference   # downloads the Inference Toolkit into ext/; adds config.inference.yaml and models.yaml (the model catalog)
    ```
 
-2. Optional: deploy a model during the install (`qwen3-0-6b` fits the minimum machine). In `env/local/models.yaml`, add `autodeploy: true` to the model's entry; in `env/local/config.inference.yaml`, set `llm_services_deploy_models: true`:
+2. Optional: deploy a model during the install (`qwen3-0-6b` fits the minimum machine). In `env/local/global_config.yaml`, uncomment `llm_services_deploy_models` and set it to `true`; in `env/local/models.yaml`, add `autodeploy: true` to the model's entry:
 
    ```yaml
      - name: qwen3-0-6b
