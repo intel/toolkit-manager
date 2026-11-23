@@ -150,11 +150,7 @@ kubectl -n keycloak get secret platform-bootstrap-admin -o jsonpath='{.data.valu
    ./toolkit_manager.sh install inference       # ◀── may take a few minutes
    ```
 
-**Check it:** deploy a model (unless you did in step 2), then call it with the credential your `auth_type` uses:
-
-```bash
-./model-manager deploy qwen3-0-6b --wait   # downloads the weights, picks serving parameters, starts the pod
-```
+**Access the model endpoint** with the credential your `auth_type` uses:
 
 - `jwt` (default): a Keycloak token → [With `auth_type: jwt`](docs/getting-started/deploy-models.md#with-auth_type-jwt)
 - `litellm_vkey`: a LiteLLM virtual key → [With `auth_type: litellm_vkey`](docs/getting-started/deploy-models.md#with-auth_type-litellm_vkey)
