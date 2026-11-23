@@ -95,6 +95,7 @@ options:
     description: "component -> objects it creates outside its tasks: [{kind, namespace, name, labels}], any subset"
   skip_resources: {type: list, elements: str, description: "resource or resource.group never listed"}
   label_prefix: {type: str, description: Prefix of the component label}
+  legacy_label_prefixes: {type: list, elements: str, description: "earlier prefixes delete also matches (delete)"}
   restore_resources: {type: list, elements: str, description: "resources whose added labels teardown restores"}
   timeout: {type: int, default: 600, description: Seconds to wait per delete phase}
   component_failed: {type: bool, default: false, description: "label: the component failed (a failure no rescue handled)"}
@@ -602,6 +603,19 @@ def _created_by(api, resources, objects, p):
 
 
 def delete(api, p, module):
+    """Delete by the current prefix, then by each legacy one (envs labelled before the rename)."""
+    total = {"deleted": [], "restored": [], "left": []}
+    for prefix in [p["label_prefix"]] + p["legacy_label_prefixes"]:
+        result = _delete(api, dict(p, label_prefix=prefix), module)
+        total["deleted"] += result["deleted"]
+        total["restored"] += result["restored"]
+        if result["left"]:
+            return dict(total, changed=bool(total["deleted"] or total["restored"]), left=result["left"],
+                        phase=result["phase"])
+    return dict(total, changed=bool(total["deleted"] or total["restored"]))
+
+
+def _delete(api, p, module):
     selector = "%s/env=%s,%s/component=%s" % (p["label_prefix"], p["env"], p["label_prefix"], p["component"])
     resources = _discover(api, set(p["skip_resources"]))
     objects = _all_objects(api, resources, selector)
@@ -650,7 +664,8 @@ def main():
             "component": {"type": "str"},
             "declared": {"type": "dict", "default": {}},
             "skip_resources": {"type": "list", "elements": "str", "default": []},
-            "label_prefix": {"type": "str", "default": "ai-solutions.intel.com"},
+            "label_prefix": {"type": "str", "default": "toolkit-manager.intel.com"},
+            "legacy_label_prefixes": {"type": "list", "elements": "str", "default": []},
             "restore_resources": {"type": "list", "elements": "str", "default": ["namespaces", "nodes"]},
             "timeout": {"type": "int", "default": 600},
             "component_failed": {"type": "bool", "default": False},

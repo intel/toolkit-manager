@@ -126,6 +126,7 @@
   ownership_k8s:
     action: delete
     label_prefix: "{{ ownership_label_prefix }}"
+    legacy_label_prefixes: "{{ ownership_legacy_label_prefixes }}"
     env: "{{ env_name | default('local') }}"
     component: "{{ component.name }}"
     skip_resources: "{{ ownership_skip_resources }}"

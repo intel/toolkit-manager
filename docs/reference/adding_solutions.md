@@ -328,10 +328,13 @@ Roles do not label anything themselves. Around every component, of every layer, 
 `ownership` role labels each object the component created:
 
 ```
-ai-solutions.intel.com/env:       <env name>
-ai-solutions.intel.com/layer:     <layer>
-ai-solutions.intel.com/component: <component>
+toolkit-manager.intel.com/env:       <env name>
+toolkit-manager.intel.com/layer:     <layer>
+toolkit-manager.intel.com/component: <component>
 ```
+
+Teardown also matches the old `ai-solutions.intel.com/` prefix, so envs labelled before the
+rename still tear down (`ownership_legacy_label_prefixes`).
 
 Before the first component it records the UID of every object on the cluster. While the
 component runs, a callback (`callback_plugins/ownership_record.py`) records what its own
@@ -368,7 +371,7 @@ teardown never deletes part of a release's history and leaves the release broken
 Labels a component adds to a Namespace or Node that was there before (a customer's
 namespace that joins the mesh with `istio.io/dataplane-mode`, a node placement label) are
 recorded, not labelled: the object gets the annotation
-`ai-solutions.intel.com/labels-before.<env>.<component>`, with the value each key had before
+`toolkit-manager.intel.com/labels-before.<env>.<component>`, with the value each key had before
 (`null`: absent) and the value set. Only objects a task reported count; kinds are listed in
 `ownership_restore_resources`. Teardown puts the old values back for the keys that still
 hold the value set, and drops the annotation. A key someone changed since is left as it is.

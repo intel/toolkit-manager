@@ -17,7 +17,7 @@ _spec = importlib.util.spec_from_file_location("ownership_k8s", _MODULE)
 own = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(own)
 
-PREFIX = "ai-solutions.intel.com"
+PREFIX = "toolkit-manager.intel.com"
 COMPONENT = f"{PREFIX}/component"
 
 
@@ -152,6 +152,7 @@ class Module:
 def params(tmp_path, component="app", **extra):
     return dict({"state_file": str(tmp_path / "ownership-uids.json"), "env": "local", "layer": "platform",
                  "component": component, "declared": {}, "skip_resources": [], "label_prefix": PREFIX,
+                 "legacy_label_prefixes": ["ai-solutions.intel.com"],
                  "restore_resources": ["namespaces", "nodes"], "timeout": 1, "component_failed": False,
                  "teardown": False, "predates_labels": False}, **extra)
 
@@ -263,6 +264,18 @@ def test_u4_teardown_leaves_pvcs_and_takes_the_certificate_secret(tmp_path):
     assert not api.exists(cert_secret)
     assert all(api.exists(u) for u in pvcs + [unrelated])
     assert sorted(result["deleted"]) == ["Certificate shared/tls", "Secret shared/tls-secret", "StatefulSet shared/db"]
+
+
+def test_teardown_matches_the_legacy_prefix(tmp_path):
+    api, p = FakeApi(), params(tmp_path)
+    old = api.add("Secret", "old", "shared", labels={"ai-solutions.intel.com/env": "local",
+                                                     "ai-solutions.intel.com/component": "app"})
+    new = api.add("Secret", "new", "shared", labels={f"{PREFIX}/env": "local", COMPONENT: "app"})
+
+    result = own.delete(api, p, Module())
+
+    assert result["left"] == []
+    assert not api.exists(old) and not api.exists(new)
 
 
 def test_failed_component_carries_unclaimed_objects(tmp_path):
