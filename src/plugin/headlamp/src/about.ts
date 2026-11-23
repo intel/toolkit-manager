@@ -4,7 +4,7 @@
 // Landing-page text about the stack. Edit freely; no code depends on the wording.
 export const ABOUT = {
   summary:
-    'An on-premises AI platform on Kubernetes: serve open models on Intel CPUs, expose them through one secure gateway, and run the platform from a single console.',
+    'An on-premises AI platform on Kubernetes: serve open models on Intel® Xeon® processors, expose them through one secure gateway, and run the platform from a single console.',
   features: [
     {
       icon: 'mdi:brain',
@@ -14,7 +14,7 @@ export const ABOUT = {
     {
       icon: 'mdi:api',
       title: 'OpenAI-compatible API',
-      text: 'LiteLLM in front of every model, with virtual keys, rate limits and spend tracking.',
+      text: 'One endpoint for every model through the Envoy AI Gateway; optional LiteLLM adds virtual keys, rate limits and spend tracking.',
     },
     {
       icon: 'mdi:shield-lock-outline',
