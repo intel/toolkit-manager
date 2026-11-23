@@ -1,0 +1,28 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+# Callers outside the mesh have no mesh identity: under STRICT ztunnel refuses their
+# plain TCP. Only the ports they call accept it, from any source; every other port of
+# the workload stays STRICT.
+#   istio_out_of_mesh_exception_namespace   default namespace of the workloads
+#   istio_out_of_mesh_exception_workloads   [{name, selector, ports, namespace (optional), labels (optional)}]
+
+- name: "istio | out-of-mesh exception | Open the callers' ports (port-level mTLS)"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: security.istio.io/v1
+      kind: PeerAuthentication
+      metadata:
+        name: "{{ item.name }}"
+        namespace: "{{ item.namespace | default(istio_out_of_mesh_exception_namespace) }}"
+        labels: "{{ item.labels | default({}) }}"
+      spec:
+        selector:
+          matchLabels: "{{ item.selector }}"
+        mtls:
+          mode: STRICT
+        portLevelMtls: "{{ dict(item.ports | map('string') | product([{'mode': 'PERMISSIVE'}])) }}"
+  loop: "{{ istio_out_of_mesh_exception_workloads }}"
+  loop_control:
+    label: "{{ item.namespace | default(istio_out_of_mesh_exception_namespace) }}/{{ item.name }}: {{ item.ports | join(',') }}"
