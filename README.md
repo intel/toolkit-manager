@@ -1,15 +1,15 @@
-![Toolkit Manager](docs/images/banner.jpg)
+![Toolkit Manager](docs/assets/banner.jpg)
 
 # Toolkit Manager
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Platform: Intel Xeon](https://img.shields.io/badge/Platform-Intel%C2%AE%20Xeon%C2%AE-0068B5)](https://www.intel.com/xeon)
+[![Platform: Intel](https://img.shields.io/badge/Platform-Intel%C2%AE-0068B5)](https://www.intel.com)
 [![Deployment: Kubernetes](https://img.shields.io/badge/Deployment-Kubernetes-326CE5)](https://kubernetes.io)
 [![Serving: vLLM · OVMS](https://img.shields.io/badge/Serving-vLLM%20%C2%B7%20OVMS-purple)](https://vllm.ai)
 [![Gateway: Envoy](https://img.shields.io/badge/Gateway-Envoy%20AI%20Gateway-orange)](https://gateway.envoyproxy.io)
 [![API: OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-green)](https://platform.openai.com/docs/api-reference)
 
-**The fast path to deploying AI on Intel® Xeon® processors. Go from bare metal to a working AI stack with one installer.**
+**The fast path to deploying AI on Intel® platforms. Go from bare metal to a working AI stack with one installer.**
 
 > Deploy and connect LLM inference, RAG, and agentic workflows in a customizable Kubernetes-based platform — with a GenAI gateway, security, intelligent routing, observability, model serving, and infrastructure automation built in.
 
@@ -19,7 +19,7 @@
 
 A production AI stack needs more than a model endpoint: LLM inference, RAG and agents, plus security, routing and observability, all connected.
 
-Toolkit Manager wires these together in a pre-integrated, customizable Kubernetes stack optimized for Intel® Xeon® processors. One installer, `toolkit_manager.sh`, takes bare-metal machines through Kubernetes, platform services, model serving and the AI gateway, and ends with secured, OpenAI-compatible endpoints. Start with the defaults, then configure or extend as needed.
+Toolkit Manager wires these together in a pre-integrated, customizable Kubernetes stack optimized for Intel® platforms. One installer, `toolkit_manager.sh`, takes bare-metal machines through Kubernetes, platform services, model serving and the AI gateway, and ends with secured, OpenAI-compatible endpoints. Start with the defaults, then configure or extend as needed.
 
 ## Architecture
 
@@ -125,7 +125,7 @@ kubectl -n keycloak get secret platform-bootstrap-admin -o jsonpath='{.data.valu
 
 ### Layer 3: Intel® Inference Toolkit
 
-**What you get:** models served on Intel® Xeon® (KServe with vLLM and OpenVINO™ Model Server) behind one OpenAI-compatible endpoint, `https://inference.inteltoolkits.ai/v1`; the Envoy AI Gateway sends each request to the model it names. `model-manager` deploys and removes models in one command.
+**What you get:** models served on Intel® platforms (KServe with vLLM and OpenVINO™ Model Server) behind one OpenAI-compatible endpoint, `https://inference.inteltoolkits.ai/v1`; the Envoy AI Gateway sends each request to the model it names. `model-manager` deploys and removes models in one command.
 
 **API sign-in:** to change it, uncomment `auth_type` in `env/local/global_config.yaml` before you install: `jwt` (default, Keycloak tokens) or `litellm_vkey` ([LiteLLM virtual keys](docs/deployment/install-platform.md#option-b--litellm-virtual-keys-auth_type-litellm_vkey)).
 
@@ -252,4 +252,4 @@ Everything beyond the Quick Start, grouped by task. The [Documentation Index](do
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
 
-*Intel®, Intel® Xeon®, and Intel® Arc™ are registered trademarks of Intel Corporation or its subsidiaries.*
+*Intel® and Intel® Arc™ are registered trademarks of Intel Corporation or its subsidiaries.*
