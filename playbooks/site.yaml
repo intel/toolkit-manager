@@ -8,7 +8,7 @@
 #   ansible-playbook playbooks/site.yaml -e key=value          # override vars
 # =============================================================================
 
-- name: "AI-solutions"
+- name: "Toolkit Manager"
   hosts: localhost
   connection: local
   gather_facts: true
@@ -33,6 +33,9 @@
   pre_tasks:
     - name: "Preflight"
       ansible.builtin.include_tasks: includes/preflight.yaml
+
+    - name: "Resolve target"
+      ansible.builtin.include_tasks: includes/resolve_target.yaml
 
     # Teardown too: it first labels what a killed install left unlabelled.
     - name: "Record what is already on the cluster (ownership labels)"

@@ -40,6 +40,7 @@ Install the platform, serve a model, deploy RAG, and go beyond a single node.
 | [Deploy on OpenShift](deploy/openshift.md) | Preparing an OpenShift + OpenShift AI cluster from the marketplace, then installing on top (preview) |
 | [NetApp ONTAP and Trident](deploy/netapp_ontap.md) | Deploying with Trident + ONTAP as the storage backend |
 | [Network Architecture](deploy/networking.md) | Network topology, IP allocation, and how a request reaches a model |
+| [Upgrade a Layer](deploy/upgrade.md) | Upgrading through `install`, the upgrade checks, backup, restore and rollback |
 
 ## Configure & customize
 
@@ -60,7 +61,7 @@ Look up exact commands, architecture decisions, and cluster-level details.
 
 | Guide | What it covers |
 |-------|----------------|
-| [CLI Reference](customize/cli.md) | `es_auto_installer.sh` and `model-manager` commands and flags |
+| [CLI Reference](customize/cli.md) | `toolkit_manager.sh` and `model-manager` commands and flags |
 | [Architecture & Design](reference/architecture.md) | How the modular deployment framework is structured |
 | [Namespace Security Labels](reference/labels.md) | Pod Security Admission and Istio labels applied per namespace |
 | [Adding Solution Layers](reference/adding_solutions.md) | How to create and plug in your own solution layer |
