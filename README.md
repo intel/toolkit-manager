@@ -150,21 +150,16 @@ kubectl -n keycloak get secret platform-bootstrap-admin -o jsonpath='{.data.valu
    ./toolkit_manager.sh install inference       # ◀── may take a few minutes
    ```
 
-**Check it:** deploy a model (unless you did in step 2), get a token, and call it:
+**Check it:** deploy a model (unless you did in step 2), then call it with the credential your `auth_type` uses:
 
 ```bash
 ./model-manager deploy qwen3-0-6b --wait   # downloads the weights, picks serving parameters, starts the pod
-
-source ./ext/enterprise.ai-inference/model_manager/scripts/get-keycloak-token.sh   # exports TOKEN, GATEWAY_IP, GATEWAY_DOMAIN, GATEWAY_URL
-
-curl -s --noproxy '*' --cacert env/local/logs/ai-solutions-ca.crt \
-  --resolve "$GATEWAY_DOMAIN:443:$GATEWAY_IP" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"model":"qwen3-0-6b","messages":[{"role":"user","content":"Hello!"}],"max_tokens":64}' \
-  "$GATEWAY_URL/v1/chat/completions"
 ```
 
-A JSON reply with `choices` means the model is serving. `--resolve` reaches the gateway without an `/etc/hosts` entry; `--cacert` trusts the installer's certificate. Any OpenAI client works here. More: [Deploy a Model](docs/getting-started/deploy-models.md) (gated models, the Python SDK, LiteLLM keys), [Integration Guide](docs/reference/integration.md).
+- `jwt` (default): a Keycloak token → [With `auth_type: jwt`](docs/getting-started/deploy-models.md#with-auth_type-jwt)
+- `litellm_vkey`: a LiteLLM virtual key → [With `auth_type: litellm_vkey`](docs/getting-started/deploy-models.md#with-auth_type-litellm_vkey)
+
+A JSON reply with `choices` means the model is serving; any OpenAI client works. More: [Deploy a Model](docs/getting-started/deploy-models.md) (gated models, the Python SDK), [Integration Guide](docs/reference/integration.md).
 
 **In the browser:** the Kubernetes cluster dashboard gains a **Models** page to deploy and remove models, plus LiteLLM and Langfuse when LiteLLM is on → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
 
