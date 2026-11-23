@@ -95,7 +95,10 @@
   vars:
     _name: "{{ item.metadata.name }}"
     _host: "{{ item.metadata.labels['kubernetes.io/hostname'] | default(_name) }}"
-    _ready: "{{ _name in space_node_hosts or _host in space_node_hosts }}"
+    # A single-node install names its one host localhost in the inventory, as for Kata
+    _ready: >-
+      {{ _name in space_node_hosts or _host in space_node_hosts
+         or (_space_k8s_nodes.resources | length == 1 and space_node_hosts | length > 0) }}
   kubernetes.core.k8s:
     state: patched
     kind: Node
