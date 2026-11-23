@@ -1,0 +1,31 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Constants (not settings)
+# =============================================================================
+# The RDMA NICs and the RoCE settings come from rack-profile.yaml
+# (node_rdma_nics, rack_scale_rdma_*). files/rdma_qos.py and
+# files/rdma_readback.py use the same state file path.
+
+rack_scale_rdma_packages: [rdma-core, ibverbs-providers, ibverbs-utils, perftest, ethtool]
+rack_scale_rdma_modules_file: /etc/modules-load.d/99-rack-rdma.conf
+rack_scale_rdma_record_path: "{{ env_dir }}/inventory/metadata/rdma-readback.yaml"
+rack_scale_rdma_label: rdma-nics
+
+# ib_write_bw: seconds and queue pairs per run; a run below this share of its
+# expected rate (the lower of the link speed and the PCIe link) is reported.
+rack_scale_rdma_bw_seconds: 5
+rack_scale_rdma_bw_qps: 4
+rack_scale_rdma_bw_low: 0.5
+# Line-buffered, so a run cut off by timeout keeps its output.
+_rdma_bw_cmd: >-
+  stdbuf -oL -eL ib_write_bw -R -q {{ rack_scale_rdma_bw_qps }} -D {{ rack_scale_rdma_bw_seconds }}
+  -F --report_gbits -T {{ rack_scale_rdma_dscp | int * 4 }}
+rack_scale_rdma_drivers: {bnxt_en: bnxt_re, ice: irdma, mlx5_core: mlx5_ib}
+rack_scale_rdma_qos_bin: /usr/local/sbin/rack-rdma-qos
+rack_scale_rdma_qos_state: /etc/rack-rdma-qos.json
+rack_scale_rdma_qos_unit: rack-rdma-qos.service
+rack_scale_rdma_qos_unit_file: "/etc/systemd/system/{{ rack_scale_rdma_qos_unit }}"
+rack_scale_rdma_netplan_dest: /etc/netplan/99-rdma.yaml

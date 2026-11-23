@@ -541,6 +541,95 @@ to install.
 
 ---
 
+## RDMA (RoCE v2)
+
+RDMA runs on the nodes that list `rdma_nics`, with any topology, `none`
+included. Each RDMA NIC is one of:
+
+- **Dedicated** (the default): a NIC of its own, on its own network. GPU
+  backend NICs (one per GPU) are always dedicated.
+- **Shared**: a NIC that is also in `fabric_nics`. RDMA runs on its
+  `fabric_ip` and `network.mtu`. Supported for CPU, storage and KV-cache RDMA.
+
+```yaml
+network:
+  rdma:                        # every key is optional; the defaults are shown
+    mtu: 9000                  # dedicated RDMA NICs
+    dscp: 26                   # how RoCE traffic is marked
+    priority: 3                # the priority DSCP 26 maps to: the one lossless priority
+    pfc: true                  # PFC on that priority only
+    ecn: true                  # warn when the NIC's ECN is off (read on ConnectX only)
+    subnet: 192.168.40.0/24    # no default: needed only when an rdma_nics entry has rdma_ip
+
+racks:
+  rack-01:
+    nodes:
+      worker1:
+        rdma_nics:
+          - nic: ens28np0          # dedicated: the installer writes /etc/netplan/99-rdma.yaml
+            rdma_ip: 192.168.40.20
+          - nic: ens29np0          # dedicated, no rdma_ip: the site configures it; checked only
+          - nic: ens801f0          # also in fabric_nics: shared
+```
+
+`rdma_nics: [ens28np0]` (names only) is the same as entries without `rdma_ip`.
+
+**What the installer does** (`fabric_rdma`, after `kubernetes`; nothing when no
+node lists `rdma_nics`):
+
+- Installs rdma-core, ibverbs-providers, ibverbs-utils, perftest and ethtool,
+  and loads the NICs' RDMA drivers (`bnxt_re`, `irdma`, `mlx5_ib`), also at boot.
+- Writes netplan for dedicated NICs with `rdma_ip` (`/etc/netplan/99-rdma.yaml`).
+  `rdma_ip` means the installer configures the NIC: no other netplan file may.
+- Applies the RoCE settings on the hosts that have none (below).
+- Reads back every RDMA NIC and measures it node to node (Validation).
+- Labels the RDMA nodes `rdma-nics=<count>`; RDMA workloads select on it.
+
+**RoCE settings on the hosts: which value wins.**
+
+1. What the site already applies on the host (PFC, a DSCP map, the RDMA-CM
+   default ToS) is kept and checked. A difference from `network.rdma` is a
+   warning; it is never overwritten. So is a NIC whose firmware takes its
+   DCB settings from the switch (DCBX, e.g. the E810's `fw-lldp-agent`).
+2. Otherwise `network.rdma`: PFC on `priority` only, DSCP `dscp` mapped to
+   `priority`, and the RDMA-CM default ToS (DSCP × 4), applied now and at
+   every boot by `rack-rdma-qos.service`. On dedicated RDMA NICs also
+   `arp_ignore 1` and `arp_announce 2`: a node with two NICs on one network
+   would otherwise answer ARP for one NIC's address from the other, and RDMA
+   sent there finds no connection.
+3. The defaults, for keys `network.rdma` leaves out.
+
+These settings do no harm while the switches lack PFC or ECN, and RoCE works
+on a lossy network. Lossless RoCE needs the switches to match them. The
+installer never configures switches: give your network team this table.
+
+| Switch setting | Value with the defaults | Why |
+|---|---|---|
+| QoS trust | DSCP | RoCE traffic is classified by its DSCP |
+| DSCP to traffic class | 26 → 3 | The RoCE class |
+| PFC | On priority 3 only | PFC on other priorities can pause TCP traffic (Calico, Ceph, etcd) |
+| ECN | On the queue of priority 3 | Congestion control slows senders before PFC has to pause them |
+| PFC watchdog | On | Stops a pause storm |
+| MTU | At least `network.rdma.mtu` plus headers (9214 for 9000) | RDMA frames at the NIC MTU must pass |
+
+**Limits:**
+
+- RoCE v2 on Ethernet only: InfiniBand ports are refused. IPv4 only.
+- ECN is read back on NVIDIA ConnectX (mlx5) NICs only.
+- A shared NIC on `star`: traffic between spokes is forwarded by the hub's
+  kernel, without PFC.
+- To change `network.rdma` or a node's `rdma_nics`, tear down `fabric_rdma`, then
+  install it again.
+- Teardown removes the RDMA netplan file and its addresses but leaves the NIC up
+  at its MTU; reboot, or `ip link set <nic> down`.
+
+**Nodes:** `add-node` sets up RDMA on the added node(s) only and checks their
+RDMA NICs; with one added node there is no second node to measure against.
+`remove-node` takes RDMA down on the removed node(s).
+`./toolkit_manager.sh validate fabric_rdma --env <env>` measures the whole rack again.
+
+---
+
 ## Validation
 
 ```bash
@@ -564,6 +653,30 @@ The `fabric_validate` role checks (read-only; with `topology: none` only the nod
 
 Quorum members (etcd/control-plane) fail hard if unreachable. Worker nodes warn
 and continue. Every check is listed per node as `OK:` or `FAIL:`; any `FAIL` fails the run.
+
+With RDMA NICs, `fabric_rdma` reads back each one and fails, naming the node
+and NIC, when it cannot work: no RDMA device (driver not loaded), an InfiniBand
+port, link down, no IPv4 address or RoCE v2 GID, the wrong MTU where the
+installer sets it, or the management NIC. Settings that differ from
+`network.rdma` are warnings.
+
+It then runs `ib_write_bw` over RDMA-CM, marked with the RoCE DSCP and pinned to
+each NIC's NUMA node, in a ring over the NICs of each RDMA network (the NICs
+whose addresses share a subnet; shared NICs are one network, the fabric): each
+NIC sends to the next NIC in the ring on another node, so every NIC is tested. Each run is reported against the lower of the
+link speed and the PCIe link (a 400G NIC on PCIe Gen4 x16 tops out near
+250 Gb/s); one under half of it is a warning. The NIC counters before and after
+show how the network behaved:
+
+| Counter | Means |
+|---|---|
+| PFC pauses received | The switch paused the NIC: switch PFC is working |
+| ECN-marked | The switch marked congestion: switch ECN is working |
+| Retransmitted | Packets were dropped: the network is lossy for RoCE (PFC or ECN off on the hosts or the switches), a warning |
+
+Everything is recorded in `inventory/metadata/rdma-readback.yaml`: per RDMA NIC
+its driver, RDMA device, RoCE v2 GID, link speed, PCIe link, NUMA node, MTU,
+PFC, DSCP, ECN and ToS, the bandwidth runs and the counters.
 
 ---
 
@@ -624,6 +737,8 @@ fabric_inventory → kubernetes → fabric_validate (labels only) → storage
 ```
 fabric_netplan, fabric_sysctl, fabric_bgp all skip. No fabric network — rack-profile used for inventory and GPU labels only.
 
+**With RDMA NICs** (any topology), `fabric_rdma` runs after `kubernetes`.
+
 **Platform layer**, after the infrastructure layer: NFD comes first on every cluster, and on a rack-scale env
 **with NVIDIA GPU nodes** (any topology) the GPU operator follows it:
 ```
@@ -646,6 +761,7 @@ kubernetes → storage
 | `inventory/metadata/bgp-peers/<name>.yaml` | Per-node BGPPeer CRDs (Clos only) |
 | `inventory/metadata/vars/ceph-storage.yml` | Ceph fabric network + OSD devices |
 | `inventory/metadata/rack-scale-flags.env` | Shell-sourceable derived flags |
+| `inventory/metadata/rdma-readback.yaml` | RDMA NICs, bandwidth and counters (written by `fabric_rdma` on install and validate) |
 
 ### Config Variables
 

@@ -81,6 +81,14 @@ components:
     enabled: "{{ rack_scale_enabled | default(false) | bool }}"
     depends_on: [kubernetes, fabric_bgp]
 
+  # RoCE v2 on the nodes that list rdma_nics in rack-profile.yaml, with any
+  # topology; a no-op when none does. After kubernetes: it labels the RDMA nodes.
+  - name: fabric_rdma
+    layer: infrastructure
+    teardown: role
+    enabled: "{{ rack_scale_enabled | default(false) | bool }}"
+    depends_on: [kubernetes]
+
   # Rook keeps the CephCluster and its pools while Ceph volumes exist: its own
   # teardown sets the cleanup policy first.
   - name: storage

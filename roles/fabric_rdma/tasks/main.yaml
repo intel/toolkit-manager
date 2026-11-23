@@ -1,0 +1,12 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Main Dispatcher
+# =============================================================================
+# add-node and remove-node include install.yaml and teardown.yaml with
+# _fabric_scope_nodes.
+
+- name: "fabric_rdma | {{ component_action }}"
+  ansible.builtin.include_tasks: "{{ component_action }}.yaml"

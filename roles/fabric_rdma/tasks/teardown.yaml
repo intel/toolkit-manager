@@ -1,0 +1,54 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Teardown
+# =============================================================================
+# Every cluster node, not only today's rdma_nodes: the profile may have dropped
+# a node's rdma_nics since the install. Removes only what install added: the
+# label, the RoCE settings rack-rdma-qos applied, the RDMA netplan file and its
+# addresses, the boot-time module list. NIC settings the site applied, and the
+# packages, stay.
+
+- name: "fabric_rdma | teardown | Cluster nodes"
+  ansible.builtin.set_fact:
+    _rdma_all_nodes: >-
+      {{ _fabric_scope_nodes | default((groups['kube_control_plane'] | default([]))
+         | union(groups['kube_node'] | default([]))
+         | union(groups.get('ceph_storage_nodes', []))
+         | reject('equalto', 'localhost') | unique) }}
+
+- name: "fabric_rdma | teardown | Remove the rdma-nics label"
+  ansible.builtin.command:
+    cmd: kubectl label node {{ item }} {{ rack_scale_rdma_label }}-
+  environment:
+    KUBECONFIG: "{{ kubernetes_kubeconfig }}"
+  delegate_to: localhost
+  loop: "{{ _rdma_all_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+  register: _rdma_unlabel
+  changed_when: "'unlabeled' in _rdma_unlabel.stdout"
+  # remove-node: the node has left the cluster
+  failed_when: _rdma_unlabel.rc != 0 and 'NotFound' not in _rdma_unlabel.stderr
+
+- name: "fabric_rdma | teardown | RoCE settings"
+  ansible.builtin.include_tasks: qos_remove.yaml
+  vars:
+    _rdma_qos_remove_hosts: "{{ _rdma_all_nodes }}"
+
+- name: "fabric_rdma | teardown | Netplan"
+  ansible.builtin.include_tasks: netplan_remove.yaml
+  vars:
+    _rdma_netplan_remove_hosts: "{{ _rdma_all_nodes }}"
+
+- name: "fabric_rdma | teardown | Remove the boot-time module list"
+  ansible.builtin.file:
+    path: "{{ rack_scale_rdma_modules_file }}"
+    state: absent
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_all_nodes }}"
+  loop_control:
+    label: "{{ item }}"

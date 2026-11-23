@@ -1,0 +1,30 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Read back the RDMA NICs into _rdma_readback (changes nothing)
+# =============================================================================
+
+- name: "fabric_rdma | Read back the RDMA NICs"
+  ansible.builtin.script:
+    cmd: "{{ role_path }}/files/rdma_readback.py"
+    executable: python3
+  environment:
+    RDMA_READBACK_SPEC: >-
+      {{ {'nics': hostvars[item].node_rdma_nics | map(attribute='nic') | list,
+          'priority': rack_scale_rdma_priority | int} | to_json }}
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_hosts }}"
+  loop_control:
+    label: "{{ item }}"
+  register: _rdma_probe
+  changed_when: false
+  check_mode: false
+
+- name: "fabric_rdma | Read-back"
+  ansible.builtin.set_fact:
+    _rdma_readback: >-
+      {{ dict(_rdma_probe.results | map(attribute='item')
+              | zip(_rdma_probe.results | map(attribute='stdout') | map('from_json'))) }}

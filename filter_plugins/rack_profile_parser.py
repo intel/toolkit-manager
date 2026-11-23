@@ -1624,6 +1624,7 @@ def _build_summary(ctx):
         "fabric_cidrs": _fabric_cidrs(ctx),
         "node_count": len(all_nodes),
         "rdma": {k: ctx["rdma"][k] for k in ("dscp", "priority", "pfc", "ecn")},
+        "netplan_renderer": ctx["netplan_renderer"],
         "gpu_vendor": gpu_vendor,
         "gpu_model": gpu_model,
         "gpu_form": gpu_form,

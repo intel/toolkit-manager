@@ -207,3 +207,6 @@ def test_rdma_nics_shape_is_checked():
         "node 'w2' rdma_nics[1] must be a NIC name or a mapping with 'nic'",
         "node 'w2' rdma_nics[2] rdma_ip must be an address such as 192.168.40.11, got 3232245771"]
 
+
+def test_summary_has_the_netplan_renderer():
+    assert parse(none_rack())["summary"]["netplan_renderer"] == "networkd"

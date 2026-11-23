@@ -1,0 +1,56 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Take back the RoCE settings: _rdma_qos_remove_hosts
+# =============================================================================
+# Nothing happens on a node without rack-rdma-qos.
+
+- name: "fabric_rdma | qos | Take back the settings"
+  ansible.builtin.command:
+    cmd: "{{ rack_scale_rdma_qos_bin }} undo"
+    removes: "{{ rack_scale_rdma_qos_bin }}"
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_qos_remove_hosts }}"
+  changed_when: true
+
+- name: "fabric_rdma | qos | Find rack-rdma-qos.service"
+  ansible.builtin.stat:
+    path: "{{ rack_scale_rdma_qos_unit_file }}"
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_qos_remove_hosts }}"
+  register: _rdma_qos_unit_file
+
+- name: "fabric_rdma | qos | Stop applying them at boot"
+  ansible.builtin.systemd_service:
+    name: "{{ rack_scale_rdma_qos_unit }}"
+    enabled: false
+    state: stopped
+  delegate_to: "{{ item.item }}"
+  become: true
+  loop: "{{ _rdma_qos_unit_file.results | selectattr('stat.exists') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: "fabric_rdma | qos | Remove rack-rdma-qos"
+  ansible.builtin.file:
+    path: "{{ item.1 }}"
+    state: absent
+  delegate_to: "{{ item.0 }}"
+  become: true
+  loop: >-
+    {{ _rdma_qos_remove_hosts | product([rack_scale_rdma_qos_bin, rack_scale_rdma_qos_state,
+                                         rack_scale_rdma_qos_unit_file]) | list }}
+  loop_control:
+    label: "{{ item.0 }}: {{ item.1 }}"
+  register: _rdma_qos_removed
+
+- name: "fabric_rdma | qos | Reload systemd"
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_qos_removed.results | selectattr('changed') | map(attribute='item') | map('first') | unique | list }}"

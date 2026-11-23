@@ -1,0 +1,46 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Netplan for dedicated RDMA NICs with rdma_ip (install)
+# =============================================================================
+# The installer configures a dedicated RDMA NIC only when rack-profile.yaml
+# gives it an rdma_ip; without one the site configures the NIC and the
+# read-back checks it. A shared NIC is a fabric NIC: fabric_netplan owns it.
+
+- name: "fabric_rdma | netplan | Nodes with an rdma_ip"
+  ansible.builtin.set_fact:
+    _rdma_netplan_hosts: >-
+      {% set out = [] %}{% for h in _rdma_hosts %}{% if hostvars[h].node_rdma_nics
+        | selectattr('rdma_ip', 'defined') | list %}{% set _ = out.append(h) %}{% endif %}{% endfor %}{{ out }}
+
+- name: "fabric_rdma | netplan | Write {{ rack_scale_rdma_netplan_dest }}"
+  vars:
+    _ethernets: >-
+      {% set out = {} %}{% for n in hostvars[item].node_rdma_nics | selectattr('rdma_ip', 'defined') %}{% set _ = out.update({n.nic: {
+        'dhcp4': false, 'dhcp6': false, 'addresses': [n.rdma_ip ~ '/' ~ n.prefix], 'mtu': n.mtu}}) %}{% endfor %}{{ out }}
+  ansible.builtin.copy:
+    content: |
+      # Written by the Toolkit Manager installer (fabric_rdma): the dedicated RDMA NICs
+      # that have rdma_ip in rack-profile.yaml. Removed on teardown.
+      {{ {'network': {'version': 2, 'renderer': rack_scale_netplan_renderer, 'ethernets': _ethernets}} | to_nice_yaml(indent=2) }}
+    dest: "{{ rack_scale_rdma_netplan_dest }}"
+    owner: root
+    group: root
+    mode: "0600"
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_netplan_hosts }}"
+  loop_control:
+    label: "{{ item }}"
+  register: _rdma_netplan_written
+
+- name: "fabric_rdma | netplan | Check and apply where it changed"
+  ansible.builtin.shell: netplan generate && netplan apply
+  delegate_to: "{{ item.item }}"
+  become: true
+  loop: "{{ _rdma_netplan_written.results | selectattr('changed') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+  changed_when: true

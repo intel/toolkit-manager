@@ -1,0 +1,42 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Bandwidth between the RDMA NICs (install and validate)
+# =============================================================================
+
+- name: "fabric_rdma | Bandwidth | Pairs"
+  ansible.builtin.set_fact:
+    _rdma_pairs: "{{ _rdma_eval.record | rdma_bw_pairs(_rdma_hosts) }}"
+    _rdma_bw: []
+    _rdma_before: "{{ _rdma_readback }}"
+
+- name: "fabric_rdma | Bandwidth | Fail if perftest is missing"
+  vars:
+    _missing: >-
+      {{ (_rdma_pairs | map(attribute='client') | list + _rdma_pairs | map(attribute='server') | list)
+         | unique | reject('in', _rdma_readback | dict2items | selectattr('value.ib_write_bw')
+                                                | map(attribute='key') | list) | list }}
+  ansible.builtin.fail:
+    msg: >-
+      ib_write_bw (perftest) is not installed on {{ _missing | join(', ') }}.
+      Install the infrastructure layer (it installs {{ rack_scale_rdma_packages | join(', ') }}), or
+      install perftest on those nodes.
+  when: _missing | length > 0
+
+- name: "fabric_rdma | Bandwidth | ib_write_bw"
+  ansible.builtin.include_tasks: bandwidth_pair.yaml
+  loop: "{{ _rdma_pairs }}"
+  loop_control:
+    loop_var: _pair
+    label: "{{ _pair.client }} {{ _pair.client_nic }} -> {{ _pair.server }} {{ _pair.server_nic }}"
+
+- name: "fabric_rdma | Bandwidth | Read the counters again"
+  ansible.builtin.include_tasks: probe.yaml
+  when: _rdma_pairs | length > 0
+
+- name: "fabric_rdma | Bandwidth | Counters that moved"
+  ansible.builtin.set_fact:
+    _rdma_deltas: "{{ _rdma_before | rdma_counter_deltas(_rdma_readback, rack_scale_rdma_priority | int) }}"
+  when: _rdma_pairs | length > 0
