@@ -98,10 +98,10 @@ Enforce mTLS across the whole mesh with the `PeerAuthentication` from [Enabling 
 oc get peerauthentication default -n istio-system -o jsonpath='{.spec.mtls.mode}'   # STRICT
 ```
 
-istio-cni SNATs the kubelet's probes of ambient pods to a fixed source address, so they reach the pod from that address, not from the node. Where a port takes both the probes and an out-of-mesh caller, the installer's `NetworkPolicy` admits that address, which it reads from the `IstioCNI`. Set it there explicitly (`169.254.7.127` is istio-cni's default):
+istio-cni SNATs the kubelet's probes of ambient pods to a fixed source address, so they reach the pod from that address, not from the node. Where a port takes both the probes and an out-of-mesh caller, the installer's `NetworkPolicy` admits that address, which it reads from the `IstioCNI`. An unset address is not readable from the API, so set it there explicitly; Istio's default is `169.254.7.127`:
 
 ```bash
-oc patch istiocni default --type merge -p '{"spec":{"values":{"cni":{"env":{"HOST_PROBE_SNAT_IP":"169.254.7.127"}}}}}'
+oc patch istiocni default --type merge -p '{"spec":{"values":{"cni":{"env":{"HOST_PROBE_SNAT_IP":"<address>"}}}}}'
 oc get istiocni default -o jsonpath='{.spec.values.cni.env.HOST_PROBE_SNAT_IP}'   # the address
 ```
 
