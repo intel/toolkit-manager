@@ -1,6 +1,6 @@
 # Getting Started with Intel® Chatbot Toolkit
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 Deploy the full RAG application stack on a single localhost machine — Kubernetes, platform services, inference models, and the RAG application layer — with one installer.
 
@@ -173,7 +173,7 @@ The installer skips Kubespray entirely and deploys platform + inference + erag o
 
 ### Multi-Node / Remote Deployment
 
-For remote nodes, list them in `env/<name>/nodes.yaml`; the installer generates `inventory/hosts.yaml` from it. See [Multi-Node & BYO Cluster](../deploy/topologies.md) for details.
+For remote nodes, list them in `env/<name>/nodes.yaml`; the installer generates `inventory/hosts.yaml` from it. See [Multi-Node & BYO Cluster](../deployment/multi-node.md) for details.
 
 ### Passing Extra Ansible Variables
 
@@ -304,8 +304,8 @@ Browse pods, logs, exec into containers, and filter by namespace — all from th
 
 | Goal | Guide |
 |------|-------|
-| Model management | [Deploy Models](../deploy/deploy_models.md) |
+| Model management | [Deploy Models](deploy-models.md) |
 | Architecture overview | [Architecture](../reference/architecture.md) |
-| Network details | [Network Architecture](../deploy/networking.md) |
-| Adding your own solution layer | [Adding Solutions](../reference/adding_solutions.md) |
+| Network details | [Network Architecture](../reference/networking.md) |
+| Adding your own solution layer | [Adding Solutions](../reference/adding-solutions.md) |
 | Platform getting started | [Getting Started](quickstart.md) |

@@ -1,6 +1,6 @@
 # Node Topology & Workload Placement
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 On a cluster with several machines, Toolkit Manager labels each node by its job and asks the scheduler to keep the platform services together, away from the machines that serve models.
 
@@ -117,7 +117,7 @@ The `workload-class=inference` label is applied to workers, and `preflight.yaml`
 - Platform services and models do not compete for the same CPU and memory, where the control plane can take the platform pods
 
 ### NUMA Optimization
-- Workers can be given over to model serving, with CPU pinning per NUMA domain (see [NRI CPU Balloons](nri_cpu_balloons.md))
+- Workers can be given over to model serving, with CPU pinning per NUMA domain (see [NRI CPU Balloons](nri-cpu-balloons.md))
 
 ### Control Plane Stability
 - The control plane is not loaded with models
@@ -243,9 +243,9 @@ Labels are applied **idempotently**: re-running the installer neither duplicates
 | If you want to… | Go to |
 |---|---|
 | Enable/disable node topology and set related flags in `global_config.yaml` | [Configuration Reference](configuration.md) |
-| Pin model pods to specific CPUs/NUMA domains once they land on the right node | [NRI CPU Balloons](nri_cpu_balloons.md) |
-| Deploy across multiple nodes in the first place | [Multi-Node & BYO Cluster](../deploy/topologies.md) |
-| Add or remove nodes from an already-provisioned cluster | [Node Scaling](node_scaling.md) |
+| Pin model pods to specific CPUs/NUMA domains once they land on the right node | [NRI CPU Balloons](nri-cpu-balloons.md) |
+| Deploy across multiple nodes in the first place | [Multi-Node & BYO Cluster](../deployment/multi-node.md) |
+| Add or remove nodes from an already-provisioned cluster | [Node Scaling](../deployment/node-scaling.md) |
 | See where node-level placement fits in the overall design | [Architecture & Design Document](../reference/architecture.md) |
 
 ## External References

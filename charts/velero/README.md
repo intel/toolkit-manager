@@ -20,4 +20,4 @@ the store's credentials and applies the CRDs, and the installer drives it:
 Every variable the component takes is declared in `roles/velero/defaults/main.yaml`.
 The backup profile format the backup engine reads is documented in `configs/backup.yaml`.
 To take and restore a backup of a layer, use `./run_backup.sh`: see
-[Backup and restore](../../docs/deploy/upgrade.md#backup-and-restore).
+[Backup and restore](../../docs/deployment/upgrade.md#backup-and-restore).

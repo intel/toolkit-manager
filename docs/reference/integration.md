@@ -1,6 +1,6 @@
 # Integrating Your Application
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 How to connect **your tool, framework, or application** to the Toolkit Manager inference stack, without changing the stack itself.
 
@@ -135,7 +135,7 @@ URL pattern: `https://inference.<domain>/v1/...`. The AI gateway picks the model
 
 - **Success:** a JSON answer with `choices[0].message.content`.
 - `"model"` is the name you deployed with `./model-manager deploy <name>`. To list them: `curl ... ${GATEWAY_URL}/v1/models`.
-- `--resolve` sends the request to the gateway IP without a DNS entry. Once DNS points at the gateway ([External access](../deploy/networking.md#external-access-configuration)), drop it.
+- `--resolve` sends the request to the gateway IP without a DNS entry. Once DNS points at the gateway ([External access](networking.md#external-access-configuration)), drop it.
 
 That same endpoint + token is what every framework below uses (`${GATEWAY_URL}/v1`).
 
@@ -274,7 +274,7 @@ These run **alongside** the stack; your app talks to them directly. For example:
 | **Weaviate** | `helm install weaviate weaviate/weaviate -n weaviate --create-namespace` |
 | **Chroma** | `helm install chromadb chromadb/chromadb` |
 
-The stack doesn't need to know about them: only your application code uses them. For a ready-made RAG stack, see [Getting Started with Intel® Chatbot Toolkit](../quickstart/getting_started_rag.md).
+The stack doesn't need to know about them: only your application code uses them. For a ready-made RAG stack, see [Getting Started with Intel® Chatbot Toolkit](../getting-started/chatbot-toolkit.md).
 
 ### Eval & Observability
 
@@ -346,7 +346,7 @@ You don't have to write Ansible. Use the model-manager:
 ./model-manager deploy <model-name>
 ```
 
-It creates the KServe resources for the model and registers it with the AI gateway (and with LiteLLM, when LiteLLM is on). The model is then reachable at the same endpoint, `${GATEWAY_URL}/v1/...`, with the same token: only the `"model"` field changes. See [Deploy a Model](../deploy/deploy_models.md).
+It creates the KServe resources for the model and registers it with the AI gateway (and with LiteLLM, when LiteLLM is on). The model is then reachable at the same endpoint, `${GATEWAY_URL}/v1/...`, with the same token: only the `"model"` field changes. See [Deploy a Model](../getting-started/deploy-models.md).
 
 To deploy models at install time instead, mark them `autodeploy: true` in `env/<env>/models.yaml` (with `llm_services_deploy_models: true` in `env/<env>/config.inference.yaml`), or list them in `llm_services_autodeploy_models`. Then run:
 
@@ -512,7 +512,7 @@ listeners:
     hostname: "<base_domain_name>"
 ```
 
-Each `HTTPRoute` then claims the exact hostnames and paths it serves. The `*.<base_domain_name>` listener speaks HTTP/1.1 only. Platform services publish their own hosts with ListenerSets on Envoy Gateway 1.9+ ([How services attach](../deploy/networking.md#gateway-resource)).
+Each `HTTPRoute` then claims the exact hostnames and paths it serves. The `*.<base_domain_name>` listener speaks HTTP/1.1 only. Platform services publish their own hosts with ListenerSets on Envoy Gateway 1.9+ ([How services attach](networking.md#gateway-resource)).
 
 ### What's running today
 
@@ -689,10 +689,10 @@ The rare cases:
 
 | Need | Where to change |
 |---|---|
-| **CPU tuning for other Intel® Xeon® generations** | NRI balloon sizing and `kubernetes_cpu_policy` ([NRI CPU Balloons](nri_cpu_balloons.md)) |
+| **CPU tuning for other Intel® Xeon® generations** | NRI balloon sizing and `kubernetes_cpu_policy` ([NRI CPU Balloons](../configuration/nri-cpu-balloons.md)) |
 | **A non-HTTP inference protocol** (raw gRPC, Triton without a predictor) | A custom route and backend pointing at the service |
 | **mTLS-only client auth** | Replace the JWT `SecurityPolicy` with a client-certificate policy, and issue certificates with cert-manager |
-| **A new service the installer deploys** | Write a role under `roles/<name>/` and register it in `configs/components.yaml`, or ship it as a solution layer ([Adding Solution Layers](../reference/adding_solutions.md)) |
+| **A new service the installer deploys** | Write a role under `roles/<name>/` and register it in `configs/components.yaml`, or ship it as a solution layer ([Adding Solution Layers](adding-solutions.md)) |
 
 ---
 
@@ -714,9 +714,9 @@ The rare cases:
 
 | If you want to… | Go to |
 |---|---|
-| See where the gateway and auth boundary you just integrated with fit in the full stack | [Architecture & Design Document](../reference/architecture.md) |
-| Trace exactly how a request flows through MetalLB, the gateway, and ingress | [Network Architecture](../deploy/networking.md) |
-| Deploy, list, or undeploy the model you're pointing your app at | [Deploy a Model](../deploy/deploy_models.md) |
+| See where the gateway and auth boundary you just integrated with fit in the full stack | [Architecture & Design Document](architecture.md) |
+| Trace exactly how a request flows through MetalLB, the gateway, and ingress | [Network Architecture](networking.md) |
+| Deploy, list, or undeploy the model you're pointing your app at | [Deploy a Model](../getting-started/deploy-models.md) |
 | Dig into the inference repo (`model-manager`, vLLM/OVMS configs) | [Intel® Inference Toolkit on GitHub](https://github.com/intel/inference-toolkit) |
 
 Files behind the auth flow above:

@@ -1,6 +1,6 @@
 # Namespace Security Labels
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 Every namespace (a named group of Kubernetes resources) that Toolkit Manager creates gets up to four labels. This page lists them per namespace, so you can see how strict each one is and whether it is in the service mesh.
 
@@ -141,5 +141,5 @@ These namespaces only exist once `install erag` has run; `install inference` doe
 | If you want to… | Go to |
 |---|---|
 | See where these namespaces sit in the overall layer architecture | [Architecture & Design Document](architecture.md) |
-| Understand how Istio ambient mode routes traffic between labeled namespaces | [Network Architecture — Layer 4: Istio Ambient](../deploy/networking.md#layer-4-istio-ambient--service-mesh-mtls) |
-| Turn components (and so their namespaces) on or off | [Configuration Reference](../customize/configuration.md) |
+| Understand how Istio ambient mode routes traffic between labeled namespaces | [Network Architecture — Layer 4: Istio Ambient](networking.md#layer-4-istio-ambient--service-mesh-mtls) |
+| Turn components (and so their namespaces) on or off | [Configuration Reference](../configuration/configuration.md) |

@@ -1,6 +1,6 @@
 # Architecture & Design
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 ## Overview
 
@@ -91,7 +91,7 @@ playbooks/site.yaml (runs on localhost, against the cluster API)
 └─ The installer prints the completion banner
 ```
 
-Teardown of `kubernetes` or `infrastructure` works the same way around Kubespray's `reset.yml`: first everything that runs on the cluster is removed, then the cluster is reset, then what the cluster ran on (the rack-scale fabric). It asks for confirmation first, because the reset destroys the cluster. See [Ownership labels](adding_solutions.md#ownership-labels) for what teardown removes.
+Teardown of `kubernetes` or `infrastructure` works the same way around Kubespray's `reset.yml`: first everything that runs on the cluster is removed, then the cluster is reset, then what the cluster ran on (the rack-scale fabric). It asks for confirmation first, because the reset destroys the cluster. See [Ownership labels](adding-solutions.md#ownership-labels) for what teardown removes.
 
 ---
 
@@ -173,7 +173,7 @@ These patterns are what let Toolkit Manager stay modular — new components, rep
 
 ### Action Dispatch
 
-Every component role's `tasks/main.yaml` is the same small dispatcher ([Roles](adding_solutions.md#4-roles)).
+Every component role's `tasks/main.yaml` is the same small dispatcher ([Roles](adding-solutions.md#4-roles)).
 The `component_action` variable is passed as an extra-var from the CLI to `playbooks/site.yaml`:
 - `install` → tasks/install.yaml
 - `teardown` → tasks/teardown.yaml
@@ -265,7 +265,7 @@ vim env/prod/nodes.yaml
 
 ### Auto-Discovery of Models and Runtimes
 
-There is no file auto-discovery. Models are entries in the catalog `env/<name>/models.yaml` (seeded from the inference repo's `model_manager/models.yaml`), and `./model-manager deploy <name>` serves one. Adding a model is a catalog entry, not a code change; serving engines (`servers`) are part of each catalog entry. See [Deploy a Model](../deploy/deploy_models.md).
+There is no file auto-discovery. Models are entries in the catalog `env/<name>/models.yaml` (seeded from the inference repo's `model_manager/models.yaml`), and `./model-manager deploy <name>` serves one. Adding a model is a catalog entry, not a code change; serving engines (`servers`) are part of each catalog entry. See [Deploy a Model](../getting-started/deploy-models.md).
 
 ### Kubernetes Installation
 
@@ -290,7 +290,7 @@ The `kubernetes` role uses **Kubespray** (kubernetes-sigs/kubespray) to install 
 
 ### Deployment Topologies
 
-Where the cluster runs is set in `env/<name>/nodes.yaml` (or, for a cluster you bring, `global_config.yaml`). When `nodes.yaml` lists nodes, the installer writes `env/<name>/inventory/hosts.yaml` from it on every run. See [Multi-Node & BYO Cluster](../deploy/topologies.md) for full examples.
+Where the cluster runs is set in `env/<name>/nodes.yaml` (or, for a cluster you bring, `global_config.yaml`). When `nodes.yaml` lists nodes, the installer writes `env/<name>/inventory/hosts.yaml` from it on every run. See [Multi-Node & BYO Cluster](../deployment/multi-node.md) for full examples.
 
 #### 1. Localhost Installation (default)
 
@@ -357,14 +357,14 @@ A file-level map of this repository and the external inference repo it composes 
 
 | File | Purpose |
 |------|---------|
-| `toolkit_manager.sh` | The CLI. Actions: `configure`, `init <layer>`, `show`, `install`, `teardown`, `validate`, `status`, `add-node`, `remove-node`. Flags: `--env <name>`, `--flavour <name>` and `--upgrade` (init only), `--only` (skip dep auto-inclusion), `--skip <names>` (comma-separated layers/components to exclude), `--force` (skip confirmation; on `install`, run past a refusing upgrade check), `--dry-run` (add-node, remove-node), `--health` (status), `--node-lost` (remove-node), `--` (pass remaining args to ansible-playbook). See the [CLI Reference](../customize/cli.md). |
+| `toolkit_manager.sh` | The CLI. Actions: `configure`, `init <layer>`, `show`, `install`, `teardown`, `validate`, `status`, `add-node`, `remove-node`. Flags: `--env <name>`, `--flavour <name>` and `--upgrade` (init only), `--only` (skip dep auto-inclusion), `--skip <names>` (comma-separated layers/components to exclude), `--force` (skip confirmation; on `install`, run past a refusing upgrade check), `--dry-run` (add-node, remove-node), `--health` (status), `--node-lost` (remove-node), `--` (pass remaining args to ansible-playbook). See the [CLI Reference](cli.md). |
 | `es_auto_installer.sh` | The CLI's former name. Runs `toolkit_manager.sh` with the same arguments and prints a notice. |
-| `run_backup.sh` | Back up, restore or list one layer's backups with Velero: actions `backup`, `restore`, `list`, each with a `<layer>`; flags `--env <name>`, `--from <backup>` (restore), `--force`, `--`. Sources `toolkit_manager.sh` for its playbook arguments and runs `playbooks/backup.yaml`. See [Upgrade a Layer](../deploy/upgrade.md). |
+| `run_backup.sh` | Back up, restore or list one layer's backups with Velero: actions `backup`, `restore`, `list`, each with a `<layer>`; flags `--env <name>`, `--from <backup>` (restore), `--force`, `--`. Sources `toolkit_manager.sh` for its playbook arguments and runs `playbooks/backup.yaml`. See [Upgrade a Layer](../deployment/upgrade.md). |
 | `model-manager` | Runs `ext/enterprise.ai-inference/model_manager/model-manager` against `env/<name>/` (`TKM_ENV` picks the env). |
 | `ansible.cfg` | Ansible configuration: `any_errors_fatal`, default stdout callback with yaml result format, `timer` + `profile_tasks` callbacks. `roles_path` is overridden at runtime by the composed `ANSIBLE_ROLES_PATH`. |
 | `configs/components.yaml` | This repo's layers and components. |
 | `configs/defaults/*.yaml` | Seeds `init` copies into a new env: `global_config.yaml`, `nodes.yaml`. |
-| `configs/repos/repos.<layer>.yaml` | The repos each solution layer needs ([Adding a Solution](adding_solutions.md#1-the-layer-manifest-in-toolkit-manager)). |
+| `configs/repos/repos.<layer>.yaml` | The repos each solution layer needs ([Adding a Solution](adding-solutions.md#1-the-layer-manifest-in-toolkit-manager)). |
 | `env/<name>/global_config.yaml` | Main config for the environment: domain, storage, TLS, proxy, auth, feature switches. Overrides role defaults and layer configs. |
 | `env/<name>/nodes.yaml` | The machines of the cluster; when it lists nodes, the installer generates `inventory/hosts.yaml` from it. |
 | `env/<name>/inventory/hosts.yaml` | Kubespray-compatible inventory. Defines control-plane, workers, etcd groups. Copied from `inventory/hosts.yaml` by `init`; regenerated from `nodes.yaml` when that lists nodes. |
@@ -398,7 +398,7 @@ A file-level map of this repository and the external inference repo it composes 
 | `tasks/precheck.yaml` | System prerequisites: swap disable, kernel modules (`br_netfilter`, `overlay`), sysctl, required packages |
 | `tasks/install_kubespray.yaml` | **Prep phase only** (3-phase split): clones Kubespray to `.kubespray/`, creates its Python venv, writes `env/<name>/kubespray_extra_auto.yml`, then exits. Installer runs `cluster.yml` directly for live output. |
 | `tasks/post_install.yaml` | **Post-kubespray phase**: with `setup_kubeconfig.yaml`, writes `env/<name>/kubeconfig.yaml`, waits for nodes ready, verifies helm, prints cluster summary. |
-| `tasks/add-node.yaml`, `tasks/remove-node.yaml` | The `add-node` / `remove-node` actions ([Node Scaling](../customize/node_scaling.md)). |
+| `tasks/add-node.yaml`, `tasks/remove-node.yaml` | The `add-node` / `remove-node` actions ([Node Scaling](../deployment/node-scaling.md)). |
 | `tasks/teardown.yaml` | Runs Kubespray `reset.yml` via 3-phase split (prep → installer runs reset → cleanup), removes kubeconfig. On a BYO cluster it only removes the workload-class labels. |
 | `tasks/validate.yaml` | Checks kubectl, kubeconfig exists, cluster reachable, node status, server version, summary report |
 
@@ -411,12 +411,12 @@ All roles follow the same pattern: `defaults/main.yaml` for config, `tasks/main.
 | `storage` | Storage engine. `defaults/main.yaml` holds the `storage_backend` selector + `storage_backends` registry; `resolve.yaml` (run in preflight) maps the selector to a backend role, rejects `local-path` on multi-node clusters and validates the ONTAP values; the meta-role `include_role`s the resolved role: `local-path` (built in), `nfs_storage`, `rook_ceph_storage`, `netapp_trident_csi` or `custom_storage`. Adding a backend = registry row + a role. |
 | `nfs_storage` | Storage backend: NFS server + NFS provisioner for ReadWriteMany volumes. Marks its SC cluster-default. Flat vars (`nfs_*`), idempotent. |
 | `rook_ceph_storage` | Storage backend: Rook/Ceph cluster on raw block devices. CephFS provides ReadWriteMany; teardown device wiping is opt-in (`rook_ceph_teardown_wipe_devices`). |
-| `netapp_trident_csi` | Storage backend: NetApp Trident operator + ONTAP `TridentBackendConfig` + StorageClass (`reclaimPolicy: Retain`, `volumeBindingMode: Immediate`). Splits its tasks by what they need (variables / nodes / array) so everything but the array probes runs offline. See [NetApp ONTAP](../deploy/netapp_ontap.md). |
+| `netapp_trident_csi` | Storage backend: NetApp Trident operator + ONTAP `TridentBackendConfig` + StorageClass (`reclaimPolicy: Retain`, `volumeBindingMode: Immediate`). Splits its tasks by what they need (variables / nodes / array) so everything but the array probes runs offline. See [NetApp ONTAP](../deployment/netapp-ontap.md). |
 | `custom_storage` | Storage backend for a CSI driver you installed yourself: installs nothing and uses your ReadWriteMany StorageClass. |
 | `kata_containers` | Kata Containers runtime on the nodes that pass its check (opt-in). |
-| `fabric_inventory`, `fabric_netplan`, `fabric_sysctl`, `fabric_bgp`, `fabric_validate` | Rack-scale fabric: inventory from `rack-profile.yaml`, NIC configuration, kernel settings, Calico BGP peers, health checks ([Rack-scale Deployment](../rack-scale-deployment.md)). |
+| `fabric_inventory`, `fabric_netplan`, `fabric_sysctl`, `fabric_bgp`, `fabric_validate` | Rack-scale fabric: inventory from `rack-profile.yaml`, NIC configuration, kernel settings, Calico BGP peers, health checks ([Rack-scale Deployment](../deployment/rack-scale.md)). |
 | `node_feature_discovery` | Labels nodes with their hardware features (for example AMX), which model scheduling uses. |
-| `intel_gpu_plugin` | Intel GPU device plugin: advertises Intel GPUs as `gpu.intel.com/xe` for the GPU model runtimes. Only on nodes NFD labels with an Intel GPU; not on OpenShift ([details](../deploy/install_platform.md#what-gets-installed)). |
+| `intel_gpu_plugin` | Intel GPU device plugin: advertises Intel GPUs as `gpu.intel.com/xe` for the GPU model runtimes. Only on nodes NFD labels with an Intel GPU; not on OpenShift ([details](../deployment/install-platform.md#what-gets-installed)). |
 | `metallb` | MetalLB for LoadBalancer services. IP range from `metallb_ip_range`, or derived from the node IPs. |
 | `cert_manager` | Helm install cert-manager (issues TLS certificates for the gateway and KServe). |
 | `istio` | Istio ambient mesh. Workload namespaces enrolled via the `istio.io/dataplane-mode: ambient` label ([labels](labels.md)). Provides mTLS between services without sidecars. |
@@ -424,14 +424,14 @@ All roles follow the same pattern: `defaults/main.yaml` for config, `tasks/main.
 | `gateway`, `envoy_gateway` | The platform's front door (Gateway API): TLS, hostnames, the deny-by-default Keycloak JWT SecurityPolicy. `envoy_gateway` installs the Envoy Gateway controller it runs on. |
 | `postgresql` | CNPG operator + the PostgreSQL cluster for Keycloak, LiteLLM, Langfuse. |
 | `keycloak` | Keycloak operator + instance and the platform realm for sign-in. On by default (`keycloak_enabled`). |
-| `headlamp` | Kubernetes web UI with Keycloak sign-in (opt-in, `headlamp_enabled`) ([Headlamp](../deploy/headlamp.md)). |
+| `headlamp` | Kubernetes web UI with Keycloak sign-in (opt-in, `headlamp_enabled`) ([Headlamp](../configuration/headlamp.md)). |
 | `object_store` | The object store interface; selects the backend (`object_store_backend`: `seaweedfs` or `external`). |
 | `seaweedfs` | S3-compatible object storage for Loki, Tempo, Langfuse blob storage. |
-| `observability` | Prometheus + Grafana + Loki + Tempo + OpenTelemetry Collector stack ([Observability](../deploy/observability.md)). |
+| `observability` | Prometheus + Grafana + Loki + Tempo + OpenTelemetry Collector stack ([Observability](../configuration/observability.md)). |
 | `keda` | Event-driven autoscaling (opt-in, `keda_enabled`). |
 | `velero` | Cluster backups (opt-in, `velero_enabled`; needs snapshot-capable storage). |
 | `nvidia_gpu_operator`, `gpu_observability` | NVIDIA GPU nodes on rack-scale: the GPU Operator, DCGM metrics and dashboards. |
-| `nri_cpu_balloons` | NRI CPU-balloons plugin. Generates per-node `BalloonsPolicy` CRs based on NUMA topology. Enabled only when `kubernetes_cpu_policy=nri-balloons` and `kubernetes_accelerator=cpu` ([NRI CPU Balloons](../customize/nri_cpu_balloons.md)). |
+| `nri_cpu_balloons` | NRI CPU-balloons plugin. Generates per-node `BalloonsPolicy` CRs based on NUMA topology. Enabled only when `kubernetes_cpu_policy=nri-balloons` and `kubernetes_accelerator=cpu` ([NRI CPU Balloons](../configuration/nri-cpu-balloons.md)). |
 | `ownership` | Library role: labels what each component creates and deletes it on teardown. |
 | `upgrade_checks` | Library role: deployment records, run classes and the checks before an upgrade. |
 | `backup` | Library role used by `playbooks/backup.yaml`. |
@@ -500,7 +500,7 @@ External repos live under `ext/<dest>/` and are cloned by `init <layer>` based o
 
 ## CLI Usage
 
-All Toolkit Manager commands run from the repository root. Every flag is in the [CLI Reference](../customize/cli.md).
+All Toolkit Manager commands run from the repository root. Every flag is in the [CLI Reference](cli.md).
 
 ```bash
 # One-time machine setup (Python venv, yq, kubectl, helm; asks first)
@@ -578,7 +578,7 @@ Alternatively, override at runtime without editing files:
 ./toolkit_manager.sh install cert_manager --only --env <name> -- -e certmanager_version=<new version>
 ```
 
-Some components have a release switch instead of a free version: `envoy_gateway_version` is derived from `envoy_gateway_upgrade` (`true` selects the newer release, and the KServe release that matches it). To upgrade a whole layer to a newer release, follow [Upgrade a Layer](../deploy/upgrade.md).
+Some components have a release switch instead of a free version: `envoy_gateway_version` is derived from `envoy_gateway_upgrade` (`true` selects the newer release, and the KServe release that matches it). To upgrade a whole layer to a newer release, follow [Upgrade a Layer](../deployment/upgrade.md).
 
 ---
 
@@ -609,11 +609,11 @@ Toolkit Manager is designed to grow without changes to this repo's core — add 
          - cert_manager
    ```
 
-3. Add default variables to `roles/my_component/defaults/main.yaml` and override in `env/<name>/global_config.yaml` if needed. Check it with `./toolkit_manager.sh show`. The full contract (fields, file rules, ownership labels) is in [Adding a Solution](adding_solutions.md).
+3. Add default variables to `roles/my_component/defaults/main.yaml` and override in `env/<name>/global_config.yaml` if needed. Check it with `./toolkit_manager.sh show`. The full contract (fields, file rules, ownership labels) is in [Adding a Solution](adding-solutions.md).
 
 ### Adding a New Repo
 
-See [Adding a Solution](adding_solutions.md) for the complete reference on creating a new solution layer with its own external repository. In brief:
+See [Adding a Solution](adding-solutions.md) for the complete reference on creating a new solution layer with its own external repository. In brief:
 
 1. Create `configs/repos/repos.<layer>.yaml` in toolkit-manager with the repo entries.
 2. In your repo, create `components.yaml`, `config.yaml`, and `roles/<component>/` directories.
@@ -632,7 +632,7 @@ Add an entry to the model catalog `env/<name>/models.yaml` (or to `model_manager
 ./model-manager deploy my-new-llm
 ```
 
-See [Deploy a Model](../deploy/deploy_models.md) for the catalog fields.
+See [Deploy a Model](../getting-started/deploy-models.md) for the catalog fields.
 
 ### Adding a New Serving Runtime
 
@@ -653,11 +653,11 @@ Toolkit Manager builds these safeguards into every install and teardown run:
 | Feature | How |
 |---------|-----|
 | **Fail-fast** | `any_errors_fatal = true` in ansible.cfg — stops entire run on any failure |
-| **Idempotent** | A second `install` with no change makes no change ([role contract](adding_solutions.md#4-roles)) |
+| **Idempotent** | A second `install` with no change makes no change ([role contract](adding-solutions.md#4-roles)) |
 | **Dry-run** | Pass `-- --check` to forward Ansible's check mode |
 | **Confirmation** | Teardown asks first and names what it removes; `--force` skips the prompt |
-| **Teardown removes only what install made** | Ownership labels ([details](adding_solutions.md#ownership-labels)) |
-| **Upgrade checks** | Run before an upgrade changes anything ([Upgrade a Layer](../deploy/upgrade.md)) |
+| **Teardown removes only what install made** | Ownership labels ([details](adding-solutions.md#ownership-labels)) |
+| **Upgrade checks** | Run before an upgrade changes anything ([Upgrade a Layer](../deployment/upgrade.md)) |
 | **Selective execution** | `--only` flag runs a single target without dependency auto-inclusion; `--skip` leaves components out |
 | **Validation** | Dedicated `validate` action runs each role's read-only checks |
 | **Timing** | `timer` + `profile_tasks` callbacks show per-task durations |
@@ -668,8 +668,8 @@ Toolkit Manager builds these safeguards into every install and teardown run:
 
 | If you want to… | Go to |
 |---|---|
-| Walk through installing the layers described here, step by step | [Deployment Guide](../deploy/install_platform.md) |
-| See how a request actually flows through the gateway and inference layers | [Network Architecture](../deploy/networking.md) |
-| Look up every setting that drives this architecture | [Configuration Reference](../customize/configuration.md) |
-| Connect your own app or framework to the inference layer | [Integration Guide](../customize/integration.md) |
-| Grow or shrink a cluster after it's already provisioned | [Node Scaling](../customize/node_scaling.md) |
+| Walk through installing the layers described here, step by step | [Deployment Guide](../deployment/install-platform.md) |
+| See how a request actually flows through the gateway and inference layers | [Network Architecture](networking.md) |
+| Look up every setting that drives this architecture | [Configuration Reference](../configuration/configuration.md) |
+| Connect your own app or framework to the inference layer | [Integration Guide](integration.md) |
+| Grow or shrink a cluster after it's already provisioned | [Node Scaling](../deployment/node-scaling.md) |

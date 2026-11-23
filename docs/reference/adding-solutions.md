@@ -1,6 +1,6 @@
 # Adding a Solution
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 A **solution** is an external Git repository that adds one layer of components to the
 stack. This repo (Toolkit Manager) declares the `infrastructure`, `platform` and `inference`
@@ -554,7 +554,7 @@ verbose output plus `ansible -vvv`, or `trace` to add bash xtrace. Per-run logs 
 
 **`backup_profile.yaml`**, beside `components.yaml`, is what `run_backup.sh` (`playbooks/backup.yaml`)
 reads to back up and restore your layer and what the `backup-freshness` upgrade check looks for; the
-operator side is in [Upgrade a Layer](../deploy/upgrade.md). On a layer that declares
+operator side is in [Upgrade a Layer](../deployment/upgrade.md). On a layer that declares
 `supports.upgrade`, an upgrade without the profile is refused (`--force` overrides, recorded as
 forced). The contract is
 [configs/backup.yaml](../../configs/backup.yaml); set `version_label` and `version_file` so each

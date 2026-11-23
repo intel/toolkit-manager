@@ -1,18 +1,18 @@
 # Multi-Node & BYO Cluster
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 How to deploy on several machines, or on a Kubernetes cluster you already run.
 
 There are two paths, and both end with the same platform:
 
-- **Multi-node:** you list your machines, and the installer builds one Kubernetes cluster across them with [Kubespray](../glossary.md) (the open-source Kubernetes installer it uses).
+- **Multi-node:** you list your machines, and the installer builds one Kubernetes cluster across them with [Kubespray](../reference/glossary.md) (the open-source Kubernetes installer it uses).
 - **Bring your own cluster (BYO):** you point the installer at an existing cluster. It skips building Kubernetes and installs only the platform and the layers above it.
 
 The stack itself is the same either way. What changes is who builds the cluster, and where data is stored.
 
 > [!IMPORTANT]
-> A multi-node cluster needs **shared storage** that several nodes can mount at once (ReadWriteMany): `storage_backend: nfs`, `ceph` or `netapp-trident`, or `custom` with a ReadWriteMany class. The default, `local-path`, keeps each volume on one node, so the other nodes could not read the model files. On more than one node, `install` stops with an error if `storage_backend` is `local-path`. See [Storage](../customize/configuration.md#storage).
+> A multi-node cluster needs **shared storage** that several nodes can mount at once (ReadWriteMany): `storage_backend: nfs`, `ceph` or `netapp-trident`, or `custom` with a ReadWriteMany class. The default, `local-path`, keeps each volume on one node, so the other nodes could not read the model files. On more than one node, `install` stops with an error if `storage_backend` is `local-path`. See [Storage](../configuration/configuration.md#storage).
 
 ---
 
@@ -61,7 +61,7 @@ base_domain_name: "inteltoolkits.ai"
 
 With `nfs`, the installer turns the **first control-plane node** into an NFS server that exports `/data/nfs`. You don't need any external storage. To use another NFS server or path, set `nfs_server` and `nfs_path` in `nodes.yaml`.
 
-For replicated block storage instead, use `ceph`. See [Configuration](../customize/configuration.md#storage).
+For replicated block storage instead, use `ceph`. See [Configuration](../configuration/configuration.md#storage).
 
 ---
 
@@ -184,7 +184,7 @@ nodes_workers:
 ```
 
 - **etcd** runs on all three control-plane nodes. It keeps working while any 2 of the 3 are up.
-- **MetalLB** (which gives the gateway its external IP address) picks its own address pool when `metallb_ip_range` is not set. With more than one control-plane node, that pool is `.240`–`.250` in the first node's subnet (here `10.0.1.240-10.0.1.250`). Make sure nothing else on your network uses those addresses, or set `metallb_ip_range` yourself in `nodes.yaml`. See [IP allocation](networking.md#ip-allocation-strategy).
+- **MetalLB** (which gives the gateway its external IP address) picks its own address pool when `metallb_ip_range` is not set. With more than one control-plane node, that pool is `.240`–`.250` in the first node's subnet (here `10.0.1.240-10.0.1.250`). Make sure nothing else on your network uses those addresses, or set `metallb_ip_range` yourself in `nodes.yaml`. See [IP allocation](../reference/networking.md#ip-allocation-strategy).
 
 ---
 
@@ -197,7 +197,7 @@ When `node_topology_enabled: true` (the default) and the cluster has worker node
 | Platform components (Keycloak, PostgreSQL, Envoy Gateway, KServe controller, ...) | Control-plane nodes | `workload-class=platform` |
 | Inference workloads (model-serving pods) | Worker nodes | `workload-class=inference` |
 
-These are **preferences, not rules**: when a preferred node is full, pods run elsewhere. No taints are added. On a single node nothing is labelled. See [Node Topology](../customize/node_topology.md) for details.
+These are **preferences, not rules**: when a preferred node is full, pods run elsewhere. No taints are added. On a single node nothing is labelled. See [Node Topology](../configuration/node-topology.md) for details.
 
 ---
 
@@ -232,7 +232,7 @@ Install the platform on a cluster you already manage. The installer skips Kubesp
    ```
 
 > **BYO with Headlamp:** the installer does not change your API server. See
-> [Headlamp and Platform Sign-in](headlamp.md#bring-your-own-kubernetes-byo) for the
+> [Headlamp and Platform Sign-in](../configuration/headlamp.md#bring-your-own-kubernetes-byo) for the
 > one-time API server step, or the mode that needs none.
 
 > **BYO node topology:** the installer does not label nodes on a BYO cluster. To get the placement above, label them yourself:
@@ -268,8 +268,8 @@ On a BYO cluster, `teardown` never resets the cluster: it only removes what the 
 
 | If you want to… | Go to |
 |---|---|
-| Understand the single-node path this guide branches from | [Getting Started](../quickstart/quickstart.md) |
-| Add or remove worker nodes on a running cluster | [Node Scaling](../customize/node_scaling.md) |
-| See exactly how platform vs. inference pods get placed on your new nodes | [Node Topology & Workload Placement](../customize/node_topology.md) |
-| Set `storage_backend`, TLS, or other multi-node-required settings | [Configuration Reference](../customize/configuration.md#storage) |
-| Trace how external traffic reaches these nodes | [Network Architecture](networking.md) |
+| Understand the single-node path this guide branches from | [Getting Started](../getting-started/quickstart.md) |
+| Add or remove worker nodes on a running cluster | [Node Scaling](node-scaling.md) |
+| See exactly how platform vs. inference pods get placed on your new nodes | [Node Topology & Workload Placement](../configuration/node-topology.md) |
+| Set `storage_backend`, TLS, or other multi-node-required settings | [Configuration Reference](../configuration/configuration.md#storage) |
+| Trace how external traffic reaches these nodes | [Network Architecture](../reference/networking.md) |

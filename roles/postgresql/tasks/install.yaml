@@ -33,7 +33,7 @@
         fail_msg: >-
           CloudNativePG is not installed. On OpenShift install it from OperatorHub
           (package cloudnative-pg, certified-operators) before running the installer;
-          see docs/deploy/openshift.md.
+          see docs/deployment/openshift.md.
         success_msg: "CNPG operator provided by the cluster (OLM) — skipping Helm install."
         quiet: true
 

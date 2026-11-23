@@ -1,5 +1,7 @@
 # Headlamp and Platform Sign-in
 
+[← Docs index](../README.md)
+
 Headlamp is the cluster web UI and the platform's landing page. People sign in
 with their Keycloak account (realm `platform`), the same sign-in as Grafana,
 Langfuse and the LiteLLM admin UI. This page covers turning it on, who gets in,

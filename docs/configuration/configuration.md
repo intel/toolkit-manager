@@ -1,6 +1,6 @@
 # Configuration Reference
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 ## What Does global_config.yaml Control?
 
@@ -75,7 +75,7 @@ Edit the file when one of these is true:
 | `storage_backend` | `local-path` | Where persistent data lives — see [Storage](#storage) |
 | `gateway_tls_mode` | `selfsigned` | Generate a certificate, or bring your own — see [TLS](#tls) |
 | `observability_enabled` | `true` | Deploy the monitoring stack: Grafana, Prometheus, Loki, Tempo |
-| `velero_enabled` | `false` | Deploy the backup mechanism (Velero). Needs `storage_backend: nfs` or `ceph`; `run_backup.sh` backs up and restores a layer with it (see [Upgrade a Layer](../deploy/upgrade.md#backup-and-restore)) |
+| `velero_enabled` | `false` | Deploy the backup mechanism (Velero). Needs `storage_backend: nfs` or `ceph`; `run_backup.sh` backs up and restores a layer with it (see [Upgrade a Layer](../deployment/upgrade.md#backup-and-restore)) |
 
 Everything else is safe to leave alone until you have a reason to change it.
 
@@ -165,7 +165,7 @@ is left as it is (or commented out).
 | `observability_enabled` | Whether the full monitoring stack (Prometheus/Grafana/Loki/Tempo) is deployed. Default `true` |
 | `observability_prometheus_retention`, `observability_prometheus_storage_size` | How long Prometheus keeps metrics (default `30d`) and its disk size (default `50Gi`) |
 | `metrics_server_enabled` | Node and pod CPU/memory figures (`kubectl top`, Headlamp). Default `true`; skipped if the cluster already has one |
-| `headlamp_enabled` | Headlamp, the Kubernetes web UI, with Keycloak sign-in. Default `false` — see [Headlamp](../deploy/headlamp.md) |
+| `headlamp_enabled` | Headlamp, the Kubernetes web UI, with Keycloak sign-in. Default `false` — see [Headlamp](headlamp.md) |
 | `keda_enabled` | KEDA event-driven autoscaling (on OpenShift: the Custom Metrics Autoscaler). Default `false` |
 | `velero_enabled` | Whether the backup mechanism (Velero) is deployed. Default `false`; needs snapshot-capable storage (`nfs` or `ceph`) |
 | `kata_containers_enabled`, `kata_runtime` | Kata Containers microVM runtime for the Agent Toolkit sandbox. Default `false`; runtime `kata-fc` (Firecracker, default), `kata-qemu` or `both` — see [Kata Containers](#kata-containers) |
@@ -175,16 +175,16 @@ is left as it is (or commented out).
 | `seaweedfs_volume_storage_size` | Size of the SeaweedFS data volume. Default `10Gi`; fixed after the first install |
 | `auth_type` | API authentication: `jwt` (default; Agent Toolkit: `litellm_vkey`). Leave it commented here: a value in this file overrides every layer's choice — see [API authentication](#api-authentication) |
 | `keycloak_platform_bootstrap_admin_mfa` | `true`: the platform admin must set up a one-time-password app at first sign-in. Default `false` |
-| `headlamp_byo_apiserver_trusted` | Your own cluster's API server already trusts the platform realm. Default `false` — see [Headlamp](../deploy/headlamp.md) |
-| `node_topology_enabled` | Prefer control-plane nodes for platform pods and worker nodes for models (a preference, not a rule). Default `true` — see [Node Topology](node_topology.md) |
+| `headlamp_byo_apiserver_trusted` | Your own cluster's API server already trusts the platform realm. Default `false` — see [Headlamp](headlamp.md) |
+| `node_topology_enabled` | Prefer control-plane nodes for platform pods and worker nodes for models (a preference, not a rule). Default `true` — see [Node Topology](node-topology.md) |
 | `enforce_pss` | Pod Security labels on every namespace the installer creates. Default `true` — see [Namespace Security Labels](../reference/labels.md) |
 | `kubernetes_cpu_policy` | CPU pinning strategy for inference workloads. Default `nri-balloons` — see [CPU policy](#cpu-policy) |
 | `kubernetes_accelerator` | Compute target for inference workloads. Default `cpu` (Intel® Xeon®: tune the kubelet's CPU/NUMA settings); CPU pinning is turned off for any other value |
-| `rack_scale_enabled` | Rack-scale fabric; needs `env/<name>/rack-profile.yaml`. Default `false` — see [Rack-scale deployment](../rack-scale-deployment.md) |
+| `rack_scale_enabled` | Rack-scale fabric; needs `env/<name>/rack-profile.yaml`. Default `false` — see [Rack-scale deployment](../deployment/rack-scale.md) |
 | `envoy_gateway_upgrade` | `true`: install Envoy Gateway 1.9.3 instead of 1.7.5 (and upgrade an older one in place). Default `false`; never downgrades |
 | `rook_ceph_devices`, `rook_ceph_teardown_wipe_devices` | `storage_backend: ceph` only — see [Storage](#storage) |
-| `ontap_*`, `gateway_s3_subdomain` | `storage_backend: netapp-trident` only — see [NetApp ONTAP and Trident](../deploy/netapp_ontap.md) |
-| `cluster_distribution`, `openshift_prereq_*` | OpenShift only — see [Deploy on OpenShift](../deploy/openshift.md) |
+| `ontap_*`, `gateway_s3_subdomain` | `storage_backend: netapp-trident` only — see [NetApp ONTAP and Trident](../deployment/netapp-ontap.md) |
+| `cluster_distribution`, `openshift_prereq_*` | OpenShift only — see [Deploy on OpenShift](../deployment/openshift.md) |
 
 ---
 
@@ -251,7 +251,7 @@ Langfuse is on whenever LiteLLM is, unless `langfuse_enabled: false`. The `litel
 | `local-path` (default) | Storage on each node's own disk (one node at a time can use a volume) | **Single node only** |
 | `nfs` | The installer sets up an NFS server on the first control-plane node, at `/data/nfs`, and shares it with every node through the `csi-driver-nfs` driver (so volumes can be snapshotted). The StorageClass is called `nfs-client` | **Multi-node**: every node needs to read the model weights. Also needed for `velero_enabled` |
 | `ceph` | Replicated storage across nodes with Rook-Ceph, on raw disks you name | Multi-node with spare disks, when data must survive a node failure |
-| `netapp-trident` | NetApp ONTAP storage through Trident | You have an ONTAP array — see [NetApp ONTAP and Trident](../deploy/netapp_ontap.md) |
+| `netapp-trident` | NetApp ONTAP storage through Trident | You have an ONTAP array — see [NetApp ONTAP and Trident](../deployment/netapp-ontap.md) |
 | `custom` | Nothing is installed; your existing StorageClass is used as it is | Your cluster already runs its own storage driver |
 
 > **Multi-node warning:** the installer stops if `storage_backend: local-path` is set on a
@@ -296,7 +296,7 @@ rook_ceph_devices:            # raw disks per node; the nodes listed run Ceph
 
 On rack-scale (`rack_scale_enabled: true`), leave `rook_ceph_devices` out: the disks come only from
 `storage.nodes` in `rack-profile.yaml`, and install and teardown stop if `rook_ceph_devices` lists
-different ones (see [Rack-scale deployment](../rack-scale-deployment.md)).
+different ones (see [Rack-scale deployment](../deployment/rack-scale.md)).
 
 ---
 
@@ -340,7 +340,7 @@ from it.
 | `best-effort` | No pinning: the scheduler places threads | Development, or small clusters |
 
 Any other value stops preflight. Pinning only applies with `kubernetes_accelerator: cpu`. See
-[NRI CPU Balloons](nri_cpu_balloons.md) for per-node balloon sizing.
+[NRI CPU Balloons](nri-cpu-balloons.md) for per-node balloon sizing.
 
 ---
 
@@ -368,7 +368,7 @@ Run `./toolkit_manager.sh show` to see every component.
 | `gateway_request_timeout` | `600s` | How long Envoy waits for an answer — raised from its 15 s default for long model responses |
 | `kubernetes_cluster_name` | `cluster.local` | The cluster's DNS suffix |
 | `kubernetes_kube_proxy_mode` | `nftables` | `nftables`, `iptables` or `ipvs` |
-| `node_topology_enabled` | `true` | Platform pods prefer control-plane nodes, model pods prefer workers. See [Node Topology](node_topology.md) |
+| `node_topology_enabled` | `true` | Platform pods prefer control-plane nodes, model pods prefer workers. See [Node Topology](node-topology.md) |
 | `routing_mode` | `subdomain` | How services are published on the domain: `subdomain` or `path` (see below) |
 
 `routing_mode` decides the service addresses:
@@ -386,7 +386,7 @@ In `path` mode, Langfuse and the vLLM Semantic Router dashboard still use their 
 ## Node preflight
 
 Before Kubespray builds a cluster, the installer runs read-only checks on every node. The checks
-are listed in [Prerequisites](../quickstart/prerequisites.md#node-checks-before-install).
+are listed in [Prerequisites](../getting-started/prerequisites.md#node-checks-before-install).
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -441,7 +441,7 @@ kubectl get secret -n keycloak keycloak-admin-secret \
 ```
 
 Grafana's admin signs in on Grafana's own login form; see
-[Observability](../deploy/observability.md#sign-in).
+[Observability](observability.md#sign-in).
 
 To choose the passwords yourself, set them **before the first install** (once a Secret exists, its
 password is kept), either in `global_config.yaml`:
@@ -476,7 +476,7 @@ existing_kubernetes: "/absolute/path/to/kubeconfig"   # skips every Kubespray st
 The installer then never builds, resets or scales the cluster: `teardown infrastructure` leaves it
 running, and `add-node` / `remove-node` are refused. A `KUBECONFIG` set in your shell is not used;
 this setting is the only way to name your cluster. See
-[Multi-Node & BYO Cluster](../deploy/topologies.md).
+[Multi-Node & BYO Cluster](../deployment/multi-node.md).
 
 ---
 
@@ -554,7 +554,7 @@ Example: `config.erag.yaml` sets Chatbot Toolkit options such as `ui_enabled`, `
 
 | If you want to… | Go to |
 |---|---|
-| See every CLI command and flag that reads this file | [CLI Reference](cli.md) |
-| Configure per-node CPU pinning (`kubernetes_cpu_policy: nri-balloons`) in depth | [NRI CPU Balloons](nri_cpu_balloons.md) |
-| Set up soft affinity for platform vs. inference workloads (`node_topology_enabled`) | [Node Topology & Workload Placement](node_topology.md) |
-| Go from a fresh clone to a running cluster using these settings | [Deployment Guide](../deploy/install_platform.md) |
+| See every CLI command and flag that reads this file | [CLI Reference](../reference/cli.md) |
+| Configure per-node CPU pinning (`kubernetes_cpu_policy: nri-balloons`) in depth | [NRI CPU Balloons](nri-cpu-balloons.md) |
+| Set up soft affinity for platform vs. inference workloads (`node_topology_enabled`) | [Node Topology & Workload Placement](node-topology.md) |
+| Go from a fresh clone to a running cluster using these settings | [Deployment Guide](../deployment/install-platform.md) |

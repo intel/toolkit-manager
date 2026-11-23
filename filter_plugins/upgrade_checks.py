@@ -496,7 +496,7 @@ def compatibility_verdict(layer, layer_class, layer_requires, layer_records, ver
 
 
 # Configuration tracking: a layer lists the env files it owns and its rules in
-# config_tracking.yaml, beside its components.yaml (docs/reference/adding_solutions.md).
+# config_tracking.yaml, beside its components.yaml (docs/reference/adding-solutions.md).
 
 
 CONFIG_TRACKING_FILE = "config_tracking.yaml"

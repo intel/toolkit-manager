@@ -1,6 +1,6 @@
 # Network Architecture — External Access & Request Flow
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 How a request from outside the cluster reaches a model, which IP address the cluster answers on, and how to make it reachable from your network.
 
@@ -8,7 +8,7 @@ How a request from outside the cluster reaches a model, which IP address the clu
 
 ## Overview
 
-Every request enters the cluster through one IP address and one gateway. In the default mode (`auth_type: jwt`, see [API authentication](../customize/configuration.md#api-authentication)) the path is:
+Every request enters the cluster through one IP address and one gateway. In the default mode (`auth_type: jwt`, see [API authentication](../configuration/configuration.md#api-authentication)) the path is:
 
 ```
 Client (curl, SDK, browser)
@@ -53,7 +53,7 @@ MetalLB is the component that gives the stack LoadBalancer IPs on bare-metal clu
 
 ### Purpose
 
-On a cloud, the provider hands out an external IP for a Kubernetes Service of type `LoadBalancer`. Bare-metal clusters have no such provider. [MetalLB](../glossary.md) fills that gap: it gives the gateway its external IP and makes that IP reachable on your local network.
+On a cloud, the provider hands out an external IP for a Kubernetes Service of type `LoadBalancer`. Bare-metal clusters have no such provider. [MetalLB](glossary.md) fills that gap: it gives the gateway its external IP and makes that IP reachable on your local network.
 
 ### Components
 
@@ -87,7 +87,7 @@ With `metallb_ip_range` unset (the default), the installer picks the pool from t
 | **More than one control-plane node** | `.240`–`.250` in the first node's `/24` | `10.1.1.240-10.1.1.250` | MetalLB can announce the IP from any of them: if it were one node's own IP, two nodes would answer ARP for it |
 | **kube-proxy ipvs**, more than one node | `.240`–`.250` in the first node's `/24` | `10.1.1.240-10.1.1.250` | IPVS binds every LoadBalancer IP on every node (`kube-ipvs0`), so a node IP in the pool would be taken over |
 
-The `.240`–`.250` addresses must be free on that subnet, and clients outside it may need a route or NAT at the edge. To choose the pool yourself, set `metallb_ip_range` in `global_config.yaml` or `nodes.yaml`, for example `"10.1.2.1-10.1.2.14"` or `"203.0.113.50/32"`. Rack-scale installs must set it, to free management-subnet addresses: see [Rack-scale deployment](../rack-scale-deployment.md).
+The `.240`–`.250` addresses must be free on that subnet, and clients outside it may need a route or NAT at the edge. To choose the pool yourself, set `metallb_ip_range` in `global_config.yaml` or `nodes.yaml`, for example `"10.1.2.1-10.1.2.14"` or `"203.0.113.50/32"`. Rack-scale installs must set it, to free management-subnet addresses: see [Rack-scale deployment](../deployment/rack-scale.md).
 
 If the cluster already has a working LoadBalancer controller (for example on a BYO cluster), the installer skips MetalLB. Set `metallb_enabled: false` to skip it yourself.
 
@@ -107,7 +107,7 @@ Good to know:
 
 ## Layer 2: Envoy Gateway — Ingress & Routing
 
-[Envoy Gateway](../glossary.md) is the single entry point and the auth-enforcement point for every request the stack serves.
+[Envoy Gateway](glossary.md) is the single entry point and the auth-enforcement point for every request the stack serves.
 
 ### Purpose
 
@@ -130,7 +130,7 @@ kubectl get svc -n envoy-gateway-system \
 # EXTERNAL-IP is the address clients connect to
 ```
 
-On OpenShift there is no MetalLB: the OpenShift router owns ports 80/443 and forwards to Envoy, which then runs as a normal Deployment. See [Deploy on OpenShift](openshift.md).
+On OpenShift there is no MetalLB: the OpenShift router owns ports 80/443 and forwards to Envoy, which then runs as a normal Deployment. See [Deploy on OpenShift](../deployment/openshift.md).
 
 ### Gateway Resource
 
@@ -337,7 +337,7 @@ A typical multi-node stack that Toolkit Manager installs looks like this at the 
 ```
 
 - The MetalLB IP is the control-plane node's own IP here (see [IP Allocation Strategy](#ip-allocation-strategy)).
-- The Envoy proxy runs on the control-plane node. Platform pods prefer it and model pods prefer the workers ([Node Topology](../customize/node_topology.md)).
+- The Envoy proxy runs on the control-plane node. Platform pods prefer it and model pods prefer the workers ([Node Topology](../configuration/node-topology.md)).
 - The pod and Service ranges are the defaults, `kubernetes_cluster_cidr` and `kubernetes_service_cidr`. Change them in `global_config.yaml` if they overlap your network.
 
 ### Traffic Flow Detail
@@ -539,7 +539,7 @@ Networking in a stack Toolkit Manager installs follows a small set of principles
 
 | If you want to… | Go to |
 |---|---|
-| See how this networking layer fits with platform, inference, and application layers | [Architecture & Design Document](../reference/architecture.md) |
-| Set up the multi-node or HA cluster this topology assumes | [Multi-Node & BYO Cluster](topologies.md) |
-| Change `gateway_request_timeout`, TLS mode, or other gateway settings | [Configuration Reference](../customize/configuration.md) |
-| Route additional tenants, versions, or canaries through the gateway | [Integration Guide — Routing Patterns](../customize/integration.md#routing-patterns-host--path) |
+| See how this networking layer fits with platform, inference, and application layers | [Architecture & Design Document](architecture.md) |
+| Set up the multi-node or HA cluster this topology assumes | [Multi-Node & BYO Cluster](../deployment/multi-node.md) |
+| Change `gateway_request_timeout`, TLS mode, or other gateway settings | [Configuration Reference](../configuration/configuration.md) |
+| Route additional tenants, versions, or canaries through the gateway | [Integration Guide — Routing Patterns](integration.md#routing-patterns-host--path) |

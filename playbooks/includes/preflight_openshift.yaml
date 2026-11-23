@@ -5,7 +5,7 @@
 # Preflight | OpenShift prerequisites
 # =============================================================================
 # On OpenShift the cluster admin installs the operators and their cluster-level
-# instances (docs/deploy/openshift.md, Prerequisites). This checks, before the
+# instances (docs/deployment/openshift.md, Prerequisites). This checks, before the
 # first component runs, that every one the plan needs is there, is Succeeded and
 # Ready, and is at least the tested version, and lists everything that is not.
 #

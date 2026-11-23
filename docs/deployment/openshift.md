@@ -1,6 +1,6 @@
 # Deploy on OpenShift
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 How to prepare a customer-owned OpenShift cluster with Red Hat OpenShift AI, install every prerequisite from the OperatorHub (Software Catalog) marketplace, and then run the installer on top of it.
 
@@ -9,7 +9,7 @@ On OpenShift the installer does not provision cluster-wide services. You install
 > [!WARNING]
 > **Preview: OpenShift support is not yet complete.** The installer [detects OpenShift](#platform-detection), [checks the prerequisites](#prerequisite-check) and deploys the platform layer with OpenShift-specific settings, as described below. What is still missing is listed in [Known gaps](#known-gaps).
 >
-> **Do not run `./toolkit_manager.sh teardown infrastructure` or `teardown platform` against an OpenShift cluster** until teardown has been validated there. Teardown deletes only what `install` labelled (see [Ownership labels](../reference/adding_solutions.md#ownership-labels)), but components marked `teardown: role` and any env installed before the labels existed still run their roles' own teardowns, and some of those delete CRDs by API group (for example `gateway.networking.k8s.io` or `monitoring.coreos.com`). On OpenShift those CRDs belong to the cluster and to OpenShift AI.
+> **Do not run `./toolkit_manager.sh teardown infrastructure` or `teardown platform` against an OpenShift cluster** until teardown has been validated there. Teardown deletes only what `install` labelled (see [Ownership labels](../reference/adding-solutions.md#ownership-labels)), but components marked `teardown: role` and any env installed before the labels existed still run their roles' own teardowns, and some of those delete CRDs by API group (for example `gateway.networking.k8s.io` or `monitoring.coreos.com`). On OpenShift those CRDs belong to the cluster and to OpenShift AI.
 
 ---
 
@@ -64,7 +64,7 @@ Each step lists only what the stack needs beyond the linked guide. The order doe
 
 ### 1. Storage: default StorageClass
 
-The installer needs a **default** StorageClass. It never creates, modifies, or demotes StorageClasses on OpenShift. LVM Storage (tested) is ReadWriteOnce only, which is fine on a single node. For multi-node clusters use ODF CephFS or Trident; see [NetApp ONTAP and Trident](netapp_ontap.md).
+The installer needs a **default** StorageClass. It never creates, modifies, or demotes StorageClasses on OpenShift. LVM Storage (tested) is ReadWriteOnce only, which is fine on a single node. For multi-node clusters use ODF CephFS or Trident; see [NetApp ONTAP and Trident](netapp-ontap.md).
 
 The installer cannot tell from a class whether it is ReadWriteMany, so it assumes ReadWriteOnce and stops on a cluster with more than one node. On a multi-node cluster with a ReadWriteMany default class, set `storage_custom_rwx: true` in `global_config.yaml`.
 
@@ -328,7 +328,7 @@ Preflight prints one line per requirement, then stops with every requirement tha
   ✗ cert-manager: TOO OLD
       cert-manager-operator.v1.20.0 1.20.0 is older than the tested 1.20.1
       an upgrade to cert-manager-operator.v1.20.1 is waiting: InstallPlan cert-manager-operator/install-kvghn is not approved; approve it: oc patch installplan install-kvghn -n cert-manager-operator --type merge -p '{"spec":{"approved":true}}'
-      see docs/deploy/openshift.md#2-cert-manager
+      see docs/deployment/openshift.md#2-cert-manager
 ```
 
 With `installPlanApproval: Manual`, OLM waits for you to approve the first install and every upgrade. When a Subscription waits on an InstallPlan, the message names the plan and the command that approves it. The installer never approves it for you.

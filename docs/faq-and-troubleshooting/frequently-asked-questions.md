@@ -1,8 +1,8 @@
 # Frequently Asked Questions
 
-[← Docs Index](README.md)
+[← Docs index](../README.md)
 
-Short answers with links to the full detail. New here? Start with [Meet Toolkit Manager](meet/meet.md).
+Short answers with links to the full detail. New here? Start with [Meet Toolkit Manager](../overview/meet.md).
 
 ---
 
@@ -14,7 +14,7 @@ A complete, self-hosted AI platform: Kubernetes, storage, service mesh, ingress,
 
 ### What do I need before running it?
 
-Ubuntu 22.04/24.04 or RHEL/Rocky Linux, `git`, `sudo` rights (passwordless is easiest), and internet access. Full hardware and software requirements are in [Prerequisites](quickstart/prerequisites.md).
+Ubuntu 22.04/24.04 or RHEL/Rocky Linux, `git`, `sudo` rights (passwordless is easiest), and internet access. Full hardware and software requirements are in [Prerequisites](../getting-started/prerequisites.md).
 
 ### Do I need Kubernetes experience?
 
@@ -30,7 +30,7 @@ No. Inference runs on Intel® Xeon® CPUs, with NUMA-aware CPU pinning and vLLM 
 2. `init <layer>` creates an environment under `env/<name>/`, copies in the settings files, and clones the external repositories that layer needs into `ext/`.
 3. `install <target>` deploys.
 
-See [CLI Reference](customize/cli.md).
+See [CLI Reference](../reference/cli.md).
 
 ### Which targets can I pass to `init`?
 
@@ -50,11 +50,11 @@ A directory under `env/<name>/` holding one deployment's configuration, inventor
 
 ### Which file do I edit to change settings?
 
-`env/<name>/global_config.yaml` for platform-wide settings, and `env/<name>/config.<layer>.yaml` for a solution layer's own settings. Never edit the templates in `configs/defaults/`; those seed new environments. See [Configuration Reference](customize/configuration.md).
+`env/<name>/global_config.yaml` for platform-wide settings, and `env/<name>/config.<layer>.yaml` for a solution layer's own settings. Never edit the templates in `configs/defaults/`; those seed new environments. See [Configuration Reference](../configuration/configuration.md).
 
 ### Do I have to configure anything before the first deploy?
 
-Usually nothing: `base_domain_name` defaults to `inteltoolkits.ai`. Change it if you want your own domain, and set the proxy settings if you are behind one. Everything else has a working default. See [Do I need to change global_config.yaml](customize/configuration.md#do-i-need-to-change-global_configyaml-before-my-first-deploy).
+Usually nothing: `base_domain_name` defaults to `inteltoolkits.ai`. Change it if you want your own domain, and set the proxy settings if you are behind one. Everything else has a working default. See [Do I need to change global_config.yaml](../configuration/configuration.md#do-i-need-to-change-global_configyaml-before-my-first-deploy).
 
 ### Why did my nested YAML override get ignored?
 
@@ -74,19 +74,19 @@ There is no full dry run for `install`: not every role supports Ansible check mo
 
 ### Can I deploy onto a cluster I already run?
 
-Yes. Set `existing_kubernetes: "/path/to/kubeconfig"` in `global_config.yaml` and the installer skips Kubespray entirely, deploying the platform and everything above it onto your cluster. See [Multi-Node & BYO Cluster](deploy/topologies.md).
+Yes. Set `existing_kubernetes: "/path/to/kubeconfig"` in `global_config.yaml` and the installer skips Kubespray entirely, deploying the platform and everything above it onto your cluster. See [Multi-Node & BYO Cluster](../deployment/multi-node.md).
 
 ### What changes for a multi-node deployment?
 
-You list the nodes in `env/<name>/nodes.yaml` (the installer generates the inventory from it), set up passwordless SSH to them, and choose shared storage: `storage_backend: nfs`, `ceph`, or `netapp-trident`. `local-path` cannot serve model weights to more than one node. See [Multi-Node & BYO Cluster](deploy/topologies.md).
+You list the nodes in `env/<name>/nodes.yaml` (the installer generates the inventory from it), set up passwordless SSH to them, and choose shared storage: `storage_backend: nfs`, `ceph`, or `netapp-trident`. `local-path` cannot serve model weights to more than one node. See [Multi-Node & BYO Cluster](../deployment/multi-node.md).
 
 ### Which storage backends are supported?
 
-`local-path` (default, single node), `nfs` (auto-provisioned on the first control-plane node), `ceph` (Rook-Ceph, replicated block storage), `netapp-trident` with ONTAP, and `custom` (your own CSI driver's default StorageClass). See [Storage](customize/configuration.md#storage) and [NetApp ONTAP and Trident](deploy/netapp_ontap.md).
+`local-path` (default, single node), `nfs` (auto-provisioned on the first control-plane node), `ceph` (Rook-Ceph, replicated block storage), `netapp-trident` with ONTAP, and `custom` (your own CSI driver's default StorageClass). See [Storage](../configuration/configuration.md#storage) and [NetApp ONTAP and Trident](../deployment/netapp-ontap.md).
 
 ### Which API authentication type should I choose?
 
-Keycloak is always deployed and handles sign-in in both modes; `auth_type` only selects what API clients send. `jwt`, the default, uses Keycloak JWTs (client credentials) on the inference endpoint and is the production choice. `litellm_vkey` uses LiteLLM virtual API keys with per-key budgets on `litellm.<domain>`, which suits multi-tenant API access. See [API authentication](customize/configuration.md#api-authentication).
+Keycloak is always deployed and handles sign-in in both modes; `auth_type` only selects what API clients send. `jwt`, the default, uses Keycloak JWTs (client credentials) on the inference endpoint and is the production choice. `litellm_vkey` uses LiteLLM virtual API keys with per-key budgets on `litellm.<domain>`, which suits multi-tenant API access. See [API authentication](../configuration/configuration.md#api-authentication).
 
 ### Can I use my own TLS certificates?
 
@@ -106,7 +106,7 @@ Yes. Pass a layer or a single component as the target. `--only` runs it without 
 
 ### How do I deploy a model?
 
-`./model-manager deploy <name> --wait` for a model in the catalog, or `./model-manager deploy --id <hf-repo-id> --cpu <n> --memory <n>Gi --wait` for anything on Hugging Face. It downloads the weights, sizes the server, and creates the pods. See [Deploy a Model](deploy/deploy_models.md).
+`./model-manager deploy <name> --wait` for a model in the catalog, or `./model-manager deploy --id <hf-repo-id> --cpu <n> --memory <n>Gi --wait` for anything on Hugging Face. It downloads the weights, sizes the server, and creates the pods. See [Deploy a Model](../getting-started/deploy-models.md).
 
 ### Do gated models need anything special?
 
@@ -114,11 +114,11 @@ Yes, a Hugging Face token exported as `HF_TOKEN` before deploying (`export HF_TO
 
 ### How do I call the model once it is running?
 
-Any OpenAI-compatible client, with a Bearer token. With `auth_type: jwt`, source the token helper script to get a JWT and the gateway address; with `litellm_vkey`, use a virtual key. See [Integration Guide](customize/integration.md).
+Any OpenAI-compatible client, with a Bearer token. With `auth_type: jwt`, source the token helper script to get a JWT and the gateway address; with `litellm_vkey`, use a virtual key. See [Integration Guide](../reference/integration.md).
 
 ### I installed agent-toolkit. Which model does it serve, and where is LiteLLM?
 
-The Intel® Agent Toolkit deploys one default model on install, `qwen2-5-coder-14b`, set by `llm_services_autodeploy_models` in `env/<name>/config.agent-toolkit.yaml`; set it to `[]` to skip it, and deploy others with `./model-manager deploy <name>`. The same file sets `auth_type: "litellm_vkey"`, so the agent toolkit installs LiteLLM: call models on `https://litellm.<domain>/v1` with a LiteLLM key. Set `auth_type: "jwt"` there instead for Keycloak tokens on the inference endpoint and no LiteLLM. See [Getting Started with the Intel® Agent Toolkit](quickstart/getting_started_agent_toolkit.md) and [Access the model](deploy/deploy_models.md#access-the-model).
+The Intel® Agent Toolkit deploys one default model on install, `qwen2-5-coder-14b`, set by `llm_services_autodeploy_models` in `env/<name>/config.agent-toolkit.yaml`; set it to `[]` to skip it, and deploy others with `./model-manager deploy <name>`. The same file sets `auth_type: "litellm_vkey"`, so the agent toolkit installs LiteLLM: call models on `https://litellm.<domain>/v1` with a LiteLLM key. Set `auth_type: "jwt"` there instead for Keycloak tokens on the inference endpoint and no LiteLLM. See [Getting Started with the Intel® Agent Toolkit](../getting-started/agent-toolkit.md) and [Access the model](../getting-started/deploy-models.md#access-the-model).
 
 ### Can I serve more than one model at a time?
 
@@ -126,7 +126,7 @@ Yes, subject to CPU and memory. The AI gateway routes by the `model` field in th
 
 ### Can I serve non-LLM models?
 
-Yes. KServe also serves scikit-learn, XGBoost, PyTorch, TensorFlow, ONNX, and Triton models. See [Traditional ML models](customize/integration.md#traditional-ml-models).
+Yes. KServe also serves scikit-learn, XGBoost, PyTorch, TensorFlow, ONNX, and Triton models. See [Traditional ML models](../reference/integration.md#traditional-ml-models).
 
 ---
 
@@ -134,7 +134,7 @@ Yes. KServe also serves scikit-learn, XGBoost, PyTorch, TensorFlow, ONNX, and Tr
 
 ### Where are the credentials?
 
-The Keycloak and Grafana admin passwords are generated on the first install and kept in Kubernetes Secrets; [Admin passwords](customize/configuration.md#admin-passwords) shows the `kubectl` commands that read them. The generated CA certificate is written to `env/<name>/logs/ai-solutions-ca.crt`. The Intel® Chatbot Toolkit also writes its user passwords to `env/<name>/logs/rag/default_credentials.txt`.
+The Keycloak and Grafana admin passwords are generated on the first install and kept in Kubernetes Secrets; [Admin passwords](../configuration/configuration.md#admin-passwords) shows the `kubectl` commands that read them. The generated CA certificate is written to `env/<name>/logs/ai-solutions-ca.crt`. The Intel® Chatbot Toolkit also writes its user passwords to `env/<name>/logs/rag/default_credentials.txt`.
 
 ### How do I check the deployment is healthy?
 
@@ -156,12 +156,12 @@ Yes. Roles are idempotent, so re-running continues from where things stand rathe
 
 1. Update this repository (`git pull`).
 2. Run `init <layer> --upgrade`. It moves the cloned `ext/` repositories onto the revisions the manifests now pin, refuses if those checkouts have local changes, and never rewrites your configuration; it only reports what changed upstream.
-3. Re-run `install <layer>`. It runs the upgrade checks first. See [Upgrade a Layer](deploy/upgrade.md).
+3. Re-run `install <layer>`. It runs the upgrade checks first. See [Upgrade a Layer](../deployment/upgrade.md).
 
 ### Can I add my own layer or component?
 
-Yes, that is the intended extension point: register it in the component registry and add a role. See [Adding Solution Layers](reference/adding_solutions.md).
+Yes, that is the intended extension point: register it in the component registry and add a role. See [Adding Solution Layers](../reference/adding-solutions.md).
 
 ### Something is broken and this list does not cover it.
 
-Check the run log in `env/<name>/logs/`, then `status` and `validate`. The [Deployment Guide](deploy/install_platform.md) and [Network Architecture](deploy/networking.md) cover the failure modes that come up most, such as ingress and DNS.
+Check the run log in `env/<name>/logs/`, then `status` and `validate`. The [Deployment Guide](../deployment/install-platform.md) and [Network Architecture](../reference/networking.md) cover the failure modes that come up most, such as ingress and DNS.

@@ -1,6 +1,6 @@
 # Deployment Guide - Install On-Premises
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 This guide walks you through installing Toolkit Manager on your own machines, step by step, from plain servers to a running self-hosted AI stack. No Kubernetes experience needed.
 
@@ -48,7 +48,7 @@ Set `intel_gpu_plugin_enabled: false` to turn it off.
 - Ubuntu 22.04 or 24.04, or a RHEL-family system (RHEL, Rocky). `configure` refuses other Ubuntu versions.
 - Internet access (a proxy is fine — see [Step 2](#step-2-edit-your-settings))
 - `git`, and `sudo` rights (passwordless is easiest; otherwise you are asked for the password)
-- No Docker on the machines that become the cluster: Kubespray removes it ([Prerequisites](../quickstart/prerequisites.md#operating-system))
+- No Docker on the machines that become the cluster: Kubespray removes it ([Prerequisites](../getting-started/prerequisites.md#operating-system))
 
 **Tooling installed by `configure`.** `./toolkit_manager.sh configure` lists what it will change, asks before going ahead, and installs these pinned versions (it skips any tool already on your `PATH`). It also creates the installer's Python environment in `.venv/`. You can install the tools yourself instead:
 
@@ -74,7 +74,7 @@ Set `intel_gpu_plugin_enabled: false` to turn it off.
 | Inference with 3B model | 64 GB | 300 GB |
 | Inference with 8B model | 128 GB | 400 GB |
 
-> More CPU cores = faster model inference. Intel® Xeon® recommended for CPU-based vLLM workloads. CPU core counts are in [Prerequisites](../quickstart/prerequisites.md#hardware-minimums).
+> More CPU cores = faster model inference. Intel® Xeon® recommended for CPU-based vLLM workloads. CPU core counts are in [Prerequisites](../getting-started/prerequisites.md#hardware-minimums).
 
 ---
 
@@ -133,7 +133,7 @@ gateway_tls_key_file: "/path/to/your/key.pem"
 
 Otherwise, leave the defaults — the domain `inteltoolkits.ai` and a self-signed certificate the installer creates.
 
-**Everything else can stay as-is for now.** Save and close the file. Every setting is described in the [Configuration Reference](../customize/configuration.md).
+**Everything else can stay as-is for now.** Save and close the file. Every setting is described in the [Configuration Reference](../configuration/configuration.md).
 
 ---
 
@@ -281,7 +281,7 @@ nodes_ssh_user: "ubuntu"
 nodes_ssh_key: "~/.ssh/cluster_key"
 ```
 
-More layouts, including a hand-written inventory, are in [Multi-Node & BYO Cluster](topologies.md).
+More layouts, including a hand-written inventory, are in [Multi-Node & BYO Cluster](multi-node.md).
 
 #### B.3 — Install
 
@@ -352,7 +352,7 @@ nodes_ssh_user: "ubuntu"
 nodes_ssh_key: "~/.ssh/cluster_key"
 ```
 
-**If there's another jump host between your bastion and the nodes**, `nodes.yaml` cannot express it. Leave `nodes_control_plane` empty in `nodes.yaml`, write `env/local/inventory/hosts.yaml` yourself (Kubespray format, see [Multi-Node & BYO Cluster](topologies.md)), and add the extra hop to its `vars` section:
+**If there's another jump host between your bastion and the nodes**, `nodes.yaml` cannot express it. Leave `nodes_control_plane` empty in `nodes.yaml`, write `env/local/inventory/hosts.yaml` yourself (Kubespray format, see [Multi-Node & BYO Cluster](multi-node.md)), and add the extra hop to its `vars` section:
 
 ```yaml
   vars:
@@ -445,7 +445,7 @@ Already have a running cluster and want to add workers? Edit `nodes.yaml` and ru
    ./toolkit_manager.sh add-node --env local
    ```
 
-Existing nodes are untouched; only the new machines are set up. `remove-node` works the same way for a worker you delete from `nodes.yaml`. Only workers can be added or removed, and the cluster must have been installed from `nodes.yaml`; all the rules are in [Node Scaling](../customize/node_scaling.md).
+Existing nodes are untouched; only the new machines are set up. `remove-node` works the same way for a worker you delete from `nodes.yaml`. Only workers can be added or removed, and the cluster must have been installed from `nodes.yaml`; all the rules are in [Node Scaling](node-scaling.md).
 
 ---
 
@@ -580,7 +580,7 @@ export KUBECONFIG=$(pwd)/env/<name>/kubeconfig.yaml
 kubectl get nodes
 ```
 
-Every command and flag: [CLI Reference](../customize/cli.md).
+Every command and flag: [CLI Reference](../reference/cli.md).
 
 ---
 
@@ -647,7 +647,7 @@ export HF_TOKEN="hf_your_token_here"
 kubectl get pods -n llm-inference
 ```
 
-The `--wait` flag blocks until the model is ready to serve requests, or until `--wait-timeout` (default 900 seconds) runs out. The first deploy of a model also downloads its weights. More options: [Deploy a Model](deploy_models.md).
+The `--wait` flag blocks until the model is ready to serve requests, or until `--wait-timeout` (default 900 seconds) runs out. The first deploy of a model also downloads its weights. More options: [Deploy a Model](../getting-started/deploy-models.md).
 
 ### 3. Authenticate and Access
 
@@ -949,7 +949,7 @@ Intel® Chatbot Toolkit adds document ingestion, vector search, RAG pipelines, a
 
 The `init erag` command downloads the inference and Intel® Chatbot Toolkit repositories (dependencies first), creates `env/<name>/config.erag.yaml` from the selected pipeline flavour (default: `chatqna`; pick another with `--flavour`), and records the layer in `env/<name>/.solutions.yaml`. The `install erag` command first installs whatever it needs that is missing (infrastructure → platform → inference), then installs the RAG application layer.
 
-**See the full guide:** [Getting Started with Intel® Chatbot Toolkit](../quickstart/getting_started_rag.md) covers prerequisites, flavour selection, per-layer install and teardown, configuration, and troubleshooting.
+**See the full guide:** [Getting Started with Intel® Chatbot Toolkit](../getting-started/chatbot-toolkit.md) covers prerequisites, flavour selection, per-layer install and teardown, configuration, and troubleshooting.
 
 ---
 
@@ -957,7 +957,7 @@ The `init erag` command downloads the inference and Intel® Chatbot Toolkit repo
 
 | If you want to… | Go to |
 |---|---|
-| Deploy across multiple machines or onto a cluster you already run | [Multi-Node & BYO Cluster](topologies.md) |
-| Change TLS, storage, auth type, or any other setting used above | [Configuration Reference](../customize/configuration.md) |
-| Deploy your first model once the platform is up | [Deploy an LLM](deploy_models.md) |
-| Understand exactly how a request reaches a model after install | [Network Architecture](networking.md) |
+| Deploy across multiple machines or onto a cluster you already run | [Multi-Node & BYO Cluster](multi-node.md) |
+| Change TLS, storage, auth type, or any other setting used above | [Configuration Reference](../configuration/configuration.md) |
+| Deploy your first model once the platform is up | [Deploy an LLM](../getting-started/deploy-models.md) |
+| Understand exactly how a request reaches a model after install | [Network Architecture](../reference/networking.md) |

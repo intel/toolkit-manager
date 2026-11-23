@@ -1,6 +1,6 @@
 # Meet Toolkit Manager
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 > **One automated workflow connecting Intel's AI portfolio — self-hosted, on-premises, and ready to deploy.**
 
@@ -147,11 +147,11 @@ github.com/intel/toolkit-manager            <- start here; run all commands from
 | Goal | Link |
 |---|---|
 | Run the platform in 3 steps | [Quick Start](../../README.md#quick-start) |
-| All deployment options (multi-node, BYO, config) | [Getting Started](../quickstart/quickstart.md) |
-| Deploy models | [Deploy a Model](../deploy/deploy_models.md) |
-| Multi-node or BYO cluster | [Multi-Node & BYO Cluster](../deploy/topologies.md) |
-| Connect your app or framework | [Integration Guide](../customize/integration.md) |
+| All deployment options (multi-node, BYO, config) | [Getting Started](../getting-started/quickstart.md) |
+| Deploy models | [Deploy a Model](../getting-started/deploy-models.md) |
+| Multi-node or BYO cluster | [Multi-Node & BYO Cluster](../deployment/multi-node.md) |
+| Connect your app or framework | [Integration Guide](../reference/integration.md) |
 | Architecture deep-dive | [Architecture](../reference/architecture.md) |
-| Common questions | [FAQ](../faq.md) |
-| What a term means | [Glossary](../glossary.md) |
-| Configuration reference | [Configuration](../customize/configuration.md) |
+| Common questions | [FAQ](../faq-and-troubleshooting/frequently-asked-questions.md) |
+| What a term means | [Glossary](../reference/glossary.md) |
+| Configuration reference | [Configuration](../configuration/configuration.md) |

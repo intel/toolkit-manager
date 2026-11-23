@@ -1,14 +1,14 @@
 # Deploy an LLM on Intel® Xeon® with model-manager
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
-How to deploy, access, and manage self-hosted LLM inference on Toolkit Manager using the `model-manager` CLI. It assumes the platform is already installed (see the [Deployment Guide](install_platform.md)).
+How to deploy, access, and manage self-hosted LLM inference on Toolkit Manager using the `model-manager` CLI. It assumes the platform is already installed (see the [Deployment Guide](../deployment/install-platform.md)).
 
 ---
 
 ## The model-manager
 
-`./model-manager` is the CLI for LLM lifecycle management. For each model it downloads the weights from [Hugging Face](https://huggingface.co) into shared storage (the `model-store` volume) once, sizes the serving pod (CPU, memory, CPU pinning) for your nodes, creates the [KServe](../glossary.md) resources that run the model server (vLLM or OpenVINO), and connects the model to the gateway (and to LiteLLM in LiteLLM mode). You do not write any KServe YAML yourself.
+`./model-manager` is the CLI for LLM lifecycle management. For each model it downloads the weights from [Hugging Face](https://huggingface.co) into shared storage (the `model-store` volume) once, sizes the serving pod (CPU, memory, CPU pinning) for your nodes, creates the [KServe](../reference/glossary.md) resources that run the model server (vLLM or OpenVINO), and connects the model to the gateway (and to LiteLLM in LiteLLM mode). You do not write any KServe YAML yourself.
 
 ```
 ./model-manager <command> [options]
@@ -23,7 +23,7 @@ How to deploy, access, and manage self-hosted LLM inference on Toolkit Manager u
 | `undeploy all` | Stop all models |
 | `cpu-collisions-check` | Report CPU pinning and NUMA layout, and spot cores shared by two models |
 
-There is no `status` command: `list` shows each model's status. Every flag is in the [CLI Reference](../customize/cli.md).
+There is no `status` command: `list` shows each model's status. Every flag is in the [CLI Reference](../reference/cli.md).
 
 Run `./model-manager` from the repository root. It works on one environment (`env/<name>/`): with only one environment it uses that one; with several it asks which one, or you set it with `TKM_ENV=prod ./model-manager list`. It then uses that environment's kubeconfig, settings (`global_config.yaml`, `config.inference.yaml`) and catalog (`models.yaml`).
 
@@ -168,7 +168,7 @@ curl -s --cacert "$CA" --noproxy '*' \
 ```
 
 The master key has full admin rights. Give applications a scoped virtual key instead, for per-key model lists, budgets and expiry. Create one in the LiteLLM admin UI (`https://litellm-ui.${DOMAIN}/ui/`, trailing slash required; sign-in with Keycloak, `platform-admins` group by default) or through the key API. The key API is not on the public `litellm.<domain>` address (it only answers the `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings` and `/v1/models` paths, plus `/health/liveliness`), so it is used through `kubectl port-forward`. See
-[Deploying and Accessing Models](install_platform.md#option-b--litellm-virtual-keys-auth_type-litellm_vkey)
+[Deploying and Accessing Models](../deployment/install-platform.md#option-b--litellm-virtual-keys-auth_type-litellm_vkey)
 for minting, listing, and revoking keys.
 
 ### With `auth_type: jwt`
@@ -188,7 +188,7 @@ curl -s --cacert "$CA" --noproxy '*' \
   -d '{"model":"qwen3-0-6b","messages":[{"role":"user","content":"Hello!"}],"max_tokens":64}'
 ```
 
-Keycloak tokens expire after 15 minutes. Source the script again for a new one, or pass `--lifespan 3600` for one hour. The same steps without the script are in [Deploying and Accessing Models](install_platform.md#option-a--keycloak-jwt-auth_type-jwt-default).
+Keycloak tokens expire after 15 minutes. Source the script again for a new one, or pass `--lifespan 3600` for one hour. The same steps without the script are in [Deploying and Accessing Models](../deployment/install-platform.md#option-a--keycloak-jwt-auth_type-jwt-default).
 
 ### Python (OpenAI SDK)
 
@@ -218,7 +218,7 @@ print(response.choices[0].message.content)
 
 Run it with `SSL_CERT_FILE=env/local/logs/ai-solutions-ca.crt` so Python trusts the self-signed certificate, and make the host name resolve to the gateway IP (DNS or `/etc/hosts`).
 
-For LangChain, LlamaIndex, CrewAI, Cursor, n8n, and others → see [Integration Guide](../customize/integration.md).
+For LangChain, LlamaIndex, CrewAI, Cursor, n8n, and others → see [Integration Guide](../reference/integration.md).
 
 ---
 
@@ -267,7 +267,7 @@ spec:
 kubectl apply -f my-sklearn-model.yaml
 ```
 
-These models are served via the Open Inference Protocol at `/v2/models/<name>/infer`. How to reach and call them is in the [Integration Guide](../customize/integration.md#traditional-ml-models).
+These models are served via the Open Inference Protocol at `/v2/models/<name>/infer`. How to reach and call them is in the [Integration Guide](../reference/integration.md#traditional-ml-models).
 
 ---
 
@@ -290,8 +290,8 @@ These models are served via the Open Inference Protocol at `/v2/models/<name>/in
 
 | If you want to… | Go to |
 |---|---|
-| Connect LangChain, LlamaIndex, agents, or a chat UI to a deployed model | [Integration Guide](../customize/integration.md) |
-| Look up every `model-manager` command and flag | [CLI Reference](../customize/cli.md) |
-| Tune per-node CPU pinning for the model pods you just deployed | [NRI CPU Balloons](../customize/nri_cpu_balloons.md) |
-| Change auth mode, storage backend, or other platform-wide settings | [Configuration Reference](../customize/configuration.md) |
-| See how a request travels from your client to the model | [Network Architecture](networking.md) |
+| Connect LangChain, LlamaIndex, agents, or a chat UI to a deployed model | [Integration Guide](../reference/integration.md) |
+| Look up every `model-manager` command and flag | [CLI Reference](../reference/cli.md) |
+| Tune per-node CPU pinning for the model pods you just deployed | [NRI CPU Balloons](../configuration/nri-cpu-balloons.md) |
+| Change auth mode, storage backend, or other platform-wide settings | [Configuration Reference](../configuration/configuration.md) |
+| See how a request travels from your client to the model | [Network Architecture](../reference/networking.md) |

@@ -4,13 +4,13 @@
 # =============================================================================
 # OpenShift prerequisites: what the cluster admin installs from the marketplace
 # =============================================================================
-# One entry per row of the Prerequisites table in docs/deploy/openshift.md. Keep
+# One entry per row of the Prerequisites table in docs/deployment/openshift.md. Keep
 # the two in sync: `version` is the tested CSV from that table and the minimum
 # preflight accepts. Read by playbooks/includes/preflight_openshift.yaml and
 # evaluated by filter_plugins/openshift_prerequisites.py.
 #
 # Per entry:
-#   name, title, doc     id, label in the report, anchor in docs/deploy/openshift.md
+#   name, title, doc     id, label in the report, anchor in docs/deployment/openshift.md
 #   layers               needed when the plan reaches any of these layers
 #   when                 extra gate, rendered like a component's enabled:
 #   package              OLM package; its Subscription (or OLM v1 ClusterExtension)
@@ -27,7 +27,7 @@
 #   storage              true → the default (or custom) StorageClass check
 # =============================================================================
 
-openshift_prerequisites_doc: docs/deploy/openshift.md
+openshift_prerequisites_doc: docs/deployment/openshift.md
 
 openshift_prerequisites_platform:
   name: openshift

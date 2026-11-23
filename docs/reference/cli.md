@@ -1,6 +1,6 @@
 # CLI Reference
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 All `toolkit_manager.sh` and `model-manager` commands for Toolkit Manager run from the repo root
 (the folder that holds `toolkit_manager.sh`). A third script, `run_backup.sh`, backs up and
@@ -29,7 +29,7 @@ The usual order:
 
 1. `configure` — once per machine.
 2. `init <layer>` — once per environment.
-3. Edit `env/<name>/global_config.yaml` if you need to (see [Configuration Reference](configuration.md)).
+3. Edit `env/<name>/global_config.yaml` if you need to (see [Configuration Reference](../configuration/configuration.md)).
 4. `install <layer>` — deploy.
 5. `status` and `validate <layer>` — check it.
 
@@ -157,7 +157,7 @@ mode (`-- --check`).
 Installing a newer release over a deployed layer upgrades it. Before anything changes, `install`
 prints each layer's run class (`fresh`, `reinstall`, `resume`, `upgrade`, `downgrade`, `conflict`,
 `unversioned`) and the verdict of each upgrade check; a layer that declares `supports.upgrade`
-refuses a blocking verdict. See [Upgrade a Layer](../deploy/upgrade.md).
+refuses a blocking verdict. See [Upgrade a Layer](../deployment/upgrade.md).
 
 **Targets for `install` / `teardown`:**
 
@@ -181,7 +181,7 @@ and environment hold.
 Remove components in reverse dependency order (newest first). Configuration files and environment
 state in `env/<name>/` are preserved; only what is running in the cluster is removed.
 
-Teardown deletes what `install` labelled with `ai-solutions.intel.com/env` and `ai-solutions.intel.com/component`, and nothing else (see [Ownership labels](../reference/adding_solutions.md#ownership-labels)). The cluster itself and host changes (`kubernetes`, `storage`, rack-scale networking) are removed by their roles. In an env installed before ownership labels existed, each component's own teardown runs as well, until it has run once (see the link above). `ownership_enabled: false` in `global_config.yaml` runs only the roles' own teardowns.
+Teardown deletes what `install` labelled with `ai-solutions.intel.com/env` and `ai-solutions.intel.com/component`, and nothing else (see [Ownership labels](adding-solutions.md#ownership-labels)). The cluster itself and host changes (`kubernetes`, `storage`, rack-scale networking) are removed by their roles. In an env installed before ownership labels existed, each component's own teardown runs as well, until it has run once (see the link above). `ownership_enabled: false` in `global_config.yaml` runs only the roles' own teardowns.
 
 ```bash
 # Remove everything, including the Kubernetes cluster
@@ -241,8 +241,8 @@ the live cluster.
 ./toolkit_manager.sh add-node --env local              # 3. apply (asks before it runs Kubespray)
 ```
 
-Control-plane node additions are refused. See [Node Scaling](node_scaling.md). On a rack-scale env,
-edit `rack-profile.yaml` instead of `nodes.yaml`: see [Rack-scale](node_scaling.md#rack-scale).
+Control-plane node additions are refused. See [Node Scaling](../deployment/node-scaling.md). On a rack-scale env,
+edit `rack-profile.yaml` instead of `nodes.yaml`: see [Rack-scale](../deployment/node-scaling.md#rack-scale).
 
 ---
 
@@ -258,7 +258,7 @@ installer removes the nodes that are in the cluster but no longer in the file.
 ./toolkit_manager.sh remove-node --node-lost --env local   # the node is already NotReady (dead or unreachable)
 ```
 
-Removing a control-plane node is refused — see [Node Scaling](node_scaling.md#control-plane-nodes-are-not-removed).
+Removing a control-plane node is refused — see [Node Scaling](../deployment/node-scaling.md#control-plane-nodes-are-not-removed).
 Before anything runs, a check simulates whether the remaining nodes can take the node's work
 (capacity, anti-affinity and spread rules, node-local volumes, and whether it is the last node
 able to run something, such as the only GPU node). No flag skips this check, and a check that
@@ -266,8 +266,8 @@ cannot run refuses the removal. After the node is gone, the same checks as `stat
 and the command fails on any problem the removal caused.
 
 `add-node` and `remove-node` both refuse on a bring-your-own cluster and on a cluster with the
-Intel® Chatbot Toolkit deployed. See [Node Scaling](node_scaling.md); on a rack-scale env,
-[Rack-scale](node_scaling.md#rack-scale).
+Intel® Chatbot Toolkit deployed. See [Node Scaling](../deployment/node-scaling.md); on a rack-scale env,
+[Rack-scale](../deployment/node-scaling.md#rack-scale).
 
 ---
 
@@ -319,7 +319,7 @@ with Velero, with the same `--env` and `--` conventions. It needs Velero install
 
 `restore` deletes data before it replays the backup, so it always asks first; a run with no
 terminal and no `--force` is refused. Its log is `env/<name>/logs/backup-<layer>-<timestamp>.log`.
-See [Upgrade a Layer](../deploy/upgrade.md#backup-and-restore).
+See [Upgrade a Layer](../deployment/upgrade.md#backup-and-restore).
 
 ---
 
@@ -353,10 +353,10 @@ See [Upgrade a Layer](../deploy/upgrade.md#backup-and-restore).
 The installer sets `KUBECONFIG` itself, to `env/<name>/kubeconfig.yaml`, or to the
 `existing_kubernetes` path for your own cluster. A `KUBECONFIG` set in your shell is not used. To
 point it at your own cluster, set `existing_kubernetes` (see
-[BYO cluster](configuration.md#byo-cluster)).
+[BYO cluster](../configuration/configuration.md#byo-cluster)).
 
 The Keycloak and Grafana admin passwords are not taken from the environment. See
-[Admin passwords](configuration.md#admin-passwords).
+[Admin passwords](../configuration/configuration.md#admin-passwords).
 
 ---
 
@@ -394,7 +394,7 @@ Key flags for `deploy`:
 | `--wait` | Wait until the model is ready (`--wait-timeout <s>`, default 900) |
 | `--dry-run` | Print the manifest without applying it |
 
-`./model-manager --help` lists every option. See [Deploy a Model](../deploy/deploy_models.md) for
+`./model-manager --help` lists every option. See [Deploy a Model](../getting-started/deploy-models.md) for
 usage examples.
 
 ---
@@ -408,7 +408,7 @@ Every `toolkit_manager.sh` run (except `configure`, `init` and `show`) writes a 
 |---|---|
 | `env/<name>/logs/<action>-<target>-<YYYYMMDD-HHMMSS>.log` | One run, for example `install-inference-20261120-091522.log`. `status`, `add-node` and `remove-node` use `cluster` as the target |
 | `env/<name>/logs/backup-<layer>-<YYYYMMDD-HHMMSS>.log` | One `run_backup.sh` run |
-| `env/<name>/logs/ai-solutions-ca.crt` | Self-signed CA certificate (import it into your browser; see [TLS](configuration.md#tls)) |
+| `env/<name>/logs/ai-solutions-ca.crt` | Self-signed CA certificate (import it into your browser; see [TLS](../configuration/configuration.md#tls)) |
 | `env/<name>/reports/<layer>-upgrade-report-<UTC>.yaml` | One per layer of each install that upgrades or downgrades it |
 
 When a run fails, the last lines on screen name its log. For more Ansible detail, append `-- -vvv`
@@ -420,9 +420,9 @@ to any command, or set `TKM_LOG_LEVEL=debug`.
 
 | If you want to… | Go to |
 |---|---|
-| Look up what each `global_config.yaml` field controls | [Configuration Reference](configuration.md) |
-| Upgrade a layer, back it up, restore or roll it back | [Upgrade a Layer](../deploy/upgrade.md) |
-| Deploy, access, and manage models with `model-manager` | [Deploy a Model](../deploy/deploy_models.md) |
-| Set up multi-node or bring-your-own-cluster installs | [Deployment Guide](../deploy/install_platform.md) |
-| Add or remove nodes from an already-provisioned cluster | [Node Scaling](node_scaling.md) |
-| See the full command dispatch flow this CLI triggers | [Architecture & Design Document](../reference/architecture.md) |
+| Look up what each `global_config.yaml` field controls | [Configuration Reference](../configuration/configuration.md) |
+| Upgrade a layer, back it up, restore or roll it back | [Upgrade a Layer](../deployment/upgrade.md) |
+| Deploy, access, and manage models with `model-manager` | [Deploy a Model](../getting-started/deploy-models.md) |
+| Set up multi-node or bring-your-own-cluster installs | [Deployment Guide](../deployment/install-platform.md) |
+| Add or remove nodes from an already-provisioned cluster | [Node Scaling](../deployment/node-scaling.md) |
+| See the full command dispatch flow this CLI triggers | [Architecture & Design Document](architecture.md) |

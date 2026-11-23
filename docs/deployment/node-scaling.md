@@ -1,6 +1,6 @@
 # Node Scaling — add-node / remove-node
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 Add a machine to a running cluster, or take one out, without tearing the cluster down and installing it again. Toolkit Manager does this with Kubespray's own `scale.yml` (add) and `remove-node.yml` (remove) playbooks. Kubespray is the tool that built the cluster in the first place.
 
@@ -257,9 +257,9 @@ Errors marked `...ignoring` in Kubespray's reset output are expected — for exa
 
 | If you want to… | Go to |
 |---|---|
-| Deploy across multiple nodes in the first place | [Multi-Node & BYO Cluster](../deploy/topologies.md) |
-| Understand the `workload-class` labels re-applied to new nodes | [Node Topology & Workload Placement](node_topology.md) |
-| Look up every `global_config.yaml` / `nodes.yaml` field | [Configuration Reference](configuration.md) |
+| Deploy across multiple nodes in the first place | [Multi-Node & BYO Cluster](multi-node.md) |
+| Understand the `workload-class` labels re-applied to new nodes | [Node Topology & Workload Placement](../configuration/node-topology.md) |
+| Look up every `global_config.yaml` / `nodes.yaml` field | [Configuration Reference](../configuration/configuration.md) |
 
 ## External References
 

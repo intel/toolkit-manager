@@ -32,7 +32,7 @@ The stack is built in **layers**, each on top of the one before. You pick a **ta
 | 4 | **Intel® Agent Toolkit** *(optional, on top of 3)* | Run AI agents safely | Agent sandboxes (optionally Kata microVMs), memory stores (Redis Stack, pgvector), LiteLLM virtual keys, guardrails, a hybrid model router; optional KubeRay | `agent-toolkit` | [agent-toolkit](https://github.com/intel/agent-toolkit) |
 
 > [!NOTE]
-> **You never clone the other repositories yourself: `init` downloads the ones your target needs into `ext/`. New to a term? The [Glossary](docs/glossary.md) defines each one in a line or two.**
+> **You never clone the other repositories yourself: `init` downloads the ones your target needs into `ext/`. New to a term? The [Glossary](docs/reference/glossary.md) defines each one in a line or two.**
 
 **Request flow:** a request enters through Envoy Gateway, which checks its credential (a Keycloak token, or a LiteLLM virtual key). The Envoy AI Gateway then routes it to the server running the requested model. Every layer's health and latency is visible in the built-in Grafana, Prometheus, Loki and Tempo stack.
 
@@ -47,7 +47,7 @@ The stack is built in **layers**, each on top of the one before. You pick a **ta
 Walk up the layers on one machine with the default settings, and stop at the one you need. Installing a layer also installs every layer below it, so you can also go straight to it (`init inference` + `install inference` builds layers 1–3). The first install takes up to an hour, mostly downloading images.
 
 > [!NOTE]
-> **Prerequisites:** Ubuntu 22.04/24.04 (or RHEL/Rocky Linux), `git`, `sudo` rights (passwordless is easiest), internet access, and at least **32 CPU cores, 64 GB RAM and 300 GB disk** for a small model (16 cores, 32 GB, 200 GB for the platform alone). Details → [Prerequisites](docs/quickstart/prerequisites.md). Several machines or an existing cluster → [Getting Started](docs/quickstart/quickstart.md).
+> **Prerequisites:** Ubuntu 22.04/24.04 (or RHEL/Rocky Linux), `git`, `sudo` rights (passwordless is easiest), internet access, and at least **32 CPU cores, 64 GB RAM and 300 GB disk** for a small model (16 cores, 32 GB, 200 GB for the platform alone). Details → [Prerequisites](docs/getting-started/prerequisites.md). Several machines or an existing cluster → [Getting Started](docs/getting-started/quickstart.md).
 
 ### Prepare the machine
 
@@ -73,7 +73,7 @@ headlamp_enabled: true                 # Kubernetes cluster dashboard
 # llm_services_deploy_models: false    # true: deploy the catalog models marked autodeploy during the install
 ```
 
-**Each toolkit layer adds its own settings file** when you `init` it, with that layer's detailed options: `config.inference.yaml`, `config.agent-toolkit.yaml` or `config.erag.yaml`, next to `global_config.yaml`. A key set in both wins in `global_config.yaml`. All options and the full order → [Configuration Reference](docs/customize/configuration.md#changing-values).
+**Each toolkit layer adds its own settings file** when you `init` it, with that layer's detailed options: `config.inference.yaml`, `config.agent-toolkit.yaml` or `config.erag.yaml`, next to `global_config.yaml`. A key set in both wins in `global_config.yaml`. All options and the full order → [Configuration Reference](docs/configuration/configuration.md#changing-values).
 
 ### Layer 1: Infrastructure
 
@@ -89,7 +89,7 @@ headlamp_enabled: true                 # Kubernetes cluster dashboard
 > nodes_ssh_key: "~/.ssh/id_rsa"
 > ```
 >
-> Add or remove machines later with `add-node` / `remove-node`. Full guide → [Multi-Node & BYO Cluster](docs/deploy/topologies.md).
+> Add or remove machines later with `add-node` / `remove-node`. Full guide → [Multi-Node & BYO Cluster](docs/deployment/multi-node.md).
 
 ```bash
 ./toolkit_manager.sh install infrastructure  # ◀── may take a few minutes
@@ -119,13 +119,13 @@ kubectl get storageclass                             # local-path
 kubectl -n keycloak get secret platform-bootstrap-admin -o jsonpath='{.data.value}' | base64 -d; echo
 ```
 
-**In the browser:** sign in once as `platform-admin` at the Kubernetes cluster dashboard, `https://headlamp.inteltoolkits.ai`; it links Keycloak and Grafana on the same sign-in → [Kubernetes cluster dashboard](docs/deploy/headlamp.md). Browser access (`/etc/hosts`, certificate) → [Access the services](docs/quickstart/quickstart.md#access-the-services). More: [Observability](docs/deploy/observability.md), [Network Architecture](docs/deploy/networking.md).
+**In the browser:** sign in once as `platform-admin` at the Kubernetes cluster dashboard, `https://headlamp.inteltoolkits.ai`; it links Keycloak and Grafana on the same sign-in → [Kubernetes cluster dashboard](docs/configuration/headlamp.md). Browser access (`/etc/hosts`, certificate) → [Access the services](docs/getting-started/quickstart.md#access-the-services). More: [Observability](docs/configuration/observability.md), [Network Architecture](docs/reference/networking.md).
 
 ### Layer 3: Intel® Inference Toolkit
 
 **What you get:** models served on Intel® Xeon® (KServe with vLLM and OpenVINO™ Model Server) behind one OpenAI-compatible endpoint, `https://inference.inteltoolkits.ai/v1`; the Envoy AI Gateway sends each request to the model it names. `model-manager` deploys and removes models in one command.
 
-**API sign-in:** to change it, uncomment `auth_type` in `env/local/global_config.yaml` before you install: `jwt` (default, Keycloak tokens) or `litellm_vkey` ([LiteLLM virtual keys](docs/deploy/install_platform.md#option-b--litellm-virtual-keys-auth_type-litellm_vkey)).
+**API sign-in:** to change it, uncomment `auth_type` in `env/local/global_config.yaml` before you install: `jwt` (default, Keycloak tokens) or `litellm_vkey` ([LiteLLM virtual keys](docs/deployment/install-platform.md#option-b--litellm-virtual-keys-auth_type-litellm_vkey)).
 
 1. Add the layer:
 
@@ -164,9 +164,9 @@ curl -s --noproxy '*' --cacert env/local/logs/ai-solutions-ca.crt \
   "$GATEWAY_URL/v1/chat/completions"
 ```
 
-A JSON reply with `choices` means the model is serving. `--resolve` reaches the gateway without an `/etc/hosts` entry; `--cacert` trusts the installer's certificate. Any OpenAI client works here. More: [Deploy a Model](docs/deploy/deploy_models.md) (gated models, the Python SDK, LiteLLM keys), [Integration Guide](docs/customize/integration.md).
+A JSON reply with `choices` means the model is serving. `--resolve` reaches the gateway without an `/etc/hosts` entry; `--cacert` trusts the installer's certificate. Any OpenAI client works here. More: [Deploy a Model](docs/getting-started/deploy-models.md) (gated models, the Python SDK, LiteLLM keys), [Integration Guide](docs/reference/integration.md).
 
-**In the browser:** the Kubernetes cluster dashboard gains a **Models** page to deploy and remove models, plus LiteLLM and Langfuse when LiteLLM is on → [Kubernetes cluster dashboard](docs/deploy/headlamp.md).
+**In the browser:** the Kubernetes cluster dashboard gains a **Models** page to deploy and remove models, plus LiteLLM and Langfuse when LiteLLM is on → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
 
 ### Layer 4: Intel® Agent Toolkit or Intel® Chatbot Toolkit
 
@@ -196,9 +196,9 @@ curl -s --noproxy '*' --cacert env/local/logs/ai-solutions-ca.crt --resolve "lit
   -H "Authorization: Bearer $MK" "https://litellm.$DOMAIN/v1/models"   # lists qwen2-5-coder-14b and hybrid-router
 ```
 
-Keep the admin key to yourself; give each application or agent its own virtual key. More: [Getting Started with the Intel® Agent Toolkit](docs/quickstart/getting_started_agent_toolkit.md) (every component and its switch), [virtual keys](docs/deploy/deploy_models.md#access-the-model).
+Keep the admin key to yourself; give each application or agent its own virtual key. More: [Getting Started with the Intel® Agent Toolkit](docs/getting-started/agent-toolkit.md) (every component and its switch), [virtual keys](docs/getting-started/deploy-models.md#access-the-model).
 
-**In the browser:** the LiteLLM admin UI (virtual keys, spend) and Langfuse (agent traces) are linked on the Kubernetes cluster dashboard → [Kubernetes cluster dashboard](docs/deploy/headlamp.md).
+**In the browser:** the LiteLLM admin UI (virtual keys, spend) and Langfuse (agent traces) are linked on the Kubernetes cluster dashboard → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
 
 #### Intel® Chatbot Toolkit
 
@@ -209,7 +209,7 @@ Keep the admin key to yourself; give each application or agent its own virtual k
 ./toolkit_manager.sh install erag            # ◀── may take a few minutes
 ```
 
-More: [Getting Started with Intel® Chatbot Toolkit](docs/quickstart/getting_started_rag.md) (prerequisites, sign-in, pipelines).
+More: [Getting Started with Intel® Chatbot Toolkit](docs/getting-started/chatbot-toolkit.md) (prerequisites, sign-in, pipelines).
 
 ### Remove or start again
 
@@ -229,29 +229,29 @@ Everything beyond the Quick Start, grouped by task. The [Documentation Index](do
 | Task | Guide |
 |---|---|
 | **Deploy and operate** | |
-| The Quick Start for several machines or an existing cluster, with web UI access | [Getting Started](docs/quickstart/quickstart.md) |
-| Install step by step: multi-node, bastion host, bring-your-own cluster, auth types | [Deployment Guide](docs/deploy/install_platform.md) |
-| Spread the cluster over several machines, or use an existing cluster | [Multi-Node & BYO Cluster](docs/deploy/topologies.md) |
-| Build a cluster on a dedicated high-speed fabric | [Rack-scale Deployment](docs/rack-scale-deployment.md) |
-| Add or remove nodes on a running cluster | [Node Scaling](docs/customize/node_scaling.md) |
-| Upgrade, back up and restore a layer | [Upgrade a Layer](docs/deploy/upgrade.md) |
-| Use the Kubernetes cluster dashboard and platform sign-in | [Kubernetes Cluster Dashboard and Platform Sign-in](docs/deploy/headlamp.md) |
-| Open Grafana and read the dashboards | [Observability](docs/deploy/observability.md) |
-| Install on OpenShift | [Deploy on OpenShift](docs/deploy/openshift.md) |
-| Use NetApp ONTAP and Trident for storage | [NetApp ONTAP and Trident](docs/deploy/netapp_ontap.md) |
+| The Quick Start for several machines or an existing cluster, with web UI access | [Getting Started](docs/getting-started/quickstart.md) |
+| Install step by step: multi-node, bastion host, bring-your-own cluster, auth types | [Deployment Guide](docs/deployment/install-platform.md) |
+| Spread the cluster over several machines, or use an existing cluster | [Multi-Node & BYO Cluster](docs/deployment/multi-node.md) |
+| Build a cluster on a dedicated high-speed fabric | [Rack-scale Deployment](docs/deployment/rack-scale.md) |
+| Add or remove nodes on a running cluster | [Node Scaling](docs/deployment/node-scaling.md) |
+| Upgrade, back up and restore a layer | [Upgrade a Layer](docs/deployment/upgrade.md) |
+| Use the Kubernetes cluster dashboard and platform sign-in | [Kubernetes Cluster Dashboard and Platform Sign-in](docs/configuration/headlamp.md) |
+| Open Grafana and read the dashboards | [Observability](docs/configuration/observability.md) |
+| Install on OpenShift | [Deploy on OpenShift](docs/deployment/openshift.md) |
+| Use NetApp ONTAP and Trident for storage | [NetApp ONTAP and Trident](docs/deployment/netapp-ontap.md) |
 | **Tune** | |
-| Place platform and inference workloads on different nodes | [Node Topology](docs/customize/node_topology.md) |
-| Pin inference pods to CPU cores (NUMA-aware) | [NRI CPU Balloons](docs/customize/nri_cpu_balloons.md) |
+| Place platform and inference workloads on different nodes | [Node Topology](docs/configuration/node-topology.md) |
+| Pin inference pods to CPU cores (NUMA-aware) | [NRI CPU Balloons](docs/configuration/nri-cpu-balloons.md) |
 | **Understand** | |
-| What the platform is and why | [Meet Toolkit Manager](docs/meet/meet.md) |
+| What the platform is and why | [Meet Toolkit Manager](docs/overview/meet.md) |
 | How it is built: layers, execution flow, repositories | [Architecture](docs/reference/architecture.md) |
-| How a request reaches a model; IPs, DNS and ingress | [Network Architecture](docs/deploy/networking.md) |
-| Every command and flag | [CLI Reference](docs/customize/cli.md) |
+| How a request reaches a model; IPs, DNS and ingress | [Network Architecture](docs/reference/networking.md) |
+| Every command and flag | [CLI Reference](docs/reference/cli.md) |
 | Pod Security and mesh labels on each namespace | [Namespace Security Labels](docs/reference/labels.md) |
 | **Extend and contribute** | |
-| Plug in your own solution layer | [Adding Solution Layers](docs/reference/adding_solutions.md) |
+| Plug in your own solution layer | [Adding Solution Layers](docs/reference/adding-solutions.md) |
 | Report a problem or send a change | [Contributing](CONTRIBUTING.md) |
-| Short answers and terms | [FAQ](docs/faq.md) · [Glossary](docs/glossary.md) |
+| Short answers and terms | [FAQ](docs/faq-and-troubleshooting/frequently-asked-questions.md) · [Glossary](docs/reference/glossary.md) |
 
 ---
 

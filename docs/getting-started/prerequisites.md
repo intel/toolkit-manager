@@ -1,6 +1,6 @@
 # Prerequisites
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 Everything needed before running the Toolkit Manager installer, whether you're deploying on-premises, air-gapped, or on a single bare-metal box.
 
@@ -14,7 +14,7 @@ Everything needed before running the Toolkit Manager installer, whether you're d
 | Ubuntu 24.04 | ✅ Supported |
 | RHEL 8 / Rocky Linux 8 (x86_64) | ✅ Supported |
 
-**No Docker on cluster nodes.** Kubespray uses containerd and, while installing it, deletes Docker and all its data (`/var/lib/docker`) on any node where Docker is installed. The installer refuses to install onto a node with a `docker.service` unit (for a single-node install, the installer host itself). Back up and uninstall Docker first, or use a different node. See [Node Scaling](../customize/node_scaling.md#built-into-add-nodes-pre-flight).
+**No Docker on cluster nodes.** Kubespray uses containerd and, while installing it, deletes Docker and all its data (`/var/lib/docker`) on any node where Docker is installed. The installer refuses to install onto a node with a `docker.service` unit (for a single-node install, the installer host itself). Back up and uninstall Docker first, or use a different node. See [Node Scaling](../deployment/node-scaling.md#built-into-add-nodes-pre-flight).
 
 ---
 
@@ -37,14 +37,14 @@ Intel® Xeon® processors are recommended for CPU-based inference. NUMA-aware pi
 | `sudo` on the installer host (passwordless is easiest; otherwise Ansible asks for the password at the start of each run) | Required | Required |
 | Passwordless SSH (key-based) from the installer host to every node | — | Required |
 | `sudo` on every target node (passwordless, or the same password as the installer host) | — | Required |
-| Installer host reaches the API server at `https://<control-plane-ip>:6443` (not only SSH to the nodes); see [Bastion (Jump Host)](../deploy/install_platform.md#option-c-bastion-jump-host) | — | Required |
+| Installer host reaches the API server at `https://<control-plane-ip>:6443` (not only SSH to the nodes); see [Bastion (Jump Host)](../deployment/install-platform.md#option-c-bastion-jump-host) | — | Required |
 
 ---
 
 ## Network
 
 - **Internet access** is required during install (package downloads, container images, model weights).
-- **Corporate proxy:** set `http_proxy`, `https_proxy`, and `no_proxy` in `env/<name>/global_config.yaml` before installing. See [Configuration](../customize/configuration.md#proxy).
+- **Corporate proxy:** set `http_proxy`, `https_proxy`, and `no_proxy` in `env/<name>/global_config.yaml` before installing. See [Configuration](../configuration/configuration.md#proxy).
 - **Time synchronization (multi-node only):** an NTP server (`chrony` or `systemd-timesyncd`) must be running and synced on every node before install. Clock skew causes intermittent etcd failures, TLS errors, and token authentication issues that are hard to diagnose.
 
 ---
@@ -110,7 +110,7 @@ done
 ## Credentials
 
 - **Hugging Face token** — required only for gated models (Llama, Mistral, Gemma, etc.). Get one at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) (free account). Export as `HF_TOKEN=hf_...` before deploying those models.
-- **Keycloak and Grafana admin passwords** — generated on the first install and kept in Kubernetes Secrets. To choose them yourself, set `keycloak_admin_password` and `observability_grafana_admin_password` in `env/<name>/global_config.yaml` before the first install. See [Admin passwords](../customize/configuration.md#admin-passwords) for how to read them.
+- **Keycloak and Grafana admin passwords** — generated on the first install and kept in Kubernetes Secrets. To choose them yourself, set `keycloak_admin_password` and `observability_grafana_admin_password` in `env/<name>/global_config.yaml` before the first install. See [Admin passwords](../configuration/configuration.md#admin-passwords) for how to read them.
 
 ---
 
@@ -127,6 +127,6 @@ done
 | If you want to… | Go to |
 |---|---|
 | Start the actual install now that prerequisites are met | [Getting Started](quickstart.md) |
-| Understand what you're installing and why, before running anything | [Meet Toolkit Manager](../meet/meet.md) |
-| Plan hardware for a multi-node or bring-your-own-cluster setup | [Multi-Node & BYO Cluster](../deploy/topologies.md) |
-| Set proxy, TLS, or other options `configure` doesn't handle | [Configuration Reference](../customize/configuration.md) |
+| Understand what you're installing and why, before running anything | [Meet Toolkit Manager](../overview/meet.md) |
+| Plan hardware for a multi-node or bring-your-own-cluster setup | [Multi-Node & BYO Cluster](../deployment/multi-node.md) |
+| Set proxy, TLS, or other options `configure` doesn't handle | [Configuration Reference](../configuration/configuration.md) |

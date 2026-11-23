@@ -1,6 +1,6 @@
 # Getting Started with the Intel® Agent Toolkit
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 Deploy the Agent Toolkit on a single localhost machine — Kubernetes, platform services, inference with the LiteLLM gateway, and the agent layer — with one installer.
 
@@ -53,7 +53,7 @@ curl -s --cacert env/local/logs/ai-solutions-ca.crt \
   https://litellm.$DOMAIN/v1/models -H "Authorization: Bearer $MK"
 ```
 
-The reply is a JSON list of models that includes `qwen2-5-coder-14b` and `hybrid-router`. The master key is LiteLLM's admin key: use it to create virtual keys, and give applications and agents a virtual key instead (see [Access the model](../deploy/deploy_models.md#access-the-model)).
+The reply is a JSON list of models that includes `qwen2-5-coder-14b` and `hybrid-router`. The master key is LiteLLM's admin key: use it to create virtual keys, and give applications and agents a virtual key instead (see [Access the model](deploy-models.md#access-the-model)).
 
 ---
 

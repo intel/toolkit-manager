@@ -18,7 +18,7 @@
       Red Hat build of Keycloak operator (Deployment {{ _keycloak_operator_deployment }})
       not found in namespace {{ keycloak_namespace }}. On OpenShift install it from
       OperatorHub (package rhbk-operator) with an OperatorGroup targeting
-      {{ keycloak_namespace }} before running the installer; see docs/deploy/openshift.md.
+      {{ keycloak_namespace }} before running the installer; see docs/deployment/openshift.md.
     success_msg: "Keycloak operator provided by the cluster (OLM) — skipping CRD and operator install."
     quiet: true
   when: _keycloak_from_olm | bool

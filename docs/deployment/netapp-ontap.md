@@ -1,6 +1,6 @@
 # NetApp ONTAP and Trident
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 Use a NetApp ONTAP storage array for the cluster's persistent volumes (and, optionally,
 as the document store for Intel® Chatbot Toolkit) instead of node-local disks.

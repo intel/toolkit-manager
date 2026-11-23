@@ -1,6 +1,6 @@
 # Upgrade a Layer
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 There is no `upgrade` command. Running `install <layer>` from a newer release over a layer that is
 already deployed **is** the upgrade. Before anything changes, the installer reads what the cluster
@@ -60,7 +60,7 @@ tarball and from a git checkout behave the same.
 | `backup-freshness` | `upgrade`, `downgrade` of a solution layer (not `infrastructure` or `platform`) | no Completed backup of the **installed** version, at most `upgrade_backup_max_age_hours` (6) old; Velero not deployed; or the layer has no enabled backup profile |
 | `compatibility` | every class (it never refuses a `fresh`, `reinstall` or `resume` run) | a layer this release `requires` (see the layer's `version.yaml`) is below the required range, or has no version. Above the range, or an installed layer on top whose own `requires` no longer matches, is only `advisory` |
 | `config-tracking` | `upgrade`, `downgrade`, `resume` | a rule of the layer's `config_tracking.yaml` marked `blocking` fires (for example, a setting that must not change across an upgrade did change); or the layer declares `supports.upgrade` but ships no `config_tracking.yaml` |
-| the layer's own checks | every class | whatever the layer's `upgrade_checks/*.yaml` files decide (see [Adding Solution Layers](../reference/adding_solutions.md#upgrades-optional)) |
+| the layer's own checks | every class | whatever the layer's `upgrade_checks/*.yaml` files decide (see [Adding Solution Layers](../reference/adding-solutions.md#upgrades-optional)) |
 
 Each check prints one line per layer with its verdict: `pass`, `advisory`, `blocking` or `skipped`
 (with the reason). `config-tracking` prints `baseline` on a layer's first install with tracking:
@@ -165,7 +165,7 @@ finishes: its `forcedChecks` are those of the interrupted run plus any its own `
 
 Backup and restore are not installer actions: `run_backup.sh` runs them, for one layer at a time,
 never a component. They need Velero (`velero_enabled: true`, see
-[Configuration](../customize/configuration.md)) and the layer's backup profile, `backup_profile.yaml`
+[Configuration](../configuration/configuration.md)) and the layer's backup profile, `backup_profile.yaml`
 beside its `components.yaml` (Intel® Chatbot Toolkit: `deployment/backup_profile.yaml`). Core's
 own layers have none.
 
@@ -294,6 +294,6 @@ An `inference` upgrade from 1.1.0 to 1.2.0 runs with advisory lines only, since 
 
 | If you want to… | Go to |
 |---|---|
-| See every action and flag | [CLI Reference](../customize/cli.md) |
-| Make your own layer upgradeable | [Adding Solution Layers](../reference/adding_solutions.md) |
-| Turn on Velero | [Configuration Reference](../customize/configuration.md) |
+| See every action and flag | [CLI Reference](../reference/cli.md) |
+| Make your own layer upgradeable | [Adding Solution Layers](../reference/adding-solutions.md) |
+| Turn on Velero | [Configuration Reference](../configuration/configuration.md) |

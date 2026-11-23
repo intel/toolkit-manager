@@ -1,5 +1,7 @@
 # Rack-Scale Deployment
 
+[← Docs index](../README.md)
+
 **[Overview](#overview)** | **[Quick Start](#quick-start)** | **[rack-profile.yaml](#writing-rack-profileyaml)** | **[Star](#star-topology)** | **[Clos](#clos-topology)** | **[L2](#l2-topology)** | **[None](#none-topology)** | **[GPU](#gpu-nodes)** | **[Validation](#validation)** | **[Troubleshooting](#troubleshooting)**
 
 ---
@@ -34,7 +36,7 @@ Four topologies are supported from the same `rack-profile.yaml` schema:
 
 ## Prerequisites
 
-- All [standard Toolkit Manager prerequisites](quickstart/prerequisites.md)
+- All [standard Toolkit Manager prerequisites](../getting-started/prerequisites.md)
 - **Ubuntu 22.04 or 24.04 LTS on every node:** the fabric is configured through
   netplan, so RHEL and Rocky Linux nodes are not supported for rack-scale, even
   though the base installer supports them. The fabric step stops before writing
@@ -56,7 +58,7 @@ failed rack-scale install. On a fresh install the installer also checks every
 node before Kubespray starts. It stops on time, disk, internet access, a
 half-removed etcd and, with Ceph, the OSD disks, and warns on leftovers from
 another cluster. See
-[Node checks before install](quickstart/prerequisites.md#node-checks-before-install).
+[Node checks before install](../getting-started/prerequisites.md#node-checks-before-install).
 
 - **Clean nodes:** start from a fresh OS install. A node that was part of
   another cluster can carry kubelet and etcd state, `/etc/kubernetes`, CNI

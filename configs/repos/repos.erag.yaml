@@ -6,7 +6,7 @@
 # rev this layer is validated against. Dependencies first: inference is
 # cloned and seeded before erag.
 #
-# Field reference: docs/adding_solutions.md
+# Field reference: docs/reference/adding-solutions.md
 # =============================================================================
 
 repos:

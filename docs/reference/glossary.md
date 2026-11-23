@@ -1,6 +1,6 @@
 # Glossary
 
-[← Docs Index](README.md)
+[← Docs index](../README.md)
 
 Terms used across this documentation, in alphabetical order.
 
@@ -10,7 +10,7 @@ Terms used across this documentation, in alphabetical order.
 
 **Ambient mesh.** Istio's sidecar-free mode. Traffic between pods is encrypted with mutual TLS by a per-node proxy (ztunnel) rather than by a proxy container injected into every pod.
 
-**Bastion.** A jump host used to reach cluster nodes that are not directly reachable from where you run the installer. See [Multi-Node & BYO Cluster](deploy/topologies.md).
+**Bastion.** A jump host used to reach cluster nodes that are not directly reachable from where you run the installer. See [Multi-Node & BYO Cluster](../deployment/multi-node.md).
 
 **BYO cluster (bring your own).** Deploying onto a Kubernetes cluster you already operate by setting `existing_kubernetes` to its kubeconfig. Cluster provisioning is skipped; everything above it still installs.
 
@@ -30,7 +30,7 @@ Terms used across this documentation, in alphabetical order.
 
 **Flavour.** A preset that `init <layer> --flavour <name>` seeds a layer's config from. Only layers that ship presets accept it, such as the RAG pipelines.
 
-**Headlamp.** An optional Kubernetes web UI with Keycloak sign-in, switched on with `headlamp_enabled: true`. See [Headlamp and Platform Sign-in](deploy/headlamp.md).
+**Headlamp.** An optional Kubernetes web UI with Keycloak sign-in, switched on with `headlamp_enabled: true`. See [Headlamp and Platform Sign-in](../configuration/headlamp.md).
 
 **Idempotent.** Running the same install twice produces the same result rather than duplicating or breaking anything. Every role is written this way, which is why a failed run can simply be re-run.
 
@@ -62,7 +62,7 @@ Terms used across this documentation, in alphabetical order.
 
 **OpenVINO™ Model Server (OVMS).** An Intel model server, the other CPU serving runtime besides vLLM.
 
-**PSA (Pod Security Admission).** The Kubernetes admission controller that enforces per-namespace security levels. Which level each namespace gets is documented in [Namespace Security Labels](reference/labels.md).
+**PSA (Pod Security Admission).** The Kubernetes admission controller that enforces per-namespace security levels. Which level each namespace gets is documented in [Namespace Security Labels](labels.md).
 
 **Role.** An Ansible role under `roles/<name>/`, implementing one component. Its `tasks/main.yaml` dispatches to the file matching the action being run.
 

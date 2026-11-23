@@ -19,7 +19,7 @@
 #
 # Adding a component here: add an entry and create roles/<name>/.
 # Adding a whole solution (its own layer, in its own repo): see
-# docs/adding_solutions.md — external repos declare their own layers, which
+# docs/reference/adding-solutions.md — external repos declare their own layers, which
 # preflight merges in, so they are not listed here.
 # =============================================================================
 

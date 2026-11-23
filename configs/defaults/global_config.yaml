@@ -83,7 +83,7 @@ seaweedfs_volume_storage_size: "10Gi"
 
 # ─── 6. Sign-in ──────────────────────────────────────────────────────────────
 # Keycloak signs people in. LiteLLM and Langfuse are set in config.inference.yaml.
-# Keycloak and Grafana admin passwords are generated and kept in Secrets: docs/customize/configuration.md.
+# Keycloak and Grafana admin passwords are generated and kept in Secrets: docs/configuration/configuration.md.
 
 # API auth: jwt (default) | litellm_vkey (the Agent Toolkit's default). Uncomment only to
 # force one for every layer: an active value here overrides the layer configs.
@@ -110,7 +110,7 @@ rack_scale_enabled: false                 # rack-scale fabric; needs env/<name>/
 #   node-2: [/dev/nvme1n1]
 # rook_ceph_teardown_wipe_devices: false          # true: teardown wipes them; else blkdiscard -f first
 
-# NetApp ONTAP (storage_backend: netapp-trident): see docs/deploy/netapp_ontap.md.
+# NetApp ONTAP (storage_backend: netapp-trident): see docs/deployment/netapp-ontap.md.
 # ontap_management_lif: "10.0.0.100"      # cluster/SVM management LIF, TCP 443
 # ontap_data_lif: "10.0.0.101"            # NFS data LIF, TCP 2049 + 111
 # ontap_svm: "svm_ai"                     # SVM that owns the LIFs above

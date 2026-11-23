@@ -1,5 +1,7 @@
 # Observability: Grafana, Prometheus, Loki and Tempo
 
+[← Docs index](../README.md)
+
 The `observability` component (on by default, `observability_enabled`) installs
 Prometheus (metrics), Loki (logs), Tempo (traces) and Grafana, with the three
 already added to Grafana as data sources. They run in the `monitoring` namespace.
@@ -26,7 +28,7 @@ at the first install and kept in a Secret:
 kubectl -n monitoring get secret grafana-admin-credentials -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 
-To choose it yourself, see [Admin passwords](../customize/configuration.md#admin-passwords).
+To choose it yourself, see [Admin passwords](configuration.md#admin-passwords).
 
 ### Sign in with Keycloak
 

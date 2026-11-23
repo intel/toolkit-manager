@@ -1,6 +1,6 @@
 # Getting Started
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 Three ways to deploy Toolkit Manager — single node, multi-node, or an existing (bring-your-own) Kubernetes cluster — depending on your setup. Pick one and follow it end to end.
 
@@ -62,7 +62,7 @@ base_domain_name: "inteltoolkits.ai"
 # no_proxy: "localhost,127.0.0.1,.svc,.cluster.local,.monitoring,10.233.0.0/18,10.233.64.0/18,<node-subnet>"
 ```
 
-Everything else uses safe defaults. Full option reference → [Configuration](../customize/configuration.md).
+Everything else uses safe defaults. Full option reference → [Configuration](../configuration/configuration.md).
 
 ---
 
@@ -87,7 +87,7 @@ kubectl get nodes
 # <your-node> Ready    control-plane   10m   v1.35.4
 ```
 
-→ Continue to [Deploy a Model](../deploy/deploy_models.md).
+→ Continue to [Deploy a Model](deploy-models.md).
 
 ---
 
@@ -95,7 +95,7 @@ kubectl get nodes
 
 Provisions Kubernetes across multiple machines via SSH. Best for production and scale-out.
 
-See the full guide → [Multi-Node & BYO Cluster](../deploy/topologies.md).
+See the full guide → [Multi-Node & BYO Cluster](../deployment/multi-node.md).
 
 Quick overview:
 
@@ -187,12 +187,12 @@ cat env/local/logs/ai-solutions-ca.crt
 
 ## Next steps
 
-- [Deploy a Model](../deploy/deploy_models.md) — serve your first LLM
-- [Integration Guide](../customize/integration.md) — connect Python, LangChain, Cursor, n8n, and more
-- [Configuration Reference](../customize/configuration.md) — all available settings
+- [Deploy a Model](deploy-models.md) — serve your first LLM
+- [Integration Guide](../reference/integration.md) — connect Python, LangChain, Cursor, n8n, and more
+- [Configuration Reference](../configuration/configuration.md) — all available settings
 - [Architecture & Design Document](../reference/architecture.md) — how the layers you just installed fit together
-- [Multi-Node & BYO Cluster](../deploy/topologies.md) — scale beyond the single-node path above
-- [Teardown](../customize/cli.md#teardown) — remove everything cleanly
+- [Multi-Node & BYO Cluster](../deployment/multi-node.md) — scale beyond the single-node path above
+- [Teardown](../reference/cli.md#teardown) — remove everything cleanly
 
 ---
 

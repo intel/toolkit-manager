@@ -1,6 +1,6 @@
 # NRI CPU Balloons — Quick Guide
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 A practical, copy-paste guide to the NRI CPU-balloons policy: what it does, how to tune it, and how models use it.
 
@@ -341,7 +341,7 @@ design; a few are roadmap items.
   `NoSchedule` taint until its policy exists, so its balloons agent never
   starts on `default`.
 - **`remove-node`** deletes the removed node's `node.<NAME>` policy once the
-  node is gone. See [Node Scaling](node_scaling.md).
+  node is gone. See [Node Scaling](../deployment/node-scaling.md).
 
 ### Reinstalling with models already deployed
 
@@ -398,8 +398,8 @@ design; a few are roadmap items.
 | If you want to… | Go to |
 |---|---|
 | Set `kubernetes_cpu_policy` and other cluster-wide settings this guide assumes | [Configuration Reference](configuration.md) |
-| Deploy, undeploy, or list models with `model-manager` | [Deploy a Model](../deploy/deploy_models.md) |
-| Separate platform pods from inference pods at the node level | [Node Topology & Workload Placement](node_topology.md) |
+| Deploy, undeploy, or list models with `model-manager` | [Deploy a Model](../getting-started/deploy-models.md) |
+| Separate platform pods from inference pods at the node level | [Node Topology & Workload Placement](node-topology.md) |
 | See how NUMA-aware CPU placement fits the broader architecture | [Architecture & Design Document](../reference/architecture.md) |
 
 ---
