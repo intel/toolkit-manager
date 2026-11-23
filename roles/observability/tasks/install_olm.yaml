@@ -580,10 +580,11 @@
 
 # Under STRICT mTLS ztunnel refuses plain TCP. The user-workload Prometheus and the
 # Grafana Operator run outside the mesh: only the ports they call accept plain TCP,
-# and the NetworkPolicy lets in only their namespaces (from), or pods (from_pods). Meshed traffic arrives on
-# HBONE (15008). The kubelet's probes: ztunnel lets them in as plain TCP and refuses
-# anything else that is not mTLS, so probe_ports are open to any source; a `probed`
-# caller port, which accepts plain TCP, admits only their address besides its callers.
+# and the NetworkPolicy lets in only their namespaces (from), or pods (from_pods).
+# Meshed traffic arrives on HBONE (15008). The kubelet's probes: ztunnel lets them in
+# as plain TCP and refuses anything else that is not mTLS, so probe_ports are open to
+# any source; `probed` caller ports, which accept plain TCP, admit only their address
+# besides the callers.
 - name: "observability | olm | Open the ports out-of-mesh callers use"
   kubernetes.core.k8s:
     state: present
@@ -595,13 +596,16 @@
     _obs_mesh_open:
       - name: logging-loki
         pods: {app.kubernetes.io/instance: logging-loki, app.kubernetes.io/managed-by: lokistack-controller}
-        port: 3100
+        # Prometheus scrapes Loki's components on 3100, the gateway on 8081 and its
+        # OPA sidecar on 8083; the kubelet probes the last two as well.
+        ports: [3100, 8081, 8083]
         from: {network.openshift.io/policy-group: monitoring}
-        # Loki's components on 3101; the gateway on 8081, its OPA sidecar on 8083.
-        probe_ports: [3101, 8081, 8083]
+        probed: true
+        # Loki's components are probed on 3101.
+        probe_ports: [3101]
       - name: "{{ observability_openshift_grafana_name }}"
         pods: {app: "{{ observability_openshift_grafana_name }}"}
-        port: 3000
+        ports: [3000]
         from: {kubernetes.io/metadata.name: "{{ observability_openshift_grafana_operator_namespace }}"}
         probed: true
       # Tempo exits on its first failed object-store call. Without CNI chaining
@@ -610,7 +614,7 @@
       # enough to be captured. Its plain TCP to S3 is let in; once captured it uses mTLS.
       - name: "{{ seaweedfs_release_name }}-seaweedfs-s3"
         pods: {app.kubernetes.io/instance: "{{ seaweedfs_release_name }}", app.kubernetes.io/name: seaweedfs, app.kubernetes.io/component: s3}
-        port: 8333
+        ports: [8333]
         from_pods: {app.kubernetes.io/instance: tempo, app.kubernetes.io/managed-by: tempo-operator}
         probed: true
     _obs_mesh_objects: >-
@@ -620,10 +624,16 @@
       {%- for p in [15008] + o.probe_ports | default([]) -%}
       {%- set _ = any.append({'port': p, 'protocol': 'TCP'}) -%}
       {%- endfor -%}
+      {%- set open = [] -%}
+      {%- set lax = {} -%}
+      {%- for p in o.ports -%}
+      {%- set _ = open.append({'port': p, 'protocol': 'TCP'}) -%}
+      {%- set _ = lax.update({p | string: {'mode': 'PERMISSIVE'}}) -%}
+      {%- endfor -%}
       {%- set _ = out.append({'apiVersion': 'security.istio.io/v1', 'kind': 'PeerAuthentication',
             'metadata': {'name': o.name, 'namespace': observability_namespace},
             'spec': {'selector': {'matchLabels': o.pods}, 'mtls': {'mode': 'STRICT'},
-                     'portLevelMtls': {o.port | string: {'mode': 'PERMISSIVE'}}}}) -%}
+                     'portLevelMtls': lax}}) -%}
       {%- set _ = out.append({'apiVersion': 'networking.k8s.io/v1', 'kind': 'NetworkPolicy',
             'metadata': {'name': o.name ~ '-ingress', 'namespace': observability_namespace},
             'spec': {'podSelector': {'matchLabels': o.pods}, 'policyTypes': ['Ingress'],
@@ -632,7 +642,7 @@
                                            else {'podSelector': {'matchLabels': o.from_pods}}]
                                           + ([{'ipBlock': {'cidr': _observability_probe_address}}]
                                              if o.probed | default(false) else []),
-                                  'ports': [{'port': o.port, 'protocol': 'TCP'}]}]}}) -%}
+                                  'ports': open}]}}) -%}
       {%- endfor -%}
       {{ out }}
   when: istio_enabled | default(false) | bool
