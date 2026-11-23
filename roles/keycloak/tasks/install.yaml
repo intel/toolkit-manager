@@ -26,68 +26,23 @@
 - name: "keycloak | Namespace labels"
   ansible.builtin.include_tasks: namespace_labels.yaml
 
-- name: "keycloak | Read the kubelet probes' source address from the IstioCNI"
-  kubernetes.core.k8s_info:
-    api_version: sailoperator.io/v1
-    kind: IstioCNI
-    name: default
-  register: _keycloak_istio_cni
-  when:
-    - istio_enabled | default(false) | bool
-    - _keycloak_out_of_mesh_callers | length > 0
-
-- name: "keycloak | Note the kubelet probes' source address"
-  ansible.builtin.set_fact:
-    _keycloak_probe_address: "{{ _keycloak_istio_cni.resources | map(attribute='spec.values.cni.env.HOST_PROBE_SNAT_IP') | first }}/32"
-  when:
-    - istio_enabled | default(false) | bool
-    - _keycloak_out_of_mesh_callers | length > 0
-
-# Only the callers' ports (vars/<platform>.yaml) accept plain TCP, from their namespaces.
+# Only the callers' ports (vars/<platform>.yaml) accept plain TCP.
 - name: "keycloak | Open Keycloak's ports to its out-of-mesh callers"
   kubernetes.core.k8s:
     state: present
-    definition: "{{ item }}"
-  loop:
-    - apiVersion: security.istio.io/v1
+    definition:
+      apiVersion: security.istio.io/v1
       kind: PeerAuthentication
       metadata:
         name: keycloak
         namespace: "{{ keycloak_namespace }}"
       spec:
-        selector: {matchLabels: "{{ _kc_pod_labels }}"}
+        selector: {matchLabels: {app: keycloak, app.kubernetes.io/managed-by: keycloak-operator}}
         mtls: {mode: STRICT}
-        portLevelMtls: "{{ _kc_ports }}"
-    - apiVersion: networking.k8s.io/v1
-      kind: NetworkPolicy
-      metadata:
-        name: keycloak-ingress
-        namespace: "{{ keycloak_namespace }}"
-      spec:
-        podSelector: {matchLabels: "{{ _kc_pod_labels }}"}
-        policyTypes: [Ingress]
-        ingress: "{{ _kc_ingress }}"
-  loop_control:
-    label: "{{ item.kind }}/{{ item.metadata.name }}"
-  vars:
-    _kc_pod_labels: {app: keycloak, app.kubernetes.io/managed-by: keycloak-operator}
-    _kc_ports: >-
-      {%- set out = {} -%}
-      {%- for c in _keycloak_out_of_mesh_callers -%}
-      {%- set _ = out.update({c.port | string: {'mode': 'PERMISSIVE'}}) -%}
-      {%- endfor -%}
-      {{ out }}
-    _kc_ingress: >-
-      {%- set out = [{'ports': [{'port': 15008, 'protocol': 'TCP'}]}] -%}
-      {%- for c in _keycloak_out_of_mesh_callers -%}
-      {%- set _ = out.append({'from': [{'namespaceSelector': {'matchLabels': c.namespace_labels}}]
-                                      + ([{'ipBlock': {'cidr': _keycloak_probe_address}}] if c.probed | default(false) else []),
-                              'ports': [{'port': c.port, 'protocol': 'TCP'}]}) -%}
-      {%- endfor -%}
-      {{ out }}
+        portLevelMtls: "{{ dict(_keycloak_out_of_mesh_ports | map('string') | product([{'mode': 'PERMISSIVE'}])) }}"
   when:
     - istio_enabled | default(false) | bool
-    - _keycloak_out_of_mesh_callers | length > 0
+    - _keycloak_out_of_mesh_ports | length > 0
 
 - name: "keycloak | Install"
   when: not _kc_installed | bool

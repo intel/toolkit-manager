@@ -24,7 +24,6 @@
 #                          namespace  omitted for cluster-scoped or any namespace
 #                          conditions {type: status}
 #                          fields     {dotted.path: value}
-#                          set        [dotted.path] that must hold a value, any value
 #   storage              true → the default (or custom) StorageClass check
 # =============================================================================
 
@@ -95,20 +94,6 @@ openshift_prerequisites:
         name: default
         namespace: istio-system
         fields: {spec.mtls.mode: STRICT}
-
-  # Part of step 3. Where a port takes both the kubelet's probes and an out-of-mesh
-  # caller, the components' NetworkPolicies admit the probes' source address, which
-  # istio-cni SNATs them to. They read it from the IstioCNI, so it must be set there.
-  - name: mesh_probe_address
-    title: Probe source address
-    doc: "#3-service-mesh-3-ambient-mode"
-    layers: [platform, inference]
-    when: "{{ istio_enabled | default(true) | bool }}"
-    instances:
-      - api_version: sailoperator.io/v1
-        kind: IstioCNI
-        name: default
-        set: [spec.values.cni.env.HOST_PROBE_SNAT_IP]
 
   - name: gateway_api
     title: Gateway API

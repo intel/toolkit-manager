@@ -158,44 +158,11 @@
           mode: STRICT
         # An existing controller keeps its owner's policies: only the webhook is opened.
         portLevelMtls: >-
-          {{ dict(_envoy_gateway_ctrl_out_of_mesh | map(attribute='port') | map('string')
-                  | product([{'mode': 'PERMISSIVE'}]))
+          {{ dict(_envoy_gateway_ctrl_out_of_mesh_ports | map('string') | product([{'mode': 'PERMISSIVE'}]))
              if gateway_platform.controller_managed | bool else {'9443': {'mode': 'PERMISSIVE'}} }}
   when:
     - gateway_platform.controller_managed | bool or gateway_platform.configure_existing | bool
     - istio_enabled | default(false) | bool
-
-# Meshed traffic arrives on HBONE (15008).
-- name: "envoy_gateway | Admit only the controller's out-of-mesh callers"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: networking.k8s.io/v1
-      kind: NetworkPolicy
-      metadata:
-        name: envoy-gateway-ingress
-        namespace: "{{ envoy_gateway_namespace }}"
-      spec:
-        podSelector:
-          matchLabels:
-            control-plane: envoy-gateway
-        policyTypes: [Ingress]
-        ingress: >-
-          {%- set any = [] -%}
-          {%- for p in [15008] + _envoy_gateway_ctrl_probe_ports -%}
-          {%- set _ = any.append({'port': p, 'protocol': 'TCP'}) -%}
-          {%- endfor -%}
-          {%- set out = [{'ports': any}] -%}
-          {%- for c in _envoy_gateway_ctrl_out_of_mesh -%}
-          {%- set _ = out.append({'ports': [{'port': c.port, 'protocol': 'TCP'}]}
-                                 | combine({'from': [{'namespaceSelector': {'matchLabels': c.namespace_labels}}]}
-                                           if c.namespace_labels is defined else {})) -%}
-          {%- endfor -%}
-          {{ out }}
-  when:
-    - gateway_platform.controller_managed | bool
-    - istio_enabled | default(false) | bool
-    - _envoy_gateway_ctrl_network_policy | bool
 
 - name: "envoy_gateway | Label envoy-gateway-system namespace — PSS"
   kubernetes.core.k8s:

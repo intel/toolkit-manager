@@ -41,19 +41,14 @@
         state: absent
       when: _keycloak_from_olm | bool
 
-    # The admin's namespace stays on OpenShift: remove the out-of-mesh exceptions.
-    - name: "keycloak | Delete the out-of-mesh exceptions"
+    # The admin's namespace stays on OpenShift: remove the out-of-mesh exception.
+    - name: "keycloak | Delete the out-of-mesh exception"
       kubernetes.core.k8s:
-        api_version: "{{ item.api_version }}"
-        kind: "{{ item.kind }}"
-        name: "{{ item.name }}"
+        api_version: security.istio.io/v1
+        kind: PeerAuthentication
+        name: keycloak
         namespace: "{{ keycloak_namespace }}"
         state: absent
-      loop:
-        - {api_version: security.istio.io/v1, kind: PeerAuthentication, name: keycloak}
-        - {api_version: networking.k8s.io/v1, kind: NetworkPolicy, name: keycloak-ingress}
-      loop_control:
-        label: "{{ item.kind }}/{{ item.name }}"
       when: _keycloak_from_olm | bool
       failed_when: false
 

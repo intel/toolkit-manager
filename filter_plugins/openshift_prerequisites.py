@@ -237,9 +237,6 @@ def _instance_mismatches(obj, spec):
         have = _get(obj, path)
         if str(have) != str(want):
             out.append("%s=%s, want %s" % (path, have, want))
-    for path in spec.get("set") or []:
-        if _get(obj, path) in (None, ""):
-            out.append("%s not set" % path)
     return out
 
 
