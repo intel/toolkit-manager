@@ -95,7 +95,7 @@ options:
     description: "component -> objects it creates outside its tasks: [{kind, namespace, name, labels}], any subset"
   skip_resources: {type: list, elements: str, description: "resource or resource.group never listed"}
   label_prefix: {type: str, description: Prefix of the component label}
-  legacy_label_prefixes: {type: list, elements: str, description: "earlier prefixes delete also matches (delete)"}
+  legacy_label_prefixes: {type: list, elements: str, description: "earlier prefixes also counted as ours (label, delete)"}
   restore_resources: {type: list, elements: str, description: "resources whose added labels teardown restores"}
   timeout: {type: int, default: 600, description: Seconds to wait per delete phase}
   component_failed: {type: bool, default: false, description: "label: the component failed (a failure no rescue handled)"}
@@ -269,6 +269,11 @@ def _restorable(objects, p):
             if res["resource"] in wanted or "%s.%s" % (res["resource"], res["group"]) in wanted}
 
 
+def _prefixes(p):
+    """The current prefix, then the legacy ones: envs labelled before the rename are still ours."""
+    return [p["label_prefix"]] + list(p.get("legacy_label_prefixes") or [])
+
+
 def _before_key(p):
     """<prefix>/labels-before.<env>.<component>, a valid annotation name (63 chars)."""
     name = re.sub(r"[^A-Za-z0-9_.-]", "-", "labels-before.%s.%s" % (p["env"], p["component"]))[:63]
@@ -289,14 +294,14 @@ def _patch(api, res, meta, body):
 def _record_added(api, objects, known, before, reported, p, module):
     """Record, on each object that was already there and that a task of the component
     changed, the labels added or changed since the last snapshot. Returns the refs recorded."""
-    prefix, key = p["label_prefix"] + "/", _before_key(p)
+    prefixes, key = tuple(pre + "/" for pre in _prefixes(p)), _before_key(p)
     recorded = []
     for uid, labels in sorted(_restorable(objects, p).items(), key=lambda o: _ref(*objects[o[0]])):
         res, meta = objects[uid]
-        if uid not in known or uid not in before or uid not in reported or prefix + "component" in labels:
+        if uid not in known or uid not in before or uid not in reported or any(pre + "component" in labels for pre in prefixes):
             continue  # new (labelled instead), no recorded labels, not ours to change, or ours: deleted whole
         old = before[uid]
-        added = {k: [old.get(k), v] for k, v in labels.items() if old.get(k) != v and not k.startswith(prefix)}
+        added = {k: [old.get(k), v] for k, v in labels.items() if old.get(k) != v and not k.startswith(prefixes)}
         if not added:
             continue
         try:
@@ -410,8 +415,16 @@ def _helm_claims(api, objects, index, new, reported, p):
     charts' crds/, which are only the component's when new; and uid -> labels of the new
     objects of a reported release another component of this env labelled (an upgrade's
     release secret, the hooks it recreated), which stay that component's."""
-    prefix = p["label_prefix"]
-    keys = [prefix + "/env", prefix + "/layer", prefix + "/component"]
+    keys = [p["label_prefix"] + k for k in ("/env", "/layer", "/component")]
+    every = [[pre + k for k in ("/env", "/layer", "/component")] for pre in _prefixes(p)]
+
+    def owner(labels):
+        """The ownership labels under the current keys, from the first prefix that has them."""
+        for env, layer, comp in every:
+            if labels.get(env) == p["env"] and labels.get(comp):
+                return {k: labels[o] for k, o in zip(keys, (env, layer, comp)) if o in labels}
+        return {}
+
     releases, first, latest, owners = {}, {}, {}, {}
     for uid, (res, meta) in objects.items():
         labels = meta.get("labels") or {}
@@ -425,12 +438,11 @@ def _helm_claims(api, objects, index, new, reported, p):
                 first[release] = uid
             if version >= latest.get(release, (0, None))[0]:
                 latest[release] = (version, meta)
-            if labels.get(keys[0]) == p["env"] and labels.get(keys[2]):
-                owners.setdefault(release, {k: labels[k] for k in keys if k in labels})
+            if owner(labels):
+                owners.setdefault(release, owner(labels))
     ours = {release for release, uids in releases.items()
             if (release in first and new(first[release])) or any(
-                (objects[u][1].get("labels") or {}).get(keys[0]) == p["env"]
-                and (objects[u][1].get("labels") or {}).get(keys[2]) == p["component"] for u in uids)}
+                owner(objects[u][1].get("labels") or {}).get(keys[2]) == p["component"] for u in uids)}
     others = {release: owners[release] for release in owners if release not in ours}
     members, crds = {release: set(releases[release]) for release in releases}, set()
     for release in ours | set(others):
@@ -516,7 +528,7 @@ def label(api, p, module, stopped=False):
     if known is not None:  # no baseline (the cluster did not exist yet): label nothing
         prefix = p["label_prefix"]
         labels = {prefix + "/env": p["env"], prefix + "/layer": p["layer"], prefix + "/component": p["component"]}
-        known, key = set(known), prefix + "/component"
+        known, owned = set(known), [pre + "/component" for pre in _prefixes(p)]
         mine = carry.get(p["component"], set())
         # Objects of a group the last pass could not list may have been there already.
         unlisted = set(state["unlisted"])
@@ -544,7 +556,7 @@ def label(api, p, module, stopped=False):
         claimed |= set(foreign)
         for uid in sorted(claimed, key=lambda u: _ref(*objects[u])):
             res, meta = objects[uid]
-            if meta.get("ownerReferences") or key in (meta.get("labels") or {}):
+            if meta.get("ownerReferences") or any(k in (meta.get("labels") or {}) for k in owned):
                 continue
             if module.check_mode or _patch(api, res, meta, {"labels": owner[uid]}):
                 labelled.append(_ref(res, meta))
@@ -576,12 +588,13 @@ def _created_by(api, resources, objects, p):
     reference: the Secret of a cert-manager Certificate. One another component
     labelled is left to it. PVCs are never derived: they outlive a teardown."""
     secrets = next((r for r in resources if (r["group"], r["resource"]) == ("", "secrets")), None)
-    key, found = p["label_prefix"] + "/component", {}
+    keys, found = [pre + "/component" for pre in _prefixes(p)], {}
 
     def add(res, namespace, match):
         for item in _list(api, dict(res, base="%s/namespaces/%s" % (res["base"], namespace))):
             meta = item["metadata"]
-            if match(meta) and (meta.get("labels") or {}).get(key, p["component"]) == p["component"]:
+            labels = meta.get("labels") or {}
+            if match(meta) and all(labels.get(k, p["component"]) == p["component"] for k in keys):
                 found[meta["uid"]] = (res, meta)
 
     def spec(res, meta):
@@ -603,24 +616,14 @@ def _created_by(api, resources, objects, p):
 
 
 def delete(api, p, module):
-    """Delete by the current prefix, then by each legacy one (envs labelled before the rename)."""
-    total = {"deleted": [], "restored": [], "left": []}
-    for prefix in [p["label_prefix"]] + p["legacy_label_prefixes"]:
-        result = _delete(api, dict(p, label_prefix=prefix), module)
-        total["deleted"] += result["deleted"]
-        total["restored"] += result["restored"]
-        if result["left"]:
-            return dict(total, changed=bool(total["deleted"] or total["restored"]), left=result["left"],
-                        phase=result["phase"])
-    return dict(total, changed=bool(total["deleted"] or total["restored"]))
-
-
-def _delete(api, p, module):
-    selector = "%s/env=%s,%s/component=%s" % (p["label_prefix"], p["env"], p["label_prefix"], p["component"])
     resources = _discover(api, set(p["skip_resources"]))
-    objects = _all_objects(api, resources, selector)
+    objects, restored = {}, []
+    # One set across prefixes, so the phase order holds for an env labelled under both.
+    for prefix in _prefixes(p):
+        objects.update(_all_objects(api, resources, "%s/env=%s,%s/component=%s" % (
+            prefix, p["env"], prefix, p["component"])))
+        restored += _restore(api, resources, dict(p, label_prefix=prefix), module)
     objects.update(_created_by(api, resources, objects, p))
-    restored = _restore(api, resources, p, module)
     deleted = []
     # Not waited for in their own phase: deleting the namespace removes them, along with
     # what holds them that no component owns (a model-manager model mounting the model store).

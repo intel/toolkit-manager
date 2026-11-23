@@ -29,6 +29,7 @@
     action: snapshot
     state_file: "{{ ownership_state_file }}"
     label_prefix: "{{ ownership_label_prefix }}"
+    legacy_label_prefixes: "{{ ownership_legacy_label_prefixes }}"
     declared: "{{ _ownership_declared }}"
     skip_resources: "{{ ownership_skip_resources }}"
     restore_resources: "{{ ownership_restore_resources }}"
@@ -98,6 +99,7 @@
     action: label
     state_file: "{{ ownership_state_file }}"
     label_prefix: "{{ ownership_label_prefix }}"
+    legacy_label_prefixes: "{{ ownership_legacy_label_prefixes }}"
     env: "{{ env_name | default('local') }}"
     layer: "{{ component.layer | default('unknown') }}"
     component: "{{ component.name }}"

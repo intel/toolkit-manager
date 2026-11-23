@@ -333,8 +333,8 @@ toolkit-manager.intel.com/layer:     <layer>
 toolkit-manager.intel.com/component: <component>
 ```
 
-Teardown also matches the old `ai-solutions.intel.com/` prefix, so envs labelled before the
-rename still tear down (`ownership_legacy_label_prefixes`).
+Objects labelled with the old `ai-solutions.intel.com/` prefix still count as owned, so envs
+labelled before the rename still upgrade and tear down (`ownership_legacy_label_prefixes`).
 
 Before the first component it records the UID of every object on the cluster. While the
 component runs, a callback (`callback_plugins/ownership_record.py`) records what its own
