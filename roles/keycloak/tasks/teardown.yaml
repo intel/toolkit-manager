@@ -43,14 +43,14 @@
 
     # The admin's namespace stays on OpenShift: remove the out-of-mesh exception.
     - name: "keycloak | Delete the out-of-mesh exception"
-      kubernetes.core.k8s:
-        api_version: security.istio.io/v1
-        kind: PeerAuthentication
-        name: keycloak
-        namespace: "{{ keycloak_namespace }}"
-        state: absent
-      when: _keycloak_from_olm | bool
-      failed_when: false
+      ansible.builtin.include_role:
+        name: istio
+        tasks_from: out_of_mesh_exception.yaml
+      vars:
+        istio_out_of_mesh_exception_state: absent
+        istio_out_of_mesh_exception_namespace: "{{ keycloak_namespace }}"
+        istio_out_of_mesh_exception_workloads: "{{ _keycloak_out_of_mesh_exceptions }}"
+      when: _keycloak_out_of_mesh_exceptions | length > 0
 
     # With _keycloak_from_olm the operator, its CRDs and the namespace come from the
     # admin's RHBK Subscription (OperatorHub) and stay.

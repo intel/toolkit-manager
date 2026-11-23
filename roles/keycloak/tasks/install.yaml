@@ -26,20 +26,16 @@
 - name: "keycloak | Namespace labels"
   ansible.builtin.include_tasks: namespace_labels.yaml
 
-# Only the callers' ports (vars/<platform>.yaml) accept plain TCP.
 - name: "keycloak | Open Keycloak's ports to its out-of-mesh callers"
   ansible.builtin.include_role:
     name: istio
     tasks_from: out_of_mesh_exception.yaml
   vars:
     istio_out_of_mesh_exception_namespace: "{{ keycloak_namespace }}"
-    istio_out_of_mesh_exception_workloads:
-      - name: keycloak
-        selector: {app: keycloak, app.kubernetes.io/managed-by: keycloak-operator}
-        ports: "{{ _keycloak_out_of_mesh_ports }}"
+    istio_out_of_mesh_exception_workloads: "{{ _keycloak_out_of_mesh_exceptions }}"
   when:
     - istio_enabled | default(false) | bool
-    - _keycloak_out_of_mesh_ports | length > 0
+    - _keycloak_out_of_mesh_exceptions | length > 0
 
 - name: "keycloak | Install"
   when: not _kc_installed | bool

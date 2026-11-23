@@ -581,31 +581,13 @@
 # 4. Mesh
 # =============================================================================
 
-# The user-workload Prometheus, the Grafana Operator and a Tempo not captured yet call
-# these workloads from outside the mesh: only the ports they call accept plain TCP.
 - name: "observability | olm | Open the ports out-of-mesh callers use"
   ansible.builtin.include_role:
     name: istio
     tasks_from: out_of_mesh_exception.yaml
   vars:
     istio_out_of_mesh_exception_namespace: "{{ observability_namespace }}"
-    istio_out_of_mesh_exception_workloads:
-      # Prometheus scrapes Loki's components on 3100, the gateway on 8081 and its OPA
-      # sidecar on 8083.
-      - name: logging-loki
-        selector: {app.kubernetes.io/instance: logging-loki, app.kubernetes.io/managed-by: lokistack-controller}
-        ports: [3100, 8081, 8083]
-      # The Grafana Operator calls Grafana's API.
-      - name: "{{ observability_openshift_grafana_name }}"
-        selector: {app: "{{ observability_openshift_grafana_name }}"}
-        ports: [3000]
-      # Tempo exits on its first failed object-store call. Without CNI chaining
-      # istio-cni captures a pod only through a running process, so a Tempo that has
-      # not been captured yet is refused by S3 under STRICT and never stays up long
-      # enough to be captured. Its plain TCP to S3 is let in; once captured it uses mTLS.
-      - name: "{{ seaweedfs_release_name }}-seaweedfs-s3"
-        selector: {app.kubernetes.io/instance: "{{ seaweedfs_release_name }}", app.kubernetes.io/name: seaweedfs, app.kubernetes.io/component: s3}
-        ports: [8333]
+    istio_out_of_mesh_exception_workloads: "{{ _observability_olm_out_of_mesh_exceptions }}"
   when: istio_enabled | default(false) | bool
 
 - name: "observability | olm | Wait for the instances"

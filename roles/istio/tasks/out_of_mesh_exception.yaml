@@ -6,10 +6,12 @@
 # the workload stays STRICT.
 #   istio_out_of_mesh_exception_namespace   default namespace of the workloads
 #   istio_out_of_mesh_exception_workloads   [{name, selector, ports, namespace (optional), labels (optional)}]
+#   istio_out_of_mesh_exception_state       present (default) or absent; absent ignores
+#                                           errors (a mesh already torn down)
 
-- name: "istio | out-of-mesh exception | Open the callers' ports (port-level mTLS)"
+- name: "istio | out-of-mesh exception | Callers' ports (port-level mTLS): {{ istio_out_of_mesh_exception_state | default('present') }}"
   kubernetes.core.k8s:
-    state: present
+    state: "{{ istio_out_of_mesh_exception_state | default('present') }}"
     definition:
       apiVersion: security.istio.io/v1
       kind: PeerAuthentication
@@ -26,3 +28,7 @@
   loop: "{{ istio_out_of_mesh_exception_workloads }}"
   loop_control:
     label: "{{ item.namespace | default(istio_out_of_mesh_exception_namespace) }}/{{ item.name }}: {{ item.ports | join(',') }}"
+  register: _istio_oome
+  failed_when:
+    - _istio_oome.failed | default(false)
+    - istio_out_of_mesh_exception_state | default('present') != 'absent'
