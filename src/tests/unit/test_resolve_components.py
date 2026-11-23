@@ -149,3 +149,38 @@ def test_intel_gpu_plugin_enable_rule(variables, enabled):
     env.filters["bool"] = lambda v: str(v).lower() in ("1", "true", "yes", "on")
     rendered = env.from_string(_component("intel_gpu_plugin")["enabled"]).render(**variables)
     assert (rendered == "True") is enabled
+
+
+_BYO = {"existing_kubernetes": "/path/kubeconfig"}
+
+
+@pytest.mark.parametrize("variables, installed", [
+    ({}, False),
+    ({"headlamp_enabled": True}, True),
+    ({"headlamp_enabled": True, "cluster_distribution": "openshift"}, False),
+    ({"headlamp_enabled": True, "existing_kubernetes": ""}, True),
+    ({"headlamp_enabled": True, **_BYO}, False),
+    ({"headlamp_enabled": True, **_BYO, "headlamp_byo_apiserver_trusted": True}, True),
+    ({"headlamp_enabled": True, **_BYO, "headlamp_auth_mode": "gateway"}, True),
+])
+def test_landing_path_points_to_headlamp_only_where_it_installs(variables, installed):
+    # On BYO without API server trust the role skips itself instead of failing the platform install.
+    import jinja2
+    root = pathlib.Path(__file__).resolve().parents[3]
+    env = jinja2.Environment()
+    env.filters["bool"] = lambda v: str(v).lower() in ("1", "true", "yes", "on")
+    role_vars = {"headlamp_auth_mode": "apiserver", "headlamp_byo_apiserver_trusted": False, **variables}
+    hvars = yaml.safe_load((root / "roles/headlamp/vars/main.yaml").read_text())
+    role_vars["__headlamp_apiserver_mode"] = env.from_string(hvars["__headlamp_apiserver_mode"]).render(**role_vars)
+    pending = env.from_string(hvars["__headlamp_byo_pending"]).render(**role_vars).strip() == "True"
+    in_registry = env.from_string(_component("headlamp")["enabled"]).render(**variables).strip() == "True"
+    assert (in_registry and not pending) is installed
+    landing = yaml.safe_load((root / "roles/gateway/defaults/main.yaml").read_text())["gateway_landing_path"]
+    assert env.from_string(landing).render(**variables).strip() == ("/headlamp/" if installed else "")
+
+def test_template_defaults_turn_on_headlamp_and_envoy_gateway_upgrade():
+    root = pathlib.Path(__file__).resolve().parents[3]
+    defaults = yaml.safe_load((root / "configs/defaults/global_config.yaml").read_text())
+    assert defaults["headlamp_enabled"] is True
+    assert defaults["envoy_gateway_upgrade"] is True
+    assert "existing_kubernetes" not in defaults and "llm_services_deploy_models" not in defaults

@@ -121,7 +121,15 @@ gateway_portal_configmap: "platform-portal"
 # when on, is the platform landing page; signing out at the gateway ends here.
 # An app that publishes '/' (e.g. a RAG UI) takes it over, and gives it back
 # when it unpublishes.
-gateway_landing_path: "{{ (headlamp_path | default('/headlamp')) ~ '/' if headlamp_enabled | default(false) | bool else '' }}"
+# Off where Headlamp is skipped: OpenShift, and BYO in apiserver mode before trust (headlamp vars).
+gateway_landing_path: >-
+  {{ (headlamp_path | default('/headlamp')) ~ '/'
+     if (headlamp_enabled | default(false) | bool
+         and cluster_distribution | default('kubernetes') != 'openshift'
+         and (existing_kubernetes | default('', true) | length == 0
+              or headlamp_byo_apiserver_trusted | default(false) | bool
+              or headlamp_auth_mode | default('apiserver') == 'gateway'))
+     else '' }}
 
 # Keycloak routing for the SecurityPolicy JWT provider (canonical owner: keycloak
 # role). Issuer and in-cluster JWKS URL follow where Keycloak serves.

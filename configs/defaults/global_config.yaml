@@ -11,33 +11,25 @@
 # remove the "# " to use one.
 # One-off override:  ./toolkit_manager.sh install <target> -- -e key=value
 #
-#   1. Kubernetes             5. Storage
-#   2. Networking and proxy   6. Sign-in
-#   3. Domain and access      7. Advanced
-#   4. Components             8. Hardware and platform specific
+# This file loads after every env/<name>/config.<layer>.yaml, so an active line here
+# overrides the same key there. Each layer's detailed settings live in its own file.
+#
+#   1. Kubernetes             6. Inference
+#   2. Domain and access      7. Agent Toolkit
+#   3. Networking and proxy   8. Sign-in
+#   4. Storage                9. Advanced
+#   5. Components            10. Hardware and platform specific
 # =============================================================================
 
 
 # ─── 1. Kubernetes ───────────────────────────────────────────────────────────
 
+# existing_kubernetes: ""                 # your own cluster: its kubeconfig path (skips Kubespray)
 kubernetes_cluster_name: "cluster.local"
 kubernetes_kube_proxy_mode: "nftables"    # nftables | iptables | ipvs
-# existing_kubernetes: ""                 # your own cluster: its kubeconfig path (skips Kubespray)
 
 
-# ─── 2. Networking and proxy ─────────────────────────────────────────────────
-
-# kubernetes_service_cidr: "10.233.0.0/18"    # ClusterIP range
-# kubernetes_cluster_cidr: "10.233.64.0/18"   # pod range
-# metallb_ip_range: ""                        # LoadBalancer IP range (a-b); auto-detected when unset
-
-# Behind a corporate proxy: no_proxy must list both CIDRs above and the node subnets (ip route).
-# http_proxy: "http://your-proxy:8080"
-# https_proxy: "http://your-proxy:8080"
-# no_proxy: "localhost,127.0.0.1,.svc,.cluster.local,.monitoring,10.233.0.0/18,10.233.64.0/18,<node-subnet>"
-
-
-# ─── 3. Domain and access ────────────────────────────────────────────────────
+# ─── 2. Domain and access ────────────────────────────────────────────────────
 
 base_domain_name: "inteltoolkits.ai"      # all URLs: grafana.<domain>, keycloak.<domain>, ...
 
@@ -54,25 +46,22 @@ gateway_tls_mode: "selfsigned"            # selfsigned | custom
 gateway_request_timeout: "600s"           # Envoy's 15s default is too short for LLM responses
 
 
-# ─── 4. Components ───────────────────────────────────────────────────────────
-# Keycloak and the gateway always install; these switch the rest on or off.
+# ─── 3. Networking and proxy ─────────────────────────────────────────────────
 
-istio_enabled: true                       # Istio ambient mesh: mTLS between services
-observability_enabled: true               # Grafana, Prometheus, Loki, Tempo
-# observability_prometheus_retention: "30d"
-# observability_prometheus_storage_size: "50Gi"
-metrics_server_enabled: true              # kubectl top, Headlamp CPU/memory; skipped if the cluster has one
-headlamp_enabled: false                   # Kubernetes web UI, Keycloak sign-in (platform realm)
-keda_enabled: false                       # event-driven autoscaling (Custom Metrics Autoscaler on OpenShift)
-velero_enabled: false                     # backup and restore; needs CSI-snapshot storage
-kata_containers_enabled: false            # microVM runtime for the Agent Sandbox (agent-toolkit)
-kata_runtime: "kata-fc"                   # kata-fc | kata-qemu | both
+# Behind a corporate proxy: no_proxy must list both CIDRs below and the node subnets (ip route).
+# http_proxy: "http://your-proxy:8080"
+# https_proxy: "http://your-proxy:8080"
+# no_proxy: "localhost,127.0.0.1,.svc,.cluster.local,.monitoring,10.233.0.0/18,10.233.64.0/18,<node-subnet>"
+
+# kubernetes_service_cidr: "10.233.0.0/18"    # ClusterIP range
+# kubernetes_cluster_cidr: "10.233.64.0/18"   # pod range
+# metallb_ip_range: ""                        # LoadBalancer IP range (a-b); auto-detected when unset
 
 
-# ─── 5. Storage ──────────────────────────────────────────────────────────────
+# ─── 4. Storage ──────────────────────────────────────────────────────────────
 
 storage_backend: local-path               # local-path (single node) | nfs | ceph | netapp-trident | custom
-# ceph and netapp-trident (NetApp ONTAP hardware) take the settings in section 8.
+# ceph and netapp-trident (NetApp ONTAP hardware) take the settings in section 10.
 # custom: your own CSI driver, whose class must be the cluster's default StorageClass.
 # storage_custom_storageclass: ""         # custom only, required
 # storage_custom_rwx: true                # custom only; false: RWO-only class (single node only)
@@ -81,28 +70,56 @@ object_store_backend: "seaweedfs"         # S3 store for Loki, Tempo and Langfus
 seaweedfs_volume_storage_size: "10Gi"
 
 
-# ─── 6. Sign-in ──────────────────────────────────────────────────────────────
-# Keycloak signs people in. LiteLLM and Langfuse are set in config.inference.yaml.
+# ─── 5. Components ───────────────────────────────────────────────────────────
+# Keycloak and the gateway always install; these switch the rest on or off.
+
+headlamp_enabled: true                    # Kubernetes web UI, Keycloak sign-in; skipped on OpenShift, and on BYO until set up (docs/deploy/headlamp.md)
+observability_enabled: true               # Grafana, Prometheus, Loki, Tempo
+# observability_prometheus_retention: "30d"
+# observability_prometheus_storage_size: "50Gi"
+istio_enabled: true                       # Istio ambient mesh: mTLS between services
+metrics_server_enabled: true              # kubectl top, Headlamp CPU/memory; skipped if the cluster has one
+envoy_gateway_upgrade: true               # Envoy Gateway 1.9.3 with ListenerSets; false: 1.7.5. Never downgrades
+keda_enabled: false                       # event-driven autoscaling (Custom Metrics Autoscaler on OpenShift)
+velero_enabled: false                     # backup and restore; needs CSI-snapshot storage
+
+
+# ─── 6. Inference ────────────────────────────────────────────────────────────
+# Uncomment only to force a value for every layer. Everything else (models, LiteLLM,
+# Langfuse, guardrails, router): env/<name>/config.inference.yaml after `init inference`.
+
+# auth_type: "jwt"                        # API sign-in: jwt (Keycloak tokens) | litellm_vkey (LiteLLM virtual keys)
+# Inference layer (llm_services role): set true to deploy catalog models during the stack install (default false).
+# Mark each one autodeploy: true in env/<name>/models.yaml. Docs: https://github.com/intel/inference-toolkit/blob/main/docs/customize/catalog.md#auto-deploy-on-install
+# llm_services_deploy_models: false
+
+
+# ─── 7. Agent Toolkit ────────────────────────────────────────────────────────
+# Sandboxes, memory stores, default model, OpenShell, KubeRay:
+# env/<name>/config.agent-toolkit.yaml after `init agent-toolkit` (it sets auth_type: litellm_vkey).
+
+kata_containers_enabled: false            # microVM runtime for the Agent Sandbox
+kata_runtime: "kata-fc"                   # kata-fc | kata-qemu | both
+
+
+# ─── 8. Sign-in ──────────────────────────────────────────────────────────────
+# Keycloak signs people in; API sign-in (auth_type) is in section 6.
 # Keycloak and Grafana admin passwords are generated and kept in Secrets: docs/customize/configuration.md.
 
-# API auth: jwt (default) | litellm_vkey (the Agent Toolkit's default). Uncomment only to
-# force one for every layer: an active value here overrides the layer configs.
-# auth_type: "jwt"
 # keycloak_platform_bootstrap_admin_mfa: true    # platform-admin enrols OTP at first login
 # headlamp_byo_apiserver_trusted: true           # your own cluster's API server trusts the platform realm
 
 
-# ─── 7. Advanced (most installs keep these) ──────────────────────────────────
+# ─── 9. Advanced (most installs keep these) ──────────────────────────────────
 
 node_topology_enabled: true               # platform pods on control-plane nodes, inference on workers (soft)
 enforce_pss: true                         # Pod Security labels on every namespace the installer creates
 kubernetes_cpu_policy: "nri-balloons"     # keep: model-manager and inference need NRI CPU pinning
 kubernetes_accelerator: "cpu"             # cpu: the kubelet CPU/NUMA tuning for Xeon
 rack_scale_enabled: false                 # rack-scale fabric; needs env/<name>/rack-profile.yaml
-# envoy_gateway_upgrade: false            # true: Envoy Gateway 1.9.3 instead of 1.7.5; never downgrades
 
 
-# ─── 8. Hardware and platform specific ───────────────────────────────────────
+# ─── 10. Hardware and platform specific ──────────────────────────────────────
 
 # Ceph (storage_backend: ceph): raw OSD devices per node; the nodes listed run the Ceph daemons.
 # rook_ceph_devices:

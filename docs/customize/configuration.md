@@ -110,18 +110,20 @@ CLI -e override  >  global_config.yaml  >  config.<solution>.yaml  >  role defau
 
 `init` copies [`configs/defaults/global_config.yaml`](../../configs/defaults/global_config.yaml)
 to `env/<name>/global_config.yaml`. Its active lines are the defaults; its `# key: value`
-lines are optional settings (remove the `# ` to use one). It has eight sections:
+lines are optional settings (remove the `# ` to use one). It has ten sections:
 
 | Section | What it sets |
 |---|---|
-| 1. Kubernetes | cluster name, kube-proxy mode, `existing_kubernetes` (your own cluster) |
-| 2. Networking and proxy | service and pod CIDRs, `metallb_ip_range`, `http_proxy` / `https_proxy` / `no_proxy` |
-| 3. Domain and access | `base_domain_name`, `routing_mode`, TLS (`gateway_tls_mode`, custom certificate files), `gateway_request_timeout` |
-| 4. Components | `istio_enabled`, `observability_enabled`, `metrics_server_enabled`, `headlamp_enabled`, `keda_enabled`, `velero_enabled`, `kata_containers_enabled` |
-| 5. Storage | `storage_backend` and its `custom` settings, `object_store_backend` |
-| 6. Sign-in | `auth_type` (API auth: `jwt` by default, `litellm_vkey` with the Agent Toolkit; set here only to force it for every layer), platform-admin MFA |
-| 7. Advanced | `node_topology_enabled`, `enforce_pss`, CPU policy, `rack_scale_enabled`, `envoy_gateway_upgrade` |
-| 8. Hardware and platform specific | Ceph devices, NetApp ONTAP, OpenShift checks |
+| 1. Kubernetes | `existing_kubernetes` (your own cluster), cluster name, kube-proxy mode |
+| 2. Domain and access | `base_domain_name`, `routing_mode`, TLS (`gateway_tls_mode`, custom certificate files), `gateway_request_timeout` |
+| 3. Networking and proxy | `http_proxy` / `https_proxy` / `no_proxy`, service and pod CIDRs, `metallb_ip_range` |
+| 4. Storage | `storage_backend` and its `custom` settings, `object_store_backend` |
+| 5. Components | `headlamp_enabled` (on), `observability_enabled`, `istio_enabled`, `metrics_server_enabled`, `envoy_gateway_upgrade` (on: Envoy Gateway 1.9.3), `keda_enabled`, `velero_enabled` |
+| 6. Inference | `auth_type` and `llm_services_deploy_models`, commented: set here only to force them for every layer. The rest is in `config.inference.yaml` |
+| 7. Agent Toolkit | `kata_containers_enabled`, `kata_runtime`. The rest is in `config.agent-toolkit.yaml` |
+| 8. Sign-in | platform-admin MFA, `headlamp_byo_apiserver_trusted` |
+| 9. Advanced | `node_topology_enabled`, `enforce_pss`, CPU policy, `rack_scale_enabled` |
+| 10. Hardware and platform specific | Ceph devices, NetApp ONTAP, OpenShift checks |
 
 ### Field summary
 
