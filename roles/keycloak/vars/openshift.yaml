@@ -11,9 +11,3 @@ _keycloak_from_olm: true
 _keycloak_out_of_mesh_callers:
   - {port: 8080, namespace_labels: {kubernetes.io/metadata.name: "{{ keycloak_authorino_namespace }}"}}
   - {port: 9000, namespace_labels: {network.openshift.io/policy-group: monitoring}, probed: true}
-# The kubelet's probes reach the pod from the address istio-cni SNATs them to:
-# HOST_PROBE_SNAT_IP on the admin's IstioCNI, read by tasks/install.yaml. A `probed`
-# port admits it.
-_keycloak_probe_address: >-
-  {{ _keycloak_istio_cni.resources | default([])
-     | map(attribute='spec.values.cni.env.HOST_PROBE_SNAT_IP', default='') | first | default('') }}

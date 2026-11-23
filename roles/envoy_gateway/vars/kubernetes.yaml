@@ -16,7 +16,8 @@ _envoy_gateway_oidc_login_patches: true
 _envoy_gateway_pss_labels: "{{ enforce_pss | default(false) | bool }}"
 # Only the API server's webhook calls (9443) come from outside the mesh. No
 # NetworkPolicy: the API server's source addresses depend on the cluster.
+# `on_existing`: opened on an existing controller too.
 _envoy_gateway_ctrl_out_of_mesh:
-  - {port: 9443}
+  - {port: 9443, on_existing: true}
 _envoy_gateway_ctrl_network_policy: false
 _envoy_gateway_ctrl_probe_ports: []

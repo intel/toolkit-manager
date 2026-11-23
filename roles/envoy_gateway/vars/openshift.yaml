@@ -19,9 +19,10 @@ _envoy_gateway_oidc_login_patches: false
 _envoy_gateway_pss_labels: false
 # The controller's callers outside the mesh: the API server calls the webhook from the
 # host network, the user-workload Prometheus scrapes the metrics. A NetworkPolicy
-# admits only these.
+# admits only these. `on_existing`: opened on an existing controller too, which keeps
+# its owner's policies, so the metrics port stays STRICT there.
 _envoy_gateway_ctrl_out_of_mesh:
-  - {port: 9443, namespace_labels: {policy-group.network.openshift.io/host-network: ""}}
+  - {port: 9443, namespace_labels: {policy-group.network.openshift.io/host-network: ""}, on_existing: true}
   - {port: 19001, namespace_labels: {network.openshift.io/policy-group: monitoring}}
 _envoy_gateway_ctrl_network_policy: true
 # The kubelet's probes. ztunnel lets them in as plain TCP and refuses anything else

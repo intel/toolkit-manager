@@ -51,6 +51,7 @@
     - istio_enabled | default(false) | bool
     - not _postgresql_from_olm | bool
 
+# istio-cni SNATs the kubelet's probes to HOST_PROBE_SNAT_IP (preflight checks it is set).
 - name: "postgresql | Read the kubelet probes' source address from the IstioCNI"
   kubernetes.core.k8s_info:
     api_version: sailoperator.io/v1
@@ -61,14 +62,9 @@
     - istio_enabled | default(false) | bool
     - _postgresql_from_olm | bool
 
-- name: "postgresql | Check the kubelet probes' source address"
-  ansible.builtin.assert:
-    that: _postgresql_probe_address | length > 0
-    fail_msg: >-
-      The IstioCNI 'default' does not set spec.values.cni.env.HOST_PROBE_SNAT_IP, which
-      the instances' NetworkPolicy needs to admit the kubelet's probes. Set it as
-      docs/deploy/openshift.md describes (step 3).
-    quiet: true
+- name: "postgresql | Note the kubelet probes' source address"
+  ansible.builtin.set_fact:
+    _postgresql_probe_address: "{{ _postgresql_istio_cni.resources | map(attribute='spec.values.cni.env.HOST_PROBE_SNAT_IP') | first }}/32"
   when:
     - istio_enabled | default(false) | bool
     - _postgresql_from_olm | bool
@@ -103,7 +99,7 @@
           - ports: [{port: 15008, protocol: TCP}]
           - from:
               - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: "{{ cnpg_olm_namespace }}"}}
-              - ipBlock: {cidr: "{{ _postgresql_probe_address }}/32"}
+              - ipBlock: {cidr: "{{ _postgresql_probe_address }}"}
             ports: [{port: 8000, protocol: TCP}]
   loop_control:
     label: "{{ item.kind }}/{{ item.metadata.name }}"

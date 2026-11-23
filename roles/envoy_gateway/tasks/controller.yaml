@@ -158,7 +158,8 @@
           mode: STRICT
         portLevelMtls: >-
           {%- set out = {} -%}
-          {%- for c in _envoy_gateway_ctrl_out_of_mesh -%}
+          {%- for c in _envoy_gateway_ctrl_out_of_mesh
+                if gateway_platform.controller_managed | bool or c.on_existing | default(false) -%}
           {%- set _ = out.update({c.port | string: {'mode': 'PERMISSIVE'}}) -%}
           {%- endfor -%}
           {{ out }}

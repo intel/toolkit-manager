@@ -578,6 +578,7 @@
 # 4. Mesh
 # =============================================================================
 
+# istio-cni SNATs the kubelet's probes to HOST_PROBE_SNAT_IP (preflight checks it is set).
 - name: "observability | olm | Read the kubelet probes' source address from the IstioCNI"
   kubernetes.core.k8s_info:
     api_version: sailoperator.io/v1
@@ -587,14 +588,9 @@
   when:
     - istio_enabled | default(false) | bool
 
-- name: "observability | olm | Check the kubelet probes' source address"
-  ansible.builtin.assert:
-    that: _observability_probe_address | length > 0
-    fail_msg: >-
-      The IstioCNI 'default' does not set spec.values.cni.env.HOST_PROBE_SNAT_IP, which
-      the observability NetworkPolicy needs to admit the kubelet's probes. Set it as
-      docs/deploy/openshift.md describes (step 3).
-    quiet: true
+- name: "observability | olm | Note the kubelet probes' source address"
+  ansible.builtin.set_fact:
+    _observability_probe_address: "{{ _observability_istio_cni.resources | map(attribute='spec.values.cni.env.HOST_PROBE_SNAT_IP') | first }}/32"
   when:
     - istio_enabled | default(false) | bool
 
@@ -660,7 +656,7 @@
                      'ingress': [{'ports': any},
                                  {'from': [{'namespaceSelector': {'matchLabels': o.from}} if o.from is defined
                                            else {'podSelector': {'matchLabels': o.from_pods}}]
-                                          + ([{'ipBlock': {'cidr': _observability_probe_address ~ '/32'}}]
+                                          + ([{'ipBlock': {'cidr': _observability_probe_address}}]
                                              if o.probed | default(false) else []),
                                   'ports': open}]}}) -%}
       {%- endfor -%}
