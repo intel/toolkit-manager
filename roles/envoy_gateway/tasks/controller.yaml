@@ -187,8 +187,9 @@
           {%- endfor -%}
           {%- set out = [{'ports': any}] -%}
           {%- for c in _envoy_gateway_ctrl_out_of_mesh -%}
-          {%- set _ = out.append({'from': [{'namespaceSelector': {'matchLabels': c.namespace_labels}}],
-                                  'ports': [{'port': c.port, 'protocol': 'TCP'}]}) -%}
+          {%- set _ = out.append({'ports': [{'port': c.port, 'protocol': 'TCP'}]}
+                                 | combine({'from': [{'namespaceSelector': {'matchLabels': c.namespace_labels}}]}
+                                           if c.namespace_labels is defined else {})) -%}
           {%- endfor -%}
           {{ out }}
   when:
