@@ -7,7 +7,8 @@ import pathlib
 import pytest
 import yaml
 
-_PLUGIN = pathlib.Path(__file__).resolve().parents[3] / "filter_plugins" / "resolve_components.py"
+_ROOT = pathlib.Path(__file__).resolve().parents[3]
+_PLUGIN = _ROOT / "filter_plugins" / "resolve_components.py"
 _spec = importlib.util.spec_from_file_location("resolve_components", _PLUGIN)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
@@ -125,6 +126,13 @@ def _component(name):
     return next(c for c in _REGISTRY["components"] if c["name"] == name)
 
 
+def _jinja():
+    import jinja2
+    env = jinja2.Environment()
+    env.filters["bool"] = lambda v: str(v).lower() in ("1", "true", "yes", "on")
+    return env
+
+
 def test_intel_gpu_plugin_is_a_platform_component_after_nfd_and_nri_cpu_balloons():
     assert _component("intel_gpu_plugin")["layer"] == "platform"
     assert _component("intel_gpu_plugin")["depends_on"] == ["node_feature_discovery"]
@@ -144,8 +152,46 @@ def test_intel_gpu_plugin_runs_in_the_platform_layer_but_not_the_inference_layer
     ({"cluster_distribution": "kubernetes"}, True),
 ])
 def test_intel_gpu_plugin_enable_rule(variables, enabled):
-    import jinja2
-    env = jinja2.Environment()
-    env.filters["bool"] = lambda v: str(v).lower() in ("1", "true", "yes", "on")
-    rendered = env.from_string(_component("intel_gpu_plugin")["enabled"]).render(**variables)
+    rendered = _jinja().from_string(_component("intel_gpu_plugin")["enabled"]).render(**variables)
     assert (rendered == "True") is enabled
+
+
+_BYO = {"existing_kubernetes": "/path/kubeconfig"}
+
+
+def _yaml(rel):
+    return yaml.safe_load((_ROOT / rel).read_text())
+
+
+def _preflight_fact(name):
+    task = next(t for t in _yaml("playbooks/includes/preflight.yaml") if name in t.get("ansible.builtin.set_fact", {}))
+    return task["ansible.builtin.set_fact"][name]
+
+
+@pytest.mark.parametrize("variables, installed", [
+    ({}, False),
+    ({"headlamp_enabled": True}, True),
+    ({"headlamp_enabled": True, "cluster_distribution": "openshift"}, False),
+    ({"headlamp_enabled": True, "existing_kubernetes": ""}, True),
+    ({"headlamp_enabled": True, **_BYO}, False),
+    ({"headlamp_enabled": True, **_BYO, "headlamp_byo_apiserver_trusted": True}, True),
+    ({"headlamp_enabled": True, **_BYO, "headlamp_auth_mode": "gateway"}, True),
+])
+def test_headlamp_installs_drives_the_role_skip_and_the_landing_path(variables, installed):
+    env = _jinja()
+    defaults = _yaml("roles/headlamp/defaults/main.yaml")
+    role_vars = {k: defaults[k] for k in ("headlamp_auth_mode", "headlamp_byo_apiserver_trusted")} | variables
+    fact = env.from_string(_preflight_fact("headlamp_installs")).render(**role_vars).strip()
+    assert (fact == "True") is installed
+    in_registry = env.from_string(_component("headlamp")["enabled"]).render(**variables) == "True"
+    pending = env.from_string(_yaml("roles/headlamp/vars/main.yaml")["__headlamp_byo_pending"]).render(headlamp_installs=fact)
+    assert (in_registry and pending == "False") is installed
+    landing = _yaml("roles/gateway/defaults/main.yaml")["gateway_landing_path"]
+    assert env.from_string(landing).render(headlamp_installs=fact) == ("/headlamp/" if installed else "")
+
+
+def test_template_defaults_turn_on_headlamp_and_envoy_gateway_upgrade():
+    defaults = _yaml("configs/defaults/global_config.yaml")
+    assert defaults["headlamp_enabled"] is True
+    assert defaults["envoy_gateway_upgrade"] is True
+    assert "existing_kubernetes" not in defaults and "llm_services_deploy_models" not in defaults

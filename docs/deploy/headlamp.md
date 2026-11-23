@@ -2,18 +2,16 @@
 
 Headlamp is the cluster web UI and the platform's landing page. People sign in
 with their Keycloak account (realm `platform`), the same sign-in as Grafana,
-Langfuse and the LiteLLM admin UI. This page covers turning it on, who gets in,
-and the extra step on a cluster you bring yourself (BYO).
+Langfuse and the LiteLLM admin UI. This page covers turning it on or off, who
+gets in, and the extra step on a cluster you bring yourself (BYO).
 
-## Turn it on
+## Turn it on or off
 
-In `env/<name>/global_config.yaml`:
-
-```yaml
-headlamp_enabled: true
-```
-
-Then install it on its own, or with the rest of the platform:
+It is on by default (`headlamp_enabled: true` in `env/<name>/global_config.yaml`);
+set it to `false` to skip it. It is skipped on OpenShift, and on a BYO cluster
+until you set `headlamp_auth_mode: gateway` or finish
+[Bring your own Kubernetes](#bring-your-own-kubernetes-byo). To add it to a
+platform installed without it:
 
 ```bash
 ./toolkit_manager.sh install headlamp --env <name>

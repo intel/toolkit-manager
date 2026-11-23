@@ -62,11 +62,14 @@ observability_enabled: true               # Grafana, Prometheus, Loki, Tempo
 # observability_prometheus_retention: "30d"
 # observability_prometheus_storage_size: "50Gi"
 metrics_server_enabled: true              # kubectl top, Headlamp CPU/memory; skipped if the cluster has one
-headlamp_enabled: false                   # Kubernetes web UI, Keycloak sign-in (platform realm)
+headlamp_enabled: true                    # Kubernetes web UI, Keycloak sign-in; skipped on OpenShift, and on BYO until set up (docs/deploy/headlamp.md)
 keda_enabled: false                       # event-driven autoscaling (Custom Metrics Autoscaler on OpenShift)
 velero_enabled: false                     # backup and restore; needs CSI-snapshot storage
 kata_containers_enabled: false            # microVM runtime for the Agent Sandbox (agent-toolkit)
 kata_runtime: "kata-fc"                   # kata-fc | kata-qemu | both
+# Inference layer: true deploys the catalog models marked autodeploy: true in env/<name>/models.yaml.
+# Commented: an active line here overrides config.inference.yaml. Docs: https://github.com/intel/inference-toolkit/blob/main/docs/customize/catalog.md#auto-deploy-on-install
+# llm_services_deploy_models: false
 
 
 # ─── 5. Storage ──────────────────────────────────────────────────────────────
@@ -99,7 +102,7 @@ enforce_pss: true                         # Pod Security labels on every namespa
 kubernetes_cpu_policy: "nri-balloons"     # keep: model-manager and inference need NRI CPU pinning
 kubernetes_accelerator: "cpu"             # cpu: the kubelet CPU/NUMA tuning for Xeon
 rack_scale_enabled: false                 # rack-scale fabric; needs env/<name>/rack-profile.yaml
-# envoy_gateway_upgrade: false            # true: Envoy Gateway 1.9.3 instead of 1.7.5; never downgrades
+envoy_gateway_upgrade: true               # Envoy Gateway 1.9.3 with ListenerSets; false: 1.7.5. Never downgrades
 
 
 # ─── 8. Hardware and platform specific ───────────────────────────────────────
