@@ -25,7 +25,7 @@ postgresql_storage_class: ""          # empty = default StorageClass
 postgresql_admin_user: "postgres"
 
 # Per-consumer databases — list of {name, user, password(optional), enabled(optional),
-# target_namespace(optional), createrole(optional: the user may create roles),
+# target_namespace(optional), createrole / createdb (optional: the user may create roles / databases),
 # namespace_labels(optional, default true: label the namespace for Istio ambient and PSS)}
 # Each entry creates a database + user in the CNPG cluster.
 # The first entry is the bootstrap "application" database.
@@ -42,11 +42,14 @@ postgresql_databases:
     user: langfuse
     enabled: "{{ (auth_type | default('jwt') == 'litellm_vkey' or litellm_enabled | default(false) | bool) and langfuse_enabled | default(true) | bool }}"
   # SPACE (agent-toolkit, foreign var space_enabled from config.agent-toolkit.yaml).
-  # Its migrate Job creates its own managed logins, so the user needs CREATEROLE.
+  # Its migrate Job creates its own managed logins and gives its break-glass role
+  # CREATEDB, so the user needs CREATEROLE and CREATEDB (not superuser: PostgreSQL 16+
+  # limits it to the roles it creates, so it cannot touch other components' roles or data).
   # Its node services are privileged and it runs its own mTLS: no mesh or PSS labels.
   - name: space
     user: space
     target_namespace: space
     createrole: true
+    createdb: true
     namespace_labels: false
     enabled: "{{ space_enabled | default(false) | bool }}"

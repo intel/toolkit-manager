@@ -2,7 +2,7 @@
 # Copyright (C) 2025-2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 """Provision a PostgreSQL database and user.
-Usage: python3 provision_db.py <db> <user> <admin> <base64-password> [createrole]
+Usage: python3 provision_db.py <db> <user> <admin> <base64-password> [createrole] [createdb]
 Password is passed as base64 to avoid all shell/shlex quoting issues.
 """
 import base64
@@ -17,7 +17,7 @@ db = sys.argv[1]
 user = sys.argv[2]
 admin = sys.argv[3]
 pw = base64.b64decode(sys.argv[4]).decode()
-createrole = sys.argv[5:] == ["createrole"]
+attributes = [a for a in sys.argv[5:] if a in ("createrole", "createdb")]
 
 if not pw:
     print("ERROR: password is empty", file=sys.stderr)
@@ -62,8 +62,8 @@ else:
     run(f"DO $$ BEGIN EXECUTE format('ALTER USER %I WITH PASSWORD %L', "
         f"'{user}', '{pw.replace(chr(39), chr(39)*2)}'); END $$")
 
-if createrole:
-    run(f'ALTER USER "{user}" CREATEROLE')
+for attribute in attributes:
+    run(f'ALTER USER "{user}" {attribute.upper()}')
 
 # Grant privileges
 run(f'GRANT ALL PRIVILEGES ON DATABASE "{db}" TO "{user}"')

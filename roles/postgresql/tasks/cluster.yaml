@@ -137,9 +137,9 @@
                 '{{ item.resources[0].data.password | b64decode }}');
             END IF;
           END $$;
-          {% if item.item.createrole | default(false) | bool %}
-          ALTER USER "{{ item.item.user }}" CREATEROLE;
-          {% endif %}
+          {% for attr in ['createrole', 'createdb'] if item.item[attr] | default(false) | bool %}
+          ALTER USER "{{ item.item.user }}" {{ attr | upper }};
+          {% endfor %}
   loop: "{{ _pg_cred_secrets.results }}"
   loop_control:
     label: "{{ item.item.name }}"
@@ -215,7 +215,7 @@
           {{ item.item.user }}
           {{ postgresql_admin_user }}
           {{ item.resources[0].data.password }}
-          {{ 'createrole' if item.item.createrole | default(false) | bool else '' }}
+          {{ ['createrole', 'createdb'] | select('in', item.item | dict2items | selectattr('value') | map(attribute='key') | list) | join(' ') }}
       loop: "{{ _pg_cred_secrets.results }}"
       loop_control:
         label: "{{ item.item.name }}"
