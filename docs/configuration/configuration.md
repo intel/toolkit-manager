@@ -51,7 +51,7 @@ env/prod/global_config.yaml      # the real cluster
 
 Not for a single-machine trial. The defaults assume: one node (this machine), the
 `inteltoolkits.ai` domain, a self-signed TLS certificate, Keycloak sign-in, storage on the node's
-own disk, and inference on Intel® Xeon® CPUs.
+own disk, and inference on Intel® Xeon® CPUs (Intel® GPU nodes are picked up automatically).
 
 Edit the file when one of these is true:
 

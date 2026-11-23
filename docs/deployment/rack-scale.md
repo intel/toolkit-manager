@@ -49,7 +49,7 @@ Four topologies are supported from the same `rack-profile.yaml` schema:
   - Clos: cables to ToR leaf switches
 - **Network plan:** fabric IP addresses, subnet layout, cable map
 - **Storage (optional):** raw NVMe devices for Ceph OSDs (not the OS disk)
-- **GPU (optional):** nodes with NVIDIA GPUs (Intel GPU support follows with the generic GPU enablement, planner epic B2)
+- **GPU (optional):** NVIDIA GPUs get the GPU Operator from the rack profile; Intel GPUs get the Intel GPU device plugin on any cluster ([Intel GPUs](install-platform.md))
 
 ### Node readiness
 

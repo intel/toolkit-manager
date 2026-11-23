@@ -76,6 +76,6 @@ Terms used across this documentation, in alphabetical order.
 
 **Virtual key.** A scoped API key issued by LiteLLM, with its own budget and rate limits, used instead of a Keycloak JWT when `auth_type: litellm_vkey`.
 
-**vLLM.** A high-throughput LLM serving runtime, the default for text generation on Xeon.
+**vLLM.** A high-throughput LLM serving runtime, the default for text generation on Xeon; the `vllm-xpu` runtime runs it on Intel® GPUs.
 
 **ztunnel.** The per-node proxy that carries mutual TLS traffic in an Istio ambient mesh.

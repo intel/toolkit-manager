@@ -4,7 +4,7 @@
 
 ## Overview
 
-Toolkit Manager is a modular, extensible deployment framework for a self-hosted Kubernetes cluster, an LLM inference serving stack, and opt-in applications on Intel® Xeon® servers — deployable on-premises, air-gapped, or in a private cloud. It is a shell script (`toolkit_manager.sh`) that drives Ansible playbooks.
+Toolkit Manager is a modular, extensible deployment framework for a self-hosted Kubernetes cluster, an LLM inference serving stack, and opt-in applications on Intel® Xeon® servers, with optional Intel® GPUs — deployable on-premises, air-gapped, or in a private cloud. It is a shell script (`toolkit_manager.sh`) that drives Ansible playbooks.
 
 This repository provides:
 - **Infrastructure layer** — Kubernetes (via Kubespray), storage (local-path, NFS, Ceph, NetApp ONTAP via Trident, or your own CSI driver), and on rack-scale clusters the fabric roles

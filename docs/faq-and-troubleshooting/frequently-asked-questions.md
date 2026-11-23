@@ -22,7 +22,7 @@ No for the default path. The installer provisions the cluster with Kubespray and
 
 ### Do I need an accelerator or a GPU?
 
-No. Inference runs on Intel® Xeon® CPUs, with NUMA-aware CPU pinning and vLLM or OpenVINO™ Model Server as the runtime.
+No, but you can use one. By default models run on Intel® Xeon® CPUs, with NUMA-aware CPU pinning and vLLM or OpenVINO™ Model Server as the runtime. On nodes with Intel® GPUs (Arc Pro B-Series) the platform installs the Intel GPU device plugin, and the `vllm-xpu` runtime serves models on them: see [Deploy a Model](../getting-started/deploy-models.md).
 
 ### What is the difference between `configure`, `init`, and `install`?
 

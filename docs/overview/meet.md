@@ -4,7 +4,7 @@
 
 > **One automated workflow connecting Intel's AI portfolio — self-hosted, on-premises, and ready to deploy.**
 
-Toolkit Manager is an open source, Kubernetes-based platform that removes the complexity of deploying self-hosted AI on Intel® Xeon® processors — on-premises, air-gapped, or in your own private cloud, with no GPU required and no data leaving your infrastructure.
+Toolkit Manager is an open source, Kubernetes-based platform that removes the complexity of deploying self-hosted AI on Intel® Xeon® processors and Intel® GPUs — on-premises, air-gapped, or in your own private cloud, with no data leaving your infrastructure.
 
 The repository acts as the integration and automation layer across Intel's AI portfolio. It connects the infrastructure, inference engines, models, retrieval services, security, and observability required to deploy complete AI solutions — through a consistent, automated workflow.
 
@@ -60,9 +60,9 @@ Solutions  (Intel® Chatbot Toolkit or Intel® Agent Toolkit — opt-in)
 
 Applications and frameworks connect through a familiar API — the same `base_url` + `api_key` pattern used by the OpenAI SDK, LangChain, LlamaIndex, Cursor, n8n, and thousands of other tools.
 
-### GPU-Free Inference on Intel® Xeon®
+### Inference on Intel® Xeon® and Intel® GPUs
 
-The platform is designed for AI inference on Intel® Xeon® processors, with NUMA-aware CPU placement (NRI Balloons) and AMX instruction acceleration — delivering high-throughput, GPU-free inference without a specialized accelerator supply chain.
+Models run on Intel® Xeon® processors out of the box, with NUMA-aware CPU placement (NRI Balloons) and AMX acceleration, so a CPU-only cluster serves models with no accelerator. Nodes with Intel® GPUs (Arc Pro B-Series) get the Intel GPU device plugin automatically, and the inference layer's `vllm-xpu` runtime serves models on them.
 
 ### Modular by design
 
@@ -129,6 +129,7 @@ github.com/intel/toolkit-manager            <- start here; run all commands from
 | 14 | **Valkey** | In-memory cache (Redis-compatible) for LiteLLM and Langfuse, installed with them |
 | 15 | **Langfuse** | LLM observability — traces, token usage, cost tracking, prompt management; installed with LiteLLM |
 | 16 | **NRI CPU Balloons** | NUMA-aware CPU pinning for model servers — keeps other workloads off their cores |
+| 17 | **Intel GPU device plugin** | Advertises Intel® GPUs to Kubernetes (`gpu.intel.com/xe`) on nodes that have one, for the `vllm-xpu` runtime |
 
 ---
 

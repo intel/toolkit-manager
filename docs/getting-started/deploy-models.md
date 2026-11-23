@@ -1,4 +1,4 @@
-# Deploy an LLM on Intel® Xeon® with model-manager
+# Deploy an LLM with model-manager
 
 [← Docs index](../README.md)
 
@@ -76,7 +76,7 @@ Key flags:
 | `--replicas` | `1` | Fixed number of serving replicas (turns autoscaling off) |
 | `--min-replicas` / `--max-replicas` | — | Autoscale between these counts. Needs `keda_enabled: true` and a KServe with KEDA scaling (installed with `envoy_gateway_upgrade: true`) |
 | `--tp` | `1` | Tensor parallelism — splits the model across NUMA nodes |
-| `--server` | `vllm` | Model server: `vllm` \| `openvino` \| `vllm-cuda` (NVIDIA GPUs). `--runtime` is the same flag |
+| `--server` | `vllm` | Model server: `vllm` \| `openvino` \| `vllm-xpu` (Intel GPUs) \| `vllm-cuda` (NVIDIA GPUs). `--runtime` is the same flag |
 | `--node` | — | Run the model on this node only (the pod stays `Pending` if it cannot) |
 | `--wait` | — | Wait for model to be ready |
 | `--dry-run` | — | Print the manifest without applying |
@@ -124,7 +124,7 @@ Only `name` and `model_id` are required; the full field list, with comments, is 
 | `servers` + `default_server` | Instead of the two above: the servers and versions this model may run on |
 | `cpu` | CPU core request for the serving pod; `cpu: auto` sizes it to the free cores of one NUMA node |
 | `memory` | Memory for the serving pod |
-| `gpus` | GPUs per pod, for a GPU server such as `vllm-cuda` |
+| `gpus` | GPUs per pod, for a GPU server (`vllm-xpu`, `vllm-cuda`) |
 | `replicas` | Number of pods to run; or `autoscaling: {min_replicas, max_replicas, scale_target}` with KEDA |
 | `node` | Pin to a specific node name (optional) |
 | `autodeploy` | `true`: deploy this model during `install` |
