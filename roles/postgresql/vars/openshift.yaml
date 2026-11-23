@@ -3,6 +3,9 @@
 _postgresql_pss_labels: false
 # CNPG operator installed by the admin from OperatorHub (OLM): the role checks it.
 _postgresql_from_olm: true
-# Istio's fixed source address for the kubelet's probes: istio-cni SNATs them to it
-# on the node. The instances' probes call the status port (8000), so it admits them.
-_postgresql_probe_address: 169.254.7.127/32
+# The kubelet's probes reach the pod from the address istio-cni SNATs them to:
+# HOST_PROBE_SNAT_IP on the admin's IstioCNI, read by tasks/cluster.yaml. The instances'
+# probes call the status port (8000), so it admits them.
+_postgresql_probe_address: >-
+  {{ _postgresql_istio_cni.resources | default([])
+     | map(attribute='spec.values.cni.env.HOST_PROBE_SNAT_IP', default='') | first | default('') }}

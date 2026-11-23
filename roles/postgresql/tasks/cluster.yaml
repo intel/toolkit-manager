@@ -51,6 +51,28 @@
     - istio_enabled | default(false) | bool
     - not _postgresql_from_olm | bool
 
+- name: "postgresql | Read the kubelet probes' source address from the IstioCNI"
+  kubernetes.core.k8s_info:
+    api_version: sailoperator.io/v1
+    kind: IstioCNI
+    name: default
+  register: _postgresql_istio_cni
+  when:
+    - istio_enabled | default(false) | bool
+    - _postgresql_from_olm | bool
+
+- name: "postgresql | Check the kubelet probes' source address"
+  ansible.builtin.assert:
+    that: _postgresql_probe_address | length > 0
+    fail_msg: >-
+      The IstioCNI 'default' does not set spec.values.cni.env.HOST_PROBE_SNAT_IP, which
+      the instances' NetworkPolicy needs to admit the kubelet's probes. Set it as
+      docs/deploy/openshift.md describes (step 3).
+    quiet: true
+  when:
+    - istio_enabled | default(false) | bool
+    - _postgresql_from_olm | bool
+
 # The marketplace operator, outside the mesh, polls each instance's status port (8000);
 # under STRICT ztunnel refuses it and the Cluster never becomes ready. Only that port
 # accepts plain TCP, and the NetworkPolicy lets in only the operator's namespace and
@@ -81,7 +103,7 @@
           - ports: [{port: 15008, protocol: TCP}]
           - from:
               - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: "{{ cnpg_olm_namespace }}"}}
-              - ipBlock: {cidr: "{{ _postgresql_probe_address }}"}
+              - ipBlock: {cidr: "{{ _postgresql_probe_address }}/32"}
             ports: [{port: 8000, protocol: TCP}]
   loop_control:
     label: "{{ item.kind }}/{{ item.metadata.name }}"

@@ -578,6 +578,26 @@
 # 4. Mesh
 # =============================================================================
 
+- name: "observability | olm | Read the kubelet probes' source address from the IstioCNI"
+  kubernetes.core.k8s_info:
+    api_version: sailoperator.io/v1
+    kind: IstioCNI
+    name: default
+  register: _observability_istio_cni
+  when:
+    - istio_enabled | default(false) | bool
+
+- name: "observability | olm | Check the kubelet probes' source address"
+  ansible.builtin.assert:
+    that: _observability_probe_address | length > 0
+    fail_msg: >-
+      The IstioCNI 'default' does not set spec.values.cni.env.HOST_PROBE_SNAT_IP, which
+      the observability NetworkPolicy needs to admit the kubelet's probes. Set it as
+      docs/deploy/openshift.md describes (step 3).
+    quiet: true
+  when:
+    - istio_enabled | default(false) | bool
+
 # Under STRICT mTLS ztunnel refuses plain TCP. The user-workload Prometheus and the
 # Grafana Operator run outside the mesh: only the ports they call accept plain TCP,
 # and the NetworkPolicy lets in only their namespaces (from), or pods (from_pods).
@@ -640,7 +660,7 @@
                      'ingress': [{'ports': any},
                                  {'from': [{'namespaceSelector': {'matchLabels': o.from}} if o.from is defined
                                            else {'podSelector': {'matchLabels': o.from_pods}}]
-                                          + ([{'ipBlock': {'cidr': _observability_probe_address}}]
+                                          + ([{'ipBlock': {'cidr': _observability_probe_address ~ '/32'}}]
                                              if o.probed | default(false) else []),
                                   'ports': open}]}}) -%}
       {%- endfor -%}

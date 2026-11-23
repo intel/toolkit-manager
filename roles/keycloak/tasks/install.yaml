@@ -26,6 +26,28 @@
 - name: "keycloak | Namespace labels"
   ansible.builtin.include_tasks: namespace_labels.yaml
 
+- name: "keycloak | Read the kubelet probes' source address from the IstioCNI"
+  kubernetes.core.k8s_info:
+    api_version: sailoperator.io/v1
+    kind: IstioCNI
+    name: default
+  register: _keycloak_istio_cni
+  when:
+    - istio_enabled | default(false) | bool
+    - _keycloak_out_of_mesh_callers | length > 0
+
+- name: "keycloak | Check the kubelet probes' source address"
+  ansible.builtin.assert:
+    that: _keycloak_probe_address | length > 0
+    fail_msg: >-
+      The IstioCNI 'default' does not set spec.values.cni.env.HOST_PROBE_SNAT_IP, which
+      Keycloak's NetworkPolicy needs to admit the kubelet's probes. Set it as
+      docs/deploy/openshift.md describes (step 3).
+    quiet: true
+  when:
+    - istio_enabled | default(false) | bool
+    - _keycloak_out_of_mesh_callers | length > 0
+
 # Under STRICT mTLS ztunnel refuses plain TCP: only the ports of
 # _keycloak_out_of_mesh_callers (vars/<platform>.yaml) accept it, and the NetworkPolicy
 # lets in only their namespaces, plus the kubelet's probes on a `probed` port. Meshed
@@ -67,7 +89,7 @@
       {%- set out = [{'ports': [{'port': 15008, 'protocol': 'TCP'}]}] -%}
       {%- for c in _keycloak_out_of_mesh_callers -%}
       {%- set _ = out.append({'from': [{'namespaceSelector': {'matchLabels': c.namespace_labels}}]
-                                      + ([{'ipBlock': {'cidr': _keycloak_probe_address}}] if c.probed | default(false) else []),
+                                      + ([{'ipBlock': {'cidr': _keycloak_probe_address ~ '/32'}}] if c.probed | default(false) else []),
                               'ports': [{'port': c.port, 'protocol': 'TCP'}]}) -%}
       {%- endfor -%}
       {{ out }}

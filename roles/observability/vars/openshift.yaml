@@ -1,5 +1,8 @@
 ---
 _observability_from_olm: true
-# Istio's fixed source address for the kubelet's probes: istio-cni SNATs them to it
-# on the node. A port the probes share with an out-of-mesh caller admits it.
-_observability_probe_address: 169.254.7.127/32
+# The kubelet's probes reach the pod from the address istio-cni SNATs them to:
+# HOST_PROBE_SNAT_IP on the admin's IstioCNI, read by tasks/install_olm.yaml. A port the
+# probes share with an out-of-mesh caller admits it.
+_observability_probe_address: >-
+  {{ _observability_istio_cni.resources | default([])
+     | map(attribute='spec.values.cni.env.HOST_PROBE_SNAT_IP', default='') | first | default('') }}

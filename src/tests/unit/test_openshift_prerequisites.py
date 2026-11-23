@@ -214,6 +214,21 @@ def test_mesh_needs_strict_mtls(policies, level, status):
     assert (row["level"], row["status"]) == (level, status)
 
 
+@pytest.mark.parametrize("env, level", [
+    ({"HOST_PROBE_SNAT_IP": "192.0.2.1"}, op.OK),
+    ({"HOST_PROBE_SNAT_IP": ""}, op.FAIL),
+    ({}, op.FAIL),                     # unset: istio-cni's built-in default, unknown here
+])
+def test_mesh_needs_probe_address(env, level):
+    spec = {"kind": "IstioCNI", "name": "default", "set": ["spec.values.cni.env.HOST_PROBE_SNAT_IP"]}
+    req = {"name": "mesh_probe_address", "instances": [spec]}
+    cni = {"metadata": {"name": "default"}, "spec": {"values": {"cni": {"env": env}}}}
+    row = op.openshift_prereq_report([req], instances={"results": [{"item": [req, spec], "resources": [cni]}]})[0]
+    assert row["level"] == level
+    if level == op.FAIL:
+        assert "HOST_PROBE_SNAT_IP not set" in row["problems"][0]
+
+
 def storage_report(storage):
     return report({"storage": True}, storage=storage)
 
