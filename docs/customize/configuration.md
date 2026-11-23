@@ -423,8 +423,9 @@ existing_kubernetes: "/absolute/path/to/kubeconfig"   # skips all Kubespray phas
 
 Opt-in microVM runtime for the Agent Sandbox of the Intel® Agent Toolkit: each
 sandbox runs as a microVM with its own guest kernel instead of a pod sharing
-the host kernel. Set the two Kata switches in `env/<name>/global_config.yaml`,
-where `init` seeds them (a value there wins over `config.agent-toolkit.yaml`).
+the host kernel. Set the two Kata switches in `env/<name>/config.agent-toolkit.yaml`,
+under the Agent Sandbox settings, where `init agent-toolkit` seeds them. A value
+set in `global_config.yaml` still wins, because that file loads last.
 
 | Setting | Default | Description |
 |---|---|---|

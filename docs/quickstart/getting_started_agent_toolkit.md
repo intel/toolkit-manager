@@ -53,8 +53,8 @@ curl -sk https://litellm.$DOMAIN/v1/models -H "Authorization: Bearer $MK"
 | LiteLLM gateway with virtual keys, content-safety guardrail, hybrid router, Langfuse | on | `auth_type` in `config.agent-toolkit.yaml` (`"jwt"` for Keycloak JWT access instead) |
 | Default model `qwen2-5-coder-14b` | on | `llm_services_autodeploy_models` in `config.agent-toolkit.yaml` |
 | Redis Stack, pgvector | on | `redis_stack_enabled`, `pgvector_enabled` |
-| Agent Sandbox (warm pools, sandbox router) | on | `agent_sandbox_enabled` |
-| Kata microVM sandboxes | off | `kata_containers_enabled`, `kata_runtime` in `global_config.yaml` |
+| Agent Sandbox (warm pools, sandbox router) | off | `agent_sandbox_enabled` (`global_config.yaml`, which wins, or `config.agent-toolkit.yaml`) |
+| Kata microVM sandboxes | off | `kata_containers_enabled`, `kata_runtime` |
 | OpenShell | off | `openshell_enabled` |
 | SPACE microVM sandboxes (evaluation, needs KVM workers) | off | `space_enabled` |
 | KubeRay | off | `kuberay_enabled` |

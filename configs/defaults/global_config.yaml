@@ -67,6 +67,7 @@ routing_mode: "subdomain"                 # subdomain | path
 # gateway_tls_ca_file: "/path/to/ca.pem"     # optional: private CA, stored as ca.crt
 
 # --- Components ---
+agent_sandbox_enabled: false             # agent-toolkit Agent Sandbox; overrides config.agent-toolkit.yaml (this file loads last)
 istio_enabled: true
 observability_enabled: true
 metrics_server_enabled: true              # resource metrics (kubectl top, Headlamp CPU/memory); skipped when the cluster already has one
@@ -136,10 +137,6 @@ seaweedfs_volume_storage_size: "10Gi"
 # Envoy Gateway 1.7.5 by default; true installs 1.9.3 (ListenerSets) and
 # upgrades this platform's own older release. Never downgrades.
 # envoy_gateway_upgrade: false
-
-# --- Kata Containers (microVM runtime for Agent Sandbox — requires agent-toolkit) ---
-kata_containers_enabled: false
-kata_runtime: "kata-fc"                   # kata-fc | kata-qemu | both
 
 # =============================================================================
 # Optional Features (only read when the matching option above selects them)
