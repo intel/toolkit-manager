@@ -51,7 +51,6 @@
     - istio_enabled | default(false) | bool
     - not _postgresql_from_olm | bool
 
-# istio-cni SNATs the kubelet's probes to HOST_PROBE_SNAT_IP (preflight checks it is set).
 - name: "postgresql | Read the kubelet probes' source address from the IstioCNI"
   kubernetes.core.k8s_info:
     api_version: sailoperator.io/v1

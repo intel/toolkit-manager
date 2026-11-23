@@ -18,9 +18,22 @@
     name: "{{ _gw_provider_role }}"
     tasks_from: proxy_peer.yaml
 
+# The admin's IstioCNI (OpenShift) sets the kubelet probes' source address; the
+# istio role's istio-cni (Kubernetes) keeps Istio's default.
+- name: "gateway | backend ingress | Read the kubelet probes' source address from the IstioCNI"
+  kubernetes.core.k8s_info:
+    api_version: sailoperator.io/v1
+    kind: IstioCNI
+    name: default
+  register: _gw_istio_cni
+  when: istio_enabled | default(false) | bool
+
 - name: "gateway | backend ingress | {{ gateway_backend_namespace }}/{{ gateway_backend_policy_name }}"
   vars:
     _mesh: "{{ istio_enabled | default(false) | bool }}"
+    _probe_address: >-
+      {{ _gw_istio_cni.resources | default([]) | map(attribute='spec.values.cni.env.HOST_PROBE_SNAT_IP')
+         | first | default('169.254.7.127') }}
     _ports: >-
       {%- set out = [] -%}
       {%- for p in gateway_backend_ports + ([15008] if _mesh | bool else []) -%}
@@ -40,7 +53,7 @@
           matchLabels: "{{ gateway_backend_selector }}"
         policyTypes: [Ingress]
         # Istio ambient carries mesh traffic on 15008 (HBONE) and SNATs kubelet
-        # probes to 169.254.7.127; both must stay allowed or the pod goes unready.
+        # probes to the probe address; both must stay allowed or the pod goes unready.
         ingress: >-
           {{ [{'from': [_gw_proxy_peer], 'ports': _ports}]
-             + ([{'from': [{'ipBlock': {'cidr': '169.254.7.127/32'}}]}] if _mesh | bool else []) }}
+             + ([{'from': [{'ipBlock': {'cidr': _probe_address ~ '/32'}}]}] if _mesh | bool else []) }}

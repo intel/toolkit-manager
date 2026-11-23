@@ -159,7 +159,7 @@
         # An existing controller keeps its owner's policies: only the webhook is opened.
         portLevelMtls: >-
           {{ dict(_envoy_gateway_ctrl_out_of_mesh | map(attribute='port') | map('string')
-                  | zip_longest([], fillvalue={'mode': 'PERMISSIVE'}))
+                  | product([{'mode': 'PERMISSIVE'}]))
              if gateway_platform.controller_managed | bool else {'9443': {'mode': 'PERMISSIVE'}} }}
   when:
     - gateway_platform.controller_managed | bool or gateway_platform.configure_existing | bool

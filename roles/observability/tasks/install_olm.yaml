@@ -578,7 +578,6 @@
 # 4. Mesh
 # =============================================================================
 
-# istio-cni SNATs the kubelet's probes to HOST_PROBE_SNAT_IP (preflight checks it is set).
 - name: "observability | olm | Read the kubelet probes' source address from the IstioCNI"
   kubernetes.core.k8s_info:
     api_version: sailoperator.io/v1
