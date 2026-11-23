@@ -157,8 +157,11 @@
         mtls:
           mode: STRICT
         portLevelMtls: >-
-          {{ dict(_envoy_gateway_ctrl_out_of_mesh | map(attribute='port') | map('string')
-                  | product([{'mode': 'PERMISSIVE'}])) }}
+          {%- set out = {} -%}
+          {%- for c in _envoy_gateway_ctrl_out_of_mesh -%}
+          {%- set _ = out.update({c.port | string: {'mode': 'PERMISSIVE'}}) -%}
+          {%- endfor -%}
+          {{ out }}
   when:
     - gateway_platform.controller_managed | bool or gateway_platform.configure_existing | bool
     - istio_enabled | default(false) | bool

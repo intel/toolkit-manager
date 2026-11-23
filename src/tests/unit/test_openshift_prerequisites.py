@@ -200,7 +200,7 @@ def test_ambient_needs_local_gateway_mode(gateway_config, level):
 
 
 @pytest.mark.parametrize("policies, level, status", [
-    ([{"mtls": {"mode": "STRICT"}}], op.OK, None),
+    ([{"mtls": {"mode": "STRICT"}}], op.OK, "OK"),
     ([{"mtls": {"mode": "PERMISSIVE"}}], op.FAIL, "NOT READY"),
     ([{}], op.FAIL, "NOT READY"),         # no mode inherits PERMISSIVE, the Istio default
     ([], op.FAIL, "MISSING"),
@@ -211,9 +211,7 @@ def test_mesh_needs_strict_mtls(policies, level, status):
     req = {"name": "mesh_strict_mtls", "instances": [spec]}
     found = [{"metadata": {"name": "default", "namespace": "istio-system"}, "spec": p} for p in policies]
     row = op.openshift_prereq_report([req], instances={"results": [{"item": [req, spec], "resources": found}]})[0]
-    assert row["level"] == level
-    if status is not None:
-        assert row["status"] == status
+    assert (row["level"], row["status"]) == (level, status)
 
 
 def storage_report(storage):
