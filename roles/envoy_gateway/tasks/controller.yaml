@@ -156,21 +156,16 @@
             control-plane: envoy-gateway
         mtls:
           mode: STRICT
+        # An existing controller keeps its owner's policies: only the webhook is opened.
         portLevelMtls: >-
-          {%- set out = {} -%}
-          {%- for c in _envoy_gateway_ctrl_out_of_mesh
-                if gateway_platform.controller_managed | bool or c.on_existing | default(false) -%}
-          {%- set _ = out.update({c.port | string: {'mode': 'PERMISSIVE'}}) -%}
-          {%- endfor -%}
-          {{ out }}
+          {{ dict(_envoy_gateway_ctrl_out_of_mesh | map(attribute='port') | map('string')
+                  | zip_longest([], fillvalue={'mode': 'PERMISSIVE'}))
+             if gateway_platform.controller_managed | bool else {'9443': {'mode': 'PERMISSIVE'}} }}
   when:
     - gateway_platform.controller_managed | bool or gateway_platform.configure_existing | bool
     - istio_enabled | default(false) | bool
 
-# With a NetworkPolicy the controller admits only its out-of-mesh callers' ports, from
-# their namespaces. Meshed traffic arrives on HBONE (15008) and the kubelet's probes on
-# _envoy_gateway_ctrl_probe_ports, both from any source. An existing controller
-# keeps the policies its owner gave it.
+# Meshed traffic arrives on HBONE (15008).
 - name: "envoy_gateway | Admit only the controller's out-of-mesh callers"
   kubernetes.core.k8s:
     state: present

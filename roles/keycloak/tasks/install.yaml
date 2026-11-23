@@ -44,10 +44,7 @@
     - istio_enabled | default(false) | bool
     - _keycloak_out_of_mesh_callers | length > 0
 
-# Under STRICT mTLS ztunnel refuses plain TCP: only the ports of
-# _keycloak_out_of_mesh_callers (vars/<platform>.yaml) accept it, and the NetworkPolicy
-# lets in only their namespaces, plus the kubelet's probes on a `probed` port. Meshed
-# traffic arrives on HBONE (15008).
+# Only the callers' ports (vars/<platform>.yaml) accept plain TCP, from their namespaces.
 - name: "keycloak | Open Keycloak's ports to its out-of-mesh callers"
   kubernetes.core.k8s:
     state: present

@@ -594,13 +594,10 @@
   when:
     - istio_enabled | default(false) | bool
 
-# Under STRICT mTLS ztunnel refuses plain TCP. The user-workload Prometheus and the
-# Grafana Operator run outside the mesh: only the ports they call accept plain TCP,
-# and the NetworkPolicy lets in only their namespaces (from), or pods (from_pods).
-# Meshed traffic arrives on HBONE (15008). The kubelet's probes: ztunnel lets them in
-# as plain TCP and refuses anything else that is not mTLS, so probe_ports are open to
-# any source; `probed` caller ports, which accept plain TCP, admit only their address
-# besides the callers.
+# The user-workload Prometheus and the Grafana Operator run outside the mesh: only the
+# ports they call accept plain TCP, from their namespaces (from) or pods (from_pods).
+# `probe_ports`: only the probes call them, open to any source. `probed`: the probes
+# call the caller ports too.
 - name: "observability | olm | Open the ports out-of-mesh callers use"
   kubernetes.core.k8s:
     state: present
