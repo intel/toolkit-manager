@@ -63,6 +63,7 @@ You need to edit the file when one of these is true:
 | Already run Kubernetes | `existing_kubernetes` → path to your kubeconfig |
 | Are behind a corporate proxy | `http_proxy` / `https_proxy` / `no_proxy` |
 | Already run cert-manager, Istio, Prometheus… | `<component>_enabled` → `false` |
+| Want catalog models deployed during the install | uncomment `llm_services_deploy_models` → `true`, and mark each model `autodeploy: true` in `env/<name>/models.yaml` |
 
 ### The settings most people touch
 
@@ -74,6 +75,8 @@ You need to edit the file when one of these is true:
 | `gateway_tls_mode` | `selfsigned` | Auto-generated CA, or bring your own — see [TLS](#tls) |
 | `kubernetes_accelerator` | `cpu` | Compute target for inference (Intel® Xeon®) |
 | `observability_enabled` | `true` | Deploy Prometheus + Grafana + Loki + Tempo |
+| `headlamp_enabled` | `true` | The Kubernetes cluster dashboard (Headlamp) — see [Headlamp](../deploy/headlamp.md) |
+| `llm_services_deploy_models` | `false` (commented) | `true`: deploy the catalog models marked `autodeploy: true` during the install. Read by the inference layer — see [Auto-deploy on install](https://github.com/intel/inference-toolkit/blob/main/docs/customize/catalog.md#auto-deploy-on-install) |
 | `velero_enabled` | `false` | Deploy the backup mechanism (Velero + CSI snapshots). Needs `storage_backend: nfs` or `ceph`; `run_backup.sh` backs up and restores a layer with it (see [Upgrade a Layer](../deploy/upgrade.md#backup-and-restore)) |
 
 Everything else is safe to leave alone until you have a reason to change it.
@@ -138,6 +141,9 @@ lines are optional settings (remove the `# ` to use one). It has ten sections:
 | `velero_enabled` | Whether the backup mechanism is deployed — needs snapshot-capable storage |
 | `gateway_request_timeout` | Max time the gateway waits for a model response before timing out |
 | `object_store_backend` | Backend for log/trace/blob storage |
+| `headlamp_enabled` | Whether the Kubernetes cluster dashboard is deployed. Skipped on OpenShift, and on a BYO cluster in `apiserver` mode until `headlamp_byo_apiserver_trusted: true`. In path mode the bare domain redirects to it |
+| `envoy_gateway_upgrade` | `true` (default): Envoy Gateway 1.9.3 with ListenerSets, and the matching KServe line; `false`: 1.7.5. Never downgrades |
+| `llm_services_deploy_models` | `true`: the inference layer deploys the catalog models marked `autodeploy: true`. An active line here overrides `config.inference.yaml` |
 | `existing_kubernetes` | Point to an existing kubeconfig to skip cluster provisioning entirely. `KUBECONFIG` is not supported: the installer uses this path, or `env/<name>/kubeconfig.yaml` for a managed cluster |
 
 ---

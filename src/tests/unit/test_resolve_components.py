@@ -125,6 +125,13 @@ def _component(name):
     return next(c for c in _REGISTRY["components"] if c["name"] == name)
 
 
+def _jinja():
+    import jinja2
+    env = jinja2.Environment()
+    env.filters["bool"] = lambda v: str(v).lower() in ("1", "true", "yes", "on")
+    return env
+
+
 def test_intel_gpu_plugin_is_a_platform_component_after_nfd_and_nri_cpu_balloons():
     assert _component("intel_gpu_plugin")["layer"] == "platform"
     assert _component("intel_gpu_plugin")["depends_on"] == ["node_feature_discovery"]
@@ -144,14 +151,21 @@ def test_intel_gpu_plugin_runs_in_the_platform_layer_but_not_the_inference_layer
     ({"cluster_distribution": "kubernetes"}, True),
 ])
 def test_intel_gpu_plugin_enable_rule(variables, enabled):
-    import jinja2
-    env = jinja2.Environment()
-    env.filters["bool"] = lambda v: str(v).lower() in ("1", "true", "yes", "on")
-    rendered = env.from_string(_component("intel_gpu_plugin")["enabled"]).render(**variables)
+    rendered = _jinja().from_string(_component("intel_gpu_plugin")["enabled"]).render(**variables)
     assert (rendered == "True") is enabled
 
 
+_ROOT = pathlib.Path(__file__).resolve().parents[3]
 _BYO = {"existing_kubernetes": "/path/kubeconfig"}
+
+
+def _yaml(rel):
+    return yaml.safe_load((_ROOT / rel).read_text())
+
+
+def _preflight_fact(name):
+    task = next(t for t in _yaml("playbooks/includes/preflight.yaml") if name in t.get("ansible.builtin.set_fact", {}))
+    return task["ansible.builtin.set_fact"][name]
 
 
 @pytest.mark.parametrize("variables, installed", [
@@ -163,24 +177,21 @@ _BYO = {"existing_kubernetes": "/path/kubeconfig"}
     ({"headlamp_enabled": True, **_BYO, "headlamp_byo_apiserver_trusted": True}, True),
     ({"headlamp_enabled": True, **_BYO, "headlamp_auth_mode": "gateway"}, True),
 ])
-def test_landing_path_points_to_headlamp_only_where_it_installs(variables, installed):
-    # On BYO without API server trust the role skips itself instead of failing the platform install.
-    import jinja2
-    root = pathlib.Path(__file__).resolve().parents[3]
-    env = jinja2.Environment()
-    env.filters["bool"] = lambda v: str(v).lower() in ("1", "true", "yes", "on")
-    role_vars = {"headlamp_auth_mode": "apiserver", "headlamp_byo_apiserver_trusted": False, **variables}
-    hvars = yaml.safe_load((root / "roles/headlamp/vars/main.yaml").read_text())
-    role_vars["__headlamp_apiserver_mode"] = env.from_string(hvars["__headlamp_apiserver_mode"]).render(**role_vars)
-    pending = env.from_string(hvars["__headlamp_byo_pending"]).render(**role_vars).strip() == "True"
-    in_registry = env.from_string(_component("headlamp")["enabled"]).render(**variables).strip() == "True"
-    assert (in_registry and not pending) is installed
-    landing = yaml.safe_load((root / "roles/gateway/defaults/main.yaml").read_text())["gateway_landing_path"]
-    assert env.from_string(landing).render(**variables).strip() == ("/headlamp/" if installed else "")
+def test_headlamp_installs_drives_the_role_skip_and_the_landing_path(variables, installed):
+    env = _jinja()
+    defaults = _yaml("roles/headlamp/defaults/main.yaml")
+    role_vars = {k: defaults[k] for k in ("headlamp_auth_mode", "headlamp_byo_apiserver_trusted")} | variables
+    fact = env.from_string(_preflight_fact("headlamp_installs")).render(**role_vars).strip()
+    assert (fact == "True") is installed
+    in_registry = env.from_string(_component("headlamp")["enabled"]).render(**variables) == "True"
+    pending = env.from_string(_yaml("roles/headlamp/vars/main.yaml")["__headlamp_byo_pending"]).render(headlamp_installs=fact)
+    assert (in_registry and pending == "False") is installed
+    landing = _yaml("roles/gateway/defaults/main.yaml")["gateway_landing_path"]
+    assert env.from_string(landing).render(headlamp_installs=fact) == ("/headlamp/" if installed else "")
+
 
 def test_template_defaults_turn_on_headlamp_and_envoy_gateway_upgrade():
-    root = pathlib.Path(__file__).resolve().parents[3]
-    defaults = yaml.safe_load((root / "configs/defaults/global_config.yaml").read_text())
+    defaults = _yaml("configs/defaults/global_config.yaml")
     assert defaults["headlamp_enabled"] is True
     assert defaults["envoy_gateway_upgrade"] is True
     assert "existing_kubernetes" not in defaults and "llm_services_deploy_models" not in defaults
