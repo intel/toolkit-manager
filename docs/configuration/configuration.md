@@ -235,8 +235,8 @@ scp <user>@<deploy-node>:<toolkit-manager-folder>/env/<name>/logs/toolkit-manage
 `https://<base_domain_name>/grafana/`). It loads with no certificate warning.
 
 The CA's private key stays in the cluster, but anyone with admin rights there can issue
-certificates your machine then trusts for any site. Remove the CA when you tear the environment
-down; a fresh install creates a new one to import.
+certificates your machine then trusts for any site. Remove the CA (listed as **Toolkit Manager
+Root CA**) when you tear the environment down; a fresh install creates a new one to import.
 
 ---
 
