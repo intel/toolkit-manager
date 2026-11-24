@@ -245,6 +245,9 @@
       spec:
         mode: deployment
         serviceAccount: otel-collector
+        # The operator's own NetworkPolicy admits only the OTLP and metrics ports, so
+        # meshed senders, which arrive on HBONE (15008), would be dropped.
+        networkPolicy: "{{ {'enabled': not (istio_enabled | default(false) | bool)} }}"
         config:
           receivers:
             otlp:
@@ -475,6 +478,10 @@
           plugins:
             plugin_admin_enabled: "true"
             preinstall: grafana-metricsdrilldown-app,grafana-lokiexplore-app,grafana-exploretraces-app,grafana-pyroscope-app
+            # The root filesystem is read-only: updating a bundled plugin (Prometheus,
+            # Loki, Tempo) unregisters it, then fails to replace it, and every panel
+            # on that data source fails with "Plugin not registered".
+            preinstall_auto_update: "false"
           auth: >-
             {{ {'login_maximum_lifetime_duration': '3h', 'login_maximum_inactive_lifetime_duration': '30m',
                 'token_rotation_interval_minutes': '10'} }}
@@ -569,6 +576,19 @@
             datasourceUid: loki
   loop_control:
     label: "{{ item.datasource.name }}"
+
+# =============================================================================
+# 4. Mesh
+# =============================================================================
+
+- name: "observability | olm | Open the ports out-of-mesh callers use"
+  ansible.builtin.include_role:
+    name: istio
+    tasks_from: out_of_mesh_exception.yaml
+  vars:
+    istio_out_of_mesh_exception_namespace: "{{ observability_namespace }}"
+    istio_out_of_mesh_exception_workloads: "{{ _observability_olm_out_of_mesh_exceptions }}"
+  when: istio_enabled | default(false) | bool
 
 - name: "observability | olm | Wait for the instances"
   vars:

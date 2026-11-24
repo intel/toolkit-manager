@@ -139,24 +139,19 @@
     - gateway_platform.controller_managed | bool or gateway_platform.configure_existing | bool
     - istio_enabled | default(false) | bool
 
-# Host-network apiserver (no mesh identity) can't reach the envoy-gateway controller's
-# admission webhook under STRICT; open only its port, rest of the pod stays STRICT.
+# The apiserver calls the controller's admission webhook from outside the mesh; on
+# OpenShift the user-workload Prometheus also scrapes its metrics (vars/<platform>.yaml).
+# An existing controller keeps its owner's policies: only the webhook is opened.
 - name: "envoy_gateway | Allow apiserver to reach controller webhook (port-level mTLS)"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: security.istio.io/v1
-      kind: PeerAuthentication
-      metadata:
-        name: allow-webhook-ctrl
-        namespace: "{{ envoy_gateway_namespace }}"
-      spec:
-        selector:
-          matchLabels:
-            control-plane: envoy-gateway
-        mtls:
-          mode: STRICT
-        portLevelMtls: "{{ {'9443': {'mode': 'PERMISSIVE'}} }}"
+  ansible.builtin.include_role:
+    name: istio
+    tasks_from: out_of_mesh_exception.yaml
+  vars:
+    istio_out_of_mesh_exception_namespace: "{{ envoy_gateway_namespace }}"
+    istio_out_of_mesh_exception_workloads:
+      - name: allow-webhook-ctrl
+        selector: {control-plane: envoy-gateway}
+        ports: "{{ _envoy_gateway_ctrl_out_of_mesh_ports if gateway_platform.controller_managed | bool else [9443] }}"
   when:
     - gateway_platform.controller_managed | bool or gateway_platform.configure_existing | bool
     - istio_enabled | default(false) | bool

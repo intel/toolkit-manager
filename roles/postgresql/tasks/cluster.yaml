@@ -51,6 +51,22 @@
     - istio_enabled | default(false) | bool
     - not _postgresql_from_olm | bool
 
+# The marketplace operator, outside the mesh, polls each instance's status port (8000);
+# under STRICT ztunnel refuses it and the Cluster never becomes ready.
+- name: "postgresql | Open the instance status port to the marketplace operator"
+  ansible.builtin.include_role:
+    name: istio
+    tasks_from: out_of_mesh_exception.yaml
+  vars:
+    istio_out_of_mesh_exception_namespace: "{{ postgresql_namespace }}"
+    istio_out_of_mesh_exception_workloads:
+      - name: "{{ postgresql_cluster_name }}-status"
+        selector: {cnpg.io/cluster: "{{ postgresql_cluster_name }}", cnpg.io/podRole: instance}
+        ports: [8000]
+  when:
+    - istio_enabled | default(false) | bool
+    - _postgresql_from_olm | bool
+
 - name: "postgresql | Label namespace — PSS"
   kubernetes.core.k8s:
     state: present
