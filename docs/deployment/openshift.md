@@ -1,15 +1,15 @@
 # Deploy on OpenShift
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
 How to prepare a customer-owned OpenShift cluster with Red Hat OpenShift AI, install every prerequisite from the OperatorHub (Software Catalog) marketplace, and then run the installer on top of it.
 
 On OpenShift the installer does not provision cluster-wide services. You install the operators from the marketplace and create their cluster-level instances. The installer then checks that everything is in place and deploys only application-scoped resources into its own namespaces.
 
 > [!WARNING]
-> **Preview: OpenShift support is not yet complete.** This guide describes the target flow. Several installer behaviours it relies on are **planned, not yet implemented**. They are marked _(planned)_ below and summarised in [Known gaps](#known-gaps). Today the installer [detects the platform](#platform-detection) and [checks the prerequisites](#prerequisite-check); the components start using the result in follow-up changes.
+> **Preview: OpenShift support is not yet complete.** The installer [detects OpenShift](#platform-detection), [checks the prerequisites](#prerequisite-check) and deploys the platform layer with OpenShift-specific settings, as described below. What is still missing is listed in [Known gaps](#known-gaps).
 >
-> Until the OpenShift-safe teardown lands, **never run `./toolkit_manager.sh teardown infrastructure` or `teardown platform` against an OpenShift cluster.** The current teardown roles delete CRDs by API group (for example all `gateway.networking.k8s.io`, `monitoring.coreos.com`, and `*kserve*` CRDs). On OpenShift those CRDs are owned by the cluster and by OpenShift AI.
+> **Do not run `./toolkit_manager.sh teardown infrastructure` or `teardown platform` against an OpenShift cluster** until teardown has been validated there. Teardown deletes only what `install` labelled (see [Ownership labels](../reference/adding-solutions.md#ownership-labels)), but components marked `teardown: role` and any env installed before the labels existed still run their roles' own teardowns, and some of those delete CRDs by API group (for example `gateway.networking.k8s.io` or `monitoring.coreos.com`). On OpenShift those CRDs belong to the cluster and to OpenShift AI.
 
 ---
 
@@ -20,7 +20,7 @@ On OpenShift the installer does not provision cluster-wide services. You install
 | **Cluster admin (you), from the marketplace** | Operators, plus the cluster-scoped singleton each one needs | LVMS + `LVMCluster`, cert-manager, Service Mesh 3 + `Istio`/`IstioCNI`/`ZTunnel`, CloudNativePG, Red Hat build of Keycloak, NFD + `NodeFeatureDiscovery`, LWS, Custom Metrics Autoscaler + `KedaController`, OpenShift AI + `DataScienceCluster`, Loki, Logging, Tempo, OpenTelemetry and Grafana operators, user-workload monitoring |
 | **Installer (`toolkit_manager.sh`)** | Resources scoped to the application, in namespaces it creates and labels | CNPG `Cluster`, `Keycloak` instance and realm, `ServiceMonitor`/`PodMonitor`, `LokiStack`, `ClusterLogForwarder`, `TempoMonolithic`, `OpenTelemetryCollector`, `Grafana`, LiteLLM, Langfuse, inference models, eRAG applications |
 
-The rule: **the installer never installs, upgrades, or deletes an operator, a CRD, or a cluster singleton that it did not create, and never changes the cluster's configuration** (for example `cluster-monitoring-config`). Anything the installer creates carries an ownership label, and teardown removes only labelled objects _(planned)_.
+The rule: **the installer never installs, upgrades, or deletes an operator, a CRD, or a cluster singleton that it did not create, and never changes the cluster's configuration** (for example `cluster-monitoring-config`). Anything the installer creates carries the ownership labels (`toolkit-manager.intel.com/env`, `/layer`, `/component`), and teardown removes only labelled objects (see the warning above for the exceptions).
 
 ---
 
@@ -40,7 +40,7 @@ To stay on the tested versions, subscribe to the channel in the table with `inst
 |---|---|---|---|---|---|---|
 | 1 | Default StorageClass | `lvms-operator` (redhat-operators), or ODF / Trident | `stable-4.22` → 4.22.0 | | [LVM Storage](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/storage/persistent-storage-using-local-storage) | **Yes** |
 | 2 | cert-manager | `openshift-cert-manager-operator` (redhat-operators) | `stable-v1` → 1.20.1 | | [cert-manager Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/security_and_compliance/cert-manager-operator-for-red-hat-openshift) | **Yes** |
-| 3 | Service Mesh 3 (ambient) | `servicemeshoperator3` (redhat-operators) | `stable` → 3.4.3 | | [Ambient mode](https://docs.redhat.com/en/documentation/red_hat_openshift_service_mesh/3.4/html/installing/ossm-istio-ambient-mode) | **Yes** |
+| 3 | Service Mesh 3 (ambient), with OVN local gateway mode and mesh-wide STRICT mTLS | `servicemeshoperator3` (redhat-operators) | `stable` → 3.4.3 | | [Ambient mode](https://docs.redhat.com/en/documentation/red_hat_openshift_service_mesh/3.4/html/installing/ossm-istio-ambient-mode) | **Yes** (local gateway mode and STRICT mTLS: when `istio_enabled`) |
 | 4 | Gateway API | built in (Ingress Operator) | — | | [Gateway API](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/ingress_and_load_balancing/configuring-gateway-api) | **Yes** (nothing to install) |
 | 5 | CloudNativePG | `cloudnative-pg` (certified-operators) | `stable-v1` → 1.30.1 | | [CloudNativePG](https://cloudnative-pg.io/documentation/current/installation_upgrade/) (certified, not a Red Hat product) | **Yes** |
 | 6 | Red Hat build of Keycloak | `rhbk-operator` (redhat-operators) | `stable-v26.6` → 26.6.7-opr.1 | | [RHBK Operator installation](https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html/operator_guide/installation-) | When `keycloak_enabled: true` (the default) |
@@ -64,7 +64,7 @@ Each step lists only what the stack needs beyond the linked guide. The order doe
 
 ### 1. Storage: default StorageClass
 
-The installer needs a **default** StorageClass. It never creates, modifies, or demotes StorageClasses on OpenShift. LVM Storage (tested) is ReadWriteOnce only, which is fine on a single node. For multi-node clusters use ODF CephFS or Trident; see [NetApp ONTAP and Trident](netapp_ontap.md).
+The installer needs a **default** StorageClass. It never creates, modifies, or demotes StorageClasses on OpenShift. LVM Storage (tested) is ReadWriteOnce only, which is fine on a single node. For multi-node clusters use ODF CephFS or Trident; see [NetApp ONTAP and Trident](netapp-ontap.md).
 
 The installer cannot tell from a class whether it is ReadWriteMany, so it assumes ReadWriteOnce and stops on a cluster with more than one node. On a multi-node cluster with a ReadWriteMany default class, set `storage_custom_rwx: true` in `global_config.yaml`.
 
@@ -76,7 +76,7 @@ OpenShift already runs a CSI snapshot controller. Do not install another one.
 
 ### 2. cert-manager
 
-Nothing beyond the guide. The installer creates only namespaced `Issuer`/`Certificate` objects and an application `ClusterIssuer` named with its own prefix _(planned)_.
+Nothing beyond the guide. The `cert_manager` component only checks that the operator runs. The `gateway` component then creates its own CA chain: the `ClusterIssuer`s for the gateway's self-signed CA and the gateway `Certificate`s.
 
 ### 3. Service Mesh 3 (ambient mode)
 
@@ -84,6 +84,18 @@ Create the `Istio`, `IstioCNI` and `ZTunnel` objects for ambient mode as the gui
 
 ```bash
 oc get istio,istiocni,ztunnel          # all READY / Healthy
+```
+
+The guide's prerequisites include OVN-Kubernetes in local gateway mode (`routingViaHost: true`); configure it as [Configuring a gateway](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/ovn-kubernetes_network_plugin/configuring-gateway) describes. Without it, the kubelet's probes of meshed pods time out, so those pods never become Ready. The setting is cluster-wide, and SR-IOV hardware offload needs it off: on such a cluster set `istio_enabled: false`, which also skips this check.
+
+```bash
+oc get network.operator cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}'   # true
+```
+
+Enforce mTLS across the whole mesh with the `PeerAuthentication` from [Enabling strict mTLS across the whole service mesh](https://docs.redhat.com/en/documentation/red_hat_openshift_service_mesh/3.4/html/installing/ossm-enabling-mtls#ossm-enabling-strict-mtls-whole-service-mesh_ossm-enabling-mtls), as the installer does on Kubernetes. The guide's `DestinationRule` for the API server applies to sidecars only; ambient mode does not need it. Callers outside the mesh still reach the meshed workloads they need: the API server calls the admission webhooks (9443), the user-workload Prometheus scrapes the metrics ports, the Grafana Operator configures Grafana (3000), Connectivity Link's Authorino reads Keycloak's keys (8080), and the CloudNativePG operator reads the database instances' status (8000). For each, the installer accepts plain TCP on that port only, from any source. SeaweedFS S3 (8333) also accepts plain TCP from any pod: istio-cni captures a pod only once it runs, and Tempo exits on its first refused object-store call, before it is captured.
+
+```bash
+oc get peerauthentication default -n istio-system -o jsonpath='{.spec.mtls.mode}'   # STRICT
 ```
 
 OpenShift already runs its own istiod (`openshift-gateway-istiod` in `openshift-ingress`) for Gateway API. It is separate from the `istio-system` control plane. Leave it alone.
@@ -145,7 +157,7 @@ oc get dsc default-dsc -o jsonpath='{.status.phase}{"\n"}'        # Ready
 oc get dsc default-dsc -o jsonpath='{.status.conditions[?(@.type=="KserveLLMInferenceServiceDependencies")].status}{"\n"}'   # True (needs step 10)
 ```
 
-OpenShift AI owns the KServe CRDs and controller. On OpenShift the installer never deploys upstream KServe: the `kserve` component only checks that the `DataScienceCluster` has KServe `Managed` and ready, then adds the inference Gateway. Its teardown does nothing _(planned)_.
+OpenShift AI owns the KServe CRDs and controller. On OpenShift the installer never deploys upstream KServe: the `kserve` component only checks that the `DataScienceCluster` has KServe `Managed` and ready, then adds the inference Gateway. Its teardown does nothing.
 
 ### 12. User-workload monitoring
 
@@ -197,7 +209,7 @@ oc get csv -A | grep -E 'loki|cluster-logging|tempo|opentelemetry|grafana'   # a
 
 ## Platform detection
 
-Preflight detects the platform before it resolves the components to install. Components that OpenShift does not need (`istio`, `metallb`) are skipped there whatever `global_config.yaml` says. The installer never stamps Pod Security labels on OpenShift, whatever `enforce_pss` says: the platform syncs them from the SCCs, and the keycloak namespace is the admin's. One default in `configs/defaults/global_config.yaml` is for Kubernetes. Set it in `env/<env>/global_config.yaml` of an OpenShift env:
+Preflight detects the platform before it resolves the components to install. Components that OpenShift provides itself or does not support are switched off in `configs/components.yaml` on OpenShift, whatever `global_config.yaml` says: `istio`, `metallb`, `metrics_server`, `headlamp`, `velero`, and on rack-scale `nvidia_gpu_operator` and `gpu_observability`. The inference layer does the same for its AI gateway (`envoy_ai_gateway`). The installer never stamps Pod Security labels on OpenShift, whatever `enforce_pss` says: the platform syncs them from the SCCs, and the keycloak namespace is the admin's. One default in `configs/defaults/global_config.yaml` is for Kubernetes. Set it in `env/<env>/global_config.yaml` of an OpenShift env:
 
 ```yaml
 istio_enabled: false   # true makes roles label their namespaces for ambient mode, which enrolls them in Service Mesh 3
@@ -242,8 +254,9 @@ There is no OpenShift-specific configuration: the same `global_config.yaml` work
 existing_kubernetes: "/home/<user>/.kube/config"   # absolute path; skips all Kubespray phases
 base_domain_name: "<apps domain>"                  # e.g. erag.apps.<cluster>.<domain>
 # http_proxy / https_proxy / no_proxy if needed; no_proxy must cover the API server
-auth_provider: keycloak                            # needs step 6; litellm needs no Keycloak
 ```
+
+The API sign-in mode (`auth_type: jwt`, the default, or `litellm_vkey`) is set in `env/ocp/config.inference.yaml`. Both modes need Keycloak (step 6). The old `auth_provider` setting still works, but preflight warns that it is deprecated.
 
 > [!CAUTION]
 > **Set `existing_kubernetes` before you run any `install` command.** Without it the installer does not use your `oc` login. It treats the env as a cluster to build, and runs Kubespray against the env's inventory, which is `localhost` by default. That installs Kubernetes on the machine you run the installer from, and the platform layer goes into that new cluster instead of OpenShift. Check it with:
@@ -259,6 +272,8 @@ What changes on OpenShift without any setting:
 | Area | Kubernetes | OpenShift |
 |---|---|---|
 | `istio`, `metallb` | installed | skipped: Service Mesh 3 and the router provide them |
+| `metrics_server`, `headlamp`, `velero` | installed when enabled | skipped: not supported on OpenShift |
+| `node_feature_discovery`, `keda` | installed from Helm | check the marketplace operator (steps 8 and 7); nothing is installed or torn down |
 | `seaweedfs` | installed with UID/GID 1000 | installed without fixed UIDs, so `restricted-v2` assigns them |
 | `observability` | kube-prometheus-stack, Loki, Tempo, OpenTelemetry Collector and Prometheus Adapter from Helm | checks the operators (steps 13–17) and user-workload monitoring (step 12), then creates their instances in `monitoring`; see [Observability on OpenShift](#observability-on-openshift) |
 | Storage (`storage_backend: local-path`) | local-path provisioner | the cluster's default StorageClass (step 1), as `custom`, assumed RWO. Set `storage_custom_rwx: true` for an RWX class (ODF CephFS, Trident) |
@@ -277,9 +292,9 @@ oc whoami && oc get dsc                       # sanity check: right cluster, Ope
 ./toolkit_manager.sh install platform --env ocp
 ```
 
-The inference layer (`install inference`) is described in the [inference layer on OpenShift](../../ext/enterprise.ai-inference/docs/deploy/openshift.md).
+The inference layer (`install inference`) is described in the [inference layer on OpenShift](https://github.com/intel/inference-toolkit/blob/main/docs/deployment/openshift.md).
 
-**What the installer deploys on OpenShift.** Every namespace it creates gets the ownership label _(planned)_. In the platform layer it deploys:
+**What the installer deploys on OpenShift.** Everything it creates gets the ownership labels. In the platform layer it deploys:
 
 - the CNPG `Cluster` and the per-database credentials (`postgresql` namespace);
 - the `Keycloak` instance and realm (`keycloak` namespace);
@@ -325,7 +340,7 @@ Preflight prints one line per requirement, then stops with every requirement tha
   ✗ cert-manager: TOO OLD
       cert-manager-operator.v1.20.0 1.20.0 is older than the tested 1.20.1
       an upgrade to cert-manager-operator.v1.20.1 is waiting: InstallPlan cert-manager-operator/install-kvghn is not approved; approve it: oc patch installplan install-kvghn -n cert-manager-operator --type merge -p '{"spec":{"approved":true}}'
-      see docs/deploy/openshift.md#2-cert-manager
+      see docs/deployment/openshift.md#2-cert-manager
 ```
 
 With `installPlanApproval: Manual`, OLM waits for you to approve the first install and every upgrade. When a Subscription waits on an InstallPlan, the message names the plan and the command that approves it. The installer never approves it for you.
@@ -350,8 +365,8 @@ The installer does not support all of the flow above yet. The blocking items sto
 
 | Area | Today | Needed | Blocking |
 |---|---|---|---|
-| **Teardown safety** | Teardown roles delete CRDs by API group or regex (`kserve`, `envoy_gateway`, `observability`, `cert_manager`, `istio`, `metallb`, `keycloak`) and whole namespaces | An ownership label on everything the installer creates; teardown deletes only labelled objects and never CRDs it did not create | **Yes**: do not run teardown |
-| **SCC** | Charts set fixed `runAsUser`/`fsGroup`; namespaces get only Pod Security labels, which do not grant an SCC on OpenShift | Leave UID/GID unset on OpenShift so `restricted-v2` assigns them; grant a dedicated SCC only where a component really needs one | **Yes** |
+| **Teardown safety** | Teardown deletes only labelled objects, but `teardown: role` components and envs installed before the ownership labels run their roles' own teardowns, some of which delete CRDs by API group; not validated on OpenShift | Validate teardown on OpenShift; never delete CRDs the installer did not create | **Yes**: do not run teardown |
+| **SCC** (Security Context Constraints) | Done for the platform layer: SeaweedFS leaves UID/GID unset so `restricted-v2` assigns them, Envoy Gateway's service accounts get `nonroot-v2`, and the NRI balloons chart grants its own SCC. Other charts (the inference and eRAG layers) may still set a fixed `runAsUser`/`fsGroup` | The same treatment for every chart that sets fixed IDs | Depends on the layer |
 | **Autoscaling** | `app_hpa` (Prometheus Adapter) and the eRAG HPAs are skipped on OpenShift | HPAs on the Custom Metrics Autoscaler (KEDA) and user-workload monitoring | No |
 | **CPU pinning (NRI balloons) and tensor parallelism** | OpenShift AI cannot annotate the pods of an `LLMInferenceService`, so every model pod (`kserve.io/component=workload`) lands in the `model-balloon-tp1` balloon and gets the CPUs of one NUMA node. Only TP=1 models are supported | Pick the balloon by the model's TP size | No (TP>1 models run with too few CPUs) |
 | **NRI plugin sync** | If a CRI-O sync with the NRI plugin fails (`failed to synchronize plugin` in the CRI-O journal), the plugin gets no container events and new pods run unpinned. The installer restarts the plugin after it applies the node policy, which is when this happens; after a policy change of your own, restart it by hand: `oc delete pod -n kube-system -l app.kubernetes.io/name=nri-resource-policy-balloons` | Detect a failed sync and restart the plugin | No |

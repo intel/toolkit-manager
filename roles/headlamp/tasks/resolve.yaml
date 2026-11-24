@@ -9,4 +9,4 @@
       {{ (components | selectattr('name', 'eq', 'headlamp') | map(attribute='enabled') | first) | bool
          and (existing_kubernetes | default('', true) | length == 0
               or headlamp_byo_apiserver_trusted | bool
-              or headlamp_auth_mode != 'apiserver') }}
+              or not __headlamp_apiserver_mode | bool) }}

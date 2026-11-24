@@ -23,7 +23,7 @@
 #
 # One global_config.yaml serves both platforms: a role's dispatcher picks its
 # vars/<cluster_distribution>.yaml from it, instead of
-# the operator setting OpenShift-specific values (docs/reference/adding_solutions.md).
+# the operator setting OpenShift-specific values (docs/reference/adding-solutions.md).
 # Set cluster_distribution in global_config.yaml to skip detection; the default
 # StorageClass is still read.
 # =============================================================================

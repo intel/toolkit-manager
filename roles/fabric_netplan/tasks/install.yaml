@@ -97,7 +97,7 @@
       ({{ hostvars[item.item].node_hostname | default(item.item) }}).
       The rack-scale fabric step configures NICs only through netplan, so this
       node is not supported. Use Ubuntu 22.04 or 24.04 LTS on every node; see
-      docs/rack-scale-deployment.md (Prerequisites).
+      docs/deployment/rack-scale.md (Prerequisites).
   when: "'netplan=yes' not in item.stdout_lines"
   loop: "{{ _netplan_probe.results }}"
   loop_control:

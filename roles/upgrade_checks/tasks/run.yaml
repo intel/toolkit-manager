@@ -135,7 +135,7 @@
       loop_control:
         loop_var: check
 
-    # The contract for these files is in docs/reference/adding_solutions.md (Upgrades).
+    # The contract for these files is in docs/reference/adding-solutions.md (Upgrades).
     - name: "upgrade_checks | Find each layer's own pre-run checks"
       ansible.builtin.set_fact:
         _layer_check_files: >-

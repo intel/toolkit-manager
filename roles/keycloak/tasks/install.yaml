@@ -18,13 +18,24 @@
       Red Hat build of Keycloak operator (Deployment {{ _keycloak_operator_deployment }})
       not found in namespace {{ keycloak_namespace }}. On OpenShift install it from
       OperatorHub (package rhbk-operator) with an OperatorGroup targeting
-      {{ keycloak_namespace }} before running the installer; see docs/deploy/openshift.md.
+      {{ keycloak_namespace }} before running the installer; see docs/deployment/openshift.md.
     success_msg: "Keycloak operator provided by the cluster (OLM) — skipping CRD and operator install."
     quiet: true
   when: _keycloak_from_olm | bool
 
 - name: "keycloak | Namespace labels"
   ansible.builtin.include_tasks: namespace_labels.yaml
+
+- name: "keycloak | Open Keycloak's ports to its out-of-mesh callers"
+  ansible.builtin.include_role:
+    name: istio
+    tasks_from: out_of_mesh_exception.yaml
+  vars:
+    istio_out_of_mesh_exception_namespace: "{{ keycloak_namespace }}"
+    istio_out_of_mesh_exception_workloads: "{{ _keycloak_out_of_mesh_exceptions }}"
+  when:
+    - istio_enabled | default(false) | bool
+    - _keycloak_out_of_mesh_exceptions | length > 0
 
 - name: "keycloak | Install"
   when: not _kc_installed | bool

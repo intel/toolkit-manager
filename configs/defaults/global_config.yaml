@@ -68,7 +68,7 @@ velero_enabled: false                     # backup and restore; needs CSI-snapsh
 kata_containers_enabled: false            # microVM runtime for the Agent Sandbox (agent-toolkit)
 kata_runtime: "kata-fc"                   # kata-fc | kata-qemu | both
 # Inference layer: true deploys the catalog models marked autodeploy: true in env/<name>/models.yaml.
-# Commented: an active line here overrides config.inference.yaml. Docs: https://github.com/intel/inference-toolkit/blob/main/docs/customize/catalog.md#auto-deploy-on-install
+# Commented: an active line here overrides config.inference.yaml. Docs: https://github.com/intel/inference-toolkit/blob/main/docs/configuration/catalog.md#auto-deploy-on-install
 # llm_services_deploy_models: false
 
 
@@ -86,7 +86,7 @@ seaweedfs_volume_storage_size: "10Gi"
 
 # ─── 6. Sign-in ──────────────────────────────────────────────────────────────
 # Keycloak signs people in. LiteLLM and Langfuse are set in config.inference.yaml.
-# Keycloak and Grafana admin passwords are generated and kept in Secrets: docs/customize/configuration.md.
+# Keycloak and Grafana admin passwords are generated and kept in Secrets: docs/configuration/configuration.md.
 
 # API auth: jwt (default) | litellm_vkey (the Agent Toolkit's default). Uncomment only to
 # force one for every layer: an active value here overrides the layer configs.
@@ -113,7 +113,7 @@ envoy_gateway_upgrade: true               # Envoy Gateway 1.9.3 with ListenerSet
 #   node-2: [/dev/nvme1n1]
 # rook_ceph_teardown_wipe_devices: false          # true: teardown wipes them; else blkdiscard -f first
 
-# NetApp ONTAP (storage_backend: netapp-trident): see docs/deploy/netapp_ontap.md.
+# NetApp ONTAP (storage_backend: netapp-trident): see docs/deployment/netapp-ontap.md.
 # ontap_management_lif: "10.0.0.100"      # cluster/SVM management LIF, TCP 443
 # ontap_data_lif: "10.0.0.101"            # NFS data LIF, TCP 2049 + 111
 # ontap_svm: "svm_ai"                     # SVM that owns the LIFs above

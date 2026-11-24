@@ -32,7 +32,7 @@
 # realm first. Skips Headlamp before anything is created, with the config ready to apply.
 
 - name: "headlamp | BYO cluster: API server trust"
-  when: not (headlamp_installs | mandatory | bool)   # set by resolve.yaml in preflight
+  when: not (headlamp_installs | mandatory | bool)
   block:
     - name: "headlamp | Render the authentication config for the cluster owner"
       ansible.builtin.template:
@@ -50,7 +50,7 @@
           preferred_username, groups = claim groups, both prefixed '{{ headlamp_oidc_prefix }}'):
           apply {{ log_dir }}/headlamp-authentication-config.yaml with kube-apiserver
           --authentication-config (or the provider's OIDC setting on managed clusters), then set
-          headlamp_byo_apiserver_trusted: true and install headlamp again. See docs/deploy/headlamp.md.
+          headlamp_byo_apiserver_trusted: true and run install platform again (it also restores the path-mode landing redirect). See docs/configuration/headlamp.md.
 
     - name: "headlamp | Skip the rest of the install"
       ansible.builtin.meta: end_role
@@ -90,7 +90,7 @@
           --authentication-config (cluster built before this release), so it would reject every Headlamp
           sign-in. Quickest: set headlamp_auth_mode: gateway (one shared read-only account). For per-person
           access, rebuild the cluster with this installer; re-running install kubernetes does not add the flag.
-          See docs/deploy/headlamp.md.
+          See docs/configuration/headlamp.md.
         quiet: true
 
 - name: "headlamp | Namespace"

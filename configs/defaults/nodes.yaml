@@ -18,7 +18,7 @@
 #
 # To grow or shrink an already-provisioned cluster, edit the node lists below
 # and run './toolkit_manager.sh add-node' or 'remove-node' — see
-# docs/customize/node_scaling.md.
+# docs/deployment/node-scaling.md.
 # =============================================================================
 
 

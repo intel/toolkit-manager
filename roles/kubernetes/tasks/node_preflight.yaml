@@ -4,7 +4,7 @@
 - name: "kubernetes | node preflight | Skip list"
   ansible.builtin.set_fact:
     # A single ID written without brackets is a one-item list. Time sync is
-    # required on multi-node installs only (docs/quickstart/prerequisites.md).
+    # required on multi-node installs only (docs/getting-started/prerequisites.md).
     _np_skip: "{{ [kubernetes_node_preflight_skip] | flatten + ([] if _k8s_needs_ssh | bool else ['N1', 'N2']) }}"
 
 - name: "kubernetes | node preflight | Probe each node"

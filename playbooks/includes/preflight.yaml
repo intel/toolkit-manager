@@ -65,7 +65,6 @@
 - name: "Preflight - Platform"
   ansible.builtin.include_tasks: preflight_platform.yaml
 
-# headlamp_installs: read by the headlamp role (BYO skip) and gateway_landing_path.
 - name: "Preflight - Headlamp: resolve whether it installs"
   ansible.builtin.include_role:
     name: headlamp

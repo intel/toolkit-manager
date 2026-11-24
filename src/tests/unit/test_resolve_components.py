@@ -164,11 +164,13 @@ def _yaml(rel):
 
 
 def _headlamp_installs(variables):
-    """Render resolve.yaml as Ansible would: role defaults under the user's vars, registry gate pre-rendered."""
+    """Render resolve.yaml as Ansible would: role defaults and vars under the user's vars, registry gate pre-rendered."""
     env = _jinja()
     task = _yaml("roles/headlamp/tasks/resolve.yaml")[0]
     defaults = _yaml("roles/headlamp/defaults/main.yaml")
     role_vars = {k: defaults[k] for k in ("headlamp_auth_mode", "headlamp_byo_apiserver_trusted")} | variables
+    mode = _yaml("roles/headlamp/vars/main.yaml")["__headlamp_apiserver_mode"]
+    role_vars["__headlamp_apiserver_mode"] = env.from_string(mode).render(**role_vars)
     gate = env.from_string(_component("headlamp")["enabled"]).render(**variables)
     expr = task["ansible.builtin.set_fact"]["headlamp_installs"]
     return env.from_string(expr).render(components=[{"name": "headlamp", "enabled": gate}], **role_vars).strip()

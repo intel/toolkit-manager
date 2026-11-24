@@ -7,7 +7,7 @@
 #
 # Self-contained: every repo this layer needs, dependencies first, each pinned
 # independently. Field reference and the rest of the wiring:
-# docs/adding_solutions.md
+# docs/reference/adding-solutions.md
 # =============================================================================
 
 repos:

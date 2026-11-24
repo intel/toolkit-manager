@@ -4,13 +4,13 @@
 # =============================================================================
 # OpenShift prerequisites: what the cluster admin installs from the marketplace
 # =============================================================================
-# One entry per row of the Prerequisites table in docs/deploy/openshift.md. Keep
+# One entry per row of the Prerequisites table in docs/deployment/openshift.md. Keep
 # the two in sync: `version` is the tested CSV from that table and the minimum
 # preflight accepts. Read by playbooks/includes/preflight_openshift.yaml and
 # evaluated by filter_plugins/openshift_prerequisites.py.
 #
 # Per entry:
-#   name, title, doc     id, label in the report, anchor in docs/deploy/openshift.md
+#   name, title, doc     id, label in the report, anchor in docs/deployment/openshift.md
 #   layers               needed when the plan reaches any of these layers
 #   when                 extra gate, rendered like a component's enabled:
 #   package              OLM package; its Subscription (or OLM v1 ClusterExtension)
@@ -27,7 +27,7 @@
 #   storage              true → the default (or custom) StorageClass check
 # =============================================================================
 
-openshift_prerequisites_doc: docs/deploy/openshift.md
+openshift_prerequisites_doc: docs/deployment/openshift.md
 
 openshift_prerequisites_platform:
   name: openshift
@@ -65,6 +65,35 @@ openshift_prerequisites:
       - {api_version: sailoperator.io/v1, kind: Istio, name: default, conditions: {Ready: "True"}}
       - {api_version: sailoperator.io/v1, kind: IstioCNI, name: default, conditions: {Ready: "True"}}
       - {api_version: sailoperator.io/v1, kind: ZTunnel, name: default, conditions: {Ready: "True"}}
+
+  # Part of step 3. Ambient needs OVN-Kubernetes in local gateway mode: in shared
+  # gateway mode (the default) the replies to the kubelet's probes of ambient pods
+  # leave through br-ex and are dropped, so meshed pods never become Ready.
+  - name: ovn_local_gateway
+    title: OVN local gateway mode
+    doc: "#3-service-mesh-3-ambient-mode"
+    layers: [platform]
+    when: "{{ istio_enabled | default(true) | bool }}"
+    instances:
+      - api_version: operator.openshift.io/v1
+        kind: Network
+        name: cluster
+        fields: {spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost: true}
+
+  # Part of step 3. On Kubernetes the istio component enforces mesh-wide STRICT mTLS;
+  # on OpenShift the control-plane namespace is the admin's, so it is a prerequisite.
+  # Each component opens only the ports its out-of-mesh callers need.
+  - name: mesh_strict_mtls
+    title: Mesh-wide STRICT mTLS
+    doc: "#3-service-mesh-3-ambient-mode"
+    layers: [platform]
+    when: "{{ istio_enabled | default(true) | bool }}"
+    instances:
+      - api_version: security.istio.io/v1
+        kind: PeerAuthentication
+        name: default
+        namespace: istio-system
+        fields: {spec.mtls.mode: STRICT}
 
   - name: gateway_api
     title: Gateway API

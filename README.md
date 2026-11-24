@@ -1,15 +1,15 @@
-![Toolkit Manager](docs/images/banner.jpg)
+![Toolkit Manager](docs/assets/banner.jpg)
 
 # Toolkit Manager
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Platform: Intel Xeon](https://img.shields.io/badge/Platform-Intel%C2%AE%20Xeon%C2%AE-0068B5)](https://www.intel.com/xeon)
+[![Platform: Intel](https://img.shields.io/badge/Platform-Intel%C2%AE-0068B5)](https://www.intel.com)
 [![Deployment: Kubernetes](https://img.shields.io/badge/Deployment-Kubernetes-326CE5)](https://kubernetes.io)
 [![Serving: vLLM · OVMS](https://img.shields.io/badge/Serving-vLLM%20%C2%B7%20OVMS-purple)](https://vllm.ai)
 [![Gateway: Envoy](https://img.shields.io/badge/Gateway-Envoy%20AI%20Gateway-orange)](https://gateway.envoyproxy.io)
 [![API: OpenAI Compatible](https://img.shields.io/badge/API-OpenAI%20Compatible-green)](https://platform.openai.com/docs/api-reference)
 
-**The fast path to deploying AI on Intel® Xeon® silicon. Go from bare metal to a working AI stack in minutes.**
+**The fast path to deploying AI on Intel® platforms. Go from bare metal to a working AI stack with one installer.**
 
 > Deploy and connect LLM inference, RAG, and agentic workflows in a customizable Kubernetes-based platform — with a GenAI gateway, security, intelligent routing, observability, model serving, and infrastructure automation built in.
 
@@ -17,32 +17,31 @@
 
 ## What is Toolkit Manager?
 
-A production AI stack needs more than a model endpoint. Teams need to connect LLM inference, RAG, and agentic workflows, along with security, routing, and observability.
+A production AI stack needs more than a model endpoint: LLM inference, RAG and agents, plus security, routing and observability, all connected.
 
-Toolkit Manager wires these pieces together in a pre-integrated, customizable Kubernetes stack optimized for Intel® Xeon® processors.
+Toolkit Manager wires these together in a pre-integrated, customizable Kubernetes stack optimized for Intel® platforms. One installer, `toolkit_manager.sh`, takes bare-metal machines through Kubernetes, platform services, model serving and the AI gateway, and ends with secured, OpenAI-compatible endpoints. Start with the defaults, then configure or extend as needed.
 
-A single installer script, `toolkit_manager.sh`, takes bare-metal nodes through Kubernetes provisioning, platform services (networking, security, observability), model serving, and AI gateway setup — delivering a production-ready AI platform with OpenAI-compatible endpoints in one run.
-
-The end result: teams get a secured, load-balanced stack where they can immediately serve LLM models, run RAG pipelines, and monitor everything through a unified gateway. Start with defaults, then configure or extend as needed.
-
-> Want the full picture? See [Architecture](docs/reference/architecture.md) and [Meet Toolkit Manager](docs/meet/meet.md).
+> Want the full picture? See [Meet Toolkit Manager](docs/overview/meet.md) and [Architecture](docs/reference/architecture.md).
 
 ## Architecture
 
-The stack installs in four ordered layers, in the order they are deployed:
+The stack is built in **layers**, each on top of the one before. You pick a **target** (the top layer you want), and the installer adds every layer below it for you.
 
-| # | Layer | Components | Source | Documentation |
-| --- | --- | --- | --- | --- |
-| 1 | **Infrastructure** | Kubernetes (via Kubespray) · Storage (local-path · NFS · Ceph · NetApp ONTAP) · Intel® Xeon® | [Toolkit Manager](https://github.com/intel/enterprise-ai-solutions) | [Deployment Guide](docs/deploy/install_platform.md) |
-| 2 | **Platform** | Istio ambient mesh, Envoy Gateway, PostgreSQL, Keycloak, SeaweedFS, observability | [Toolkit Manager](https://github.com/intel/enterprise-ai-solutions) | [Deployment Guide](docs/deploy/install_platform.md) |
-| 3 | **Intel® Inference Toolkit** | Envoy AI Gateway, KServe, vLLM / OpenVINO™ Model Server — exposes the model endpoint on top of which services like RAG and agents can be built | [Inference Toolkit](https://github.com/intel/enterprise-inference) | [Deploy a Model](docs/deploy/deploy_models.md) |
-| 4 | **Intel® Chatbot Toolkit** *(opt-in)* | Vector database, document ingestion (EDP), RAG pipeline orchestration (GMC), MCP gateway, chat history, web UI — requires `init erag` and `install erag` | [Chatbot Toolkit](https://github.com/intel/enterprise-rag) | [Getting Started with Intel® Chatbot Toolkit](docs/quickstart/getting_started_rag.md) |
-| 4 | **Intel® Agent Toolkit** *(opt-in)* | Agent Sandbox (optional Kata microVMs), OpenShell, Redis Stack, pgvector, KubeRay, LiteLLM virtual keys, guardrail and hybrid router — requires `init agent-toolkit` and `install agent-toolkit` | [Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit) | [Getting Started with the Intel® Agent Toolkit](docs/quickstart/getting_started_agent_toolkit.md) |
+| # | Layer | In short | What it installs | Install target | Learn more |
+| --- | --- | --- | --- | --- | --- |
+| 1 | **Infrastructure** | The cluster your machines become | Kubernetes (built with Kubespray) and storage (local-path, NFS, Ceph, NetApp ONTAP, or your own CSI driver) | `infrastructure` | [Quick Start: Layer 1](#layer-1-infrastructure) |
+| 2 | **Platform** | Shared services every layer uses: the front door, sign-in, encryption, monitoring, databases | Envoy Gateway, Keycloak, cert-manager, Istio ambient mesh, MetalLB, PostgreSQL, SeaweedFS, observability (Grafana, Prometheus, Loki, Tempo), Node Feature Discovery, NRI CPU balloons, metrics-server, the Intel GPU device plugin, the Kubernetes cluster dashboard (Headlamp); opt-in KEDA, Velero | `platform` | [Quick Start: Layer 2](#layer-2-platform) |
+| 3 | **Intel® Inference Toolkit** | Serves models behind one OpenAI-compatible API | Envoy AI Gateway, KServe, vLLM / OpenVINO™ Model Server, optional LiteLLM and Langfuse | `inference` | [inference-toolkit](https://github.com/intel/inference-toolkit) |
+| 4 | **Intel® Chatbot Toolkit** *(optional, on top of 3)* | Chat with your own documents (RAG) | Vector database, document ingestion, RAG pipeline, MCP gateway, chat history, web UI | `erag` | [chatbot-toolkit](https://github.com/intel/chatbot-toolkit) |
+| 4 | **Intel® Agent Toolkit** *(optional, on top of 3)* | Run AI agents safely | Agent sandboxes (optionally Kata microVMs), memory stores (Redis Stack, pgvector), LiteLLM virtual keys, guardrails, a hybrid model router; optional KubeRay | `agent-toolkit` | [agent-toolkit](https://github.com/intel/agent-toolkit) |
 
-**Request flow:** a request enters through the Envoy AI Gateway, is authenticated against Keycloak (or a LiteLLM virtual key), and is routed to the matching model-serving backend. Every layer's health and latency is visible in the built-in Grafana / Prometheus / Loki / Tempo stack.
+> [!NOTE]
+> **You never clone the other repositories yourself: `init` downloads the ones your target needs into `ext/`. New to a term? The [Glossary](docs/reference/glossary.md) defines each one in a line or two.**
+
+**Request flow:** a request enters through Envoy Gateway, which checks its credential (a Keycloak token, or a LiteLLM virtual key). The Envoy AI Gateway then routes it to the server running the requested model. Every layer's health and latency is visible in the built-in Grafana, Prometheus, Loki and Tempo stack.
 
 <p align="center">
-  <img src="docs/assets/toolkit-manager-architecture.png" alt="Toolkit Manager architecture: Toolkit Manager is the core repository and one installer (git clone, then the installer, then the solutions). It auto-deploys a platform with inference, RAG, and agents. Four blocks stack upward: Infrastructure (Kubernetes, Intel infrastructure, OS and drivers, bring-your-own cluster) at the base; Platform (gateway, auth, routing, observability, serving, storage) builds on infrastructure; Model Inference (Intel® Inference Toolkit and Intel® Inference Microservices) builds on the platform; Solutions requires inference. Chatbot/RAG (Intel® Chatbot Toolkit) and Agents (Intel® Agent Toolkit) are marked coming soon." />
+  <img src="docs/assets/toolkit-manager-architecture.png" alt="Toolkit Manager architecture: Toolkit Manager is the core repository and one installer (git clone, then the installer, then the solutions). It auto-deploys a platform with inference, RAG, and agents. Four blocks stack upward: Infrastructure (Kubernetes, Intel infrastructure, OS and drivers, bring-your-own cluster) at the base; Platform (gateway, auth, routing, observability, serving, storage) builds on infrastructure; Model Inference (Intel® Inference Toolkit and Intel® Inference Microservices) builds on the platform; Solutions requires inference. The solutions are Chatbot/RAG (Intel® Chatbot Toolkit) and Agents (Intel® Agent Toolkit)." />
 </p>
 
 > See the [Architecture deep-dive](docs/reference/architecture.md) for the full component list, execution flow, and cross-repo layering.
@@ -51,90 +50,224 @@ The stack installs in four ordered layers, in the order they are deployed:
 
 ## Quick Start
 
-One node, defaults, and roughly 20 minutes from bare metal to a working stack. Each target pulls in the layers below it automatically, so the target name is the only thing that changes between use cases.
+Walk up the layers on one machine with the default settings, and stop at the one you need. Installing a layer also installs every layer below it, so you can also go straight to it (`init inference` + `install inference` builds layers 1–3). The first install takes up to an hour, mostly downloading images.
 
 > [!NOTE]
-> **Prerequisites:** Ubuntu 22.04/24.04 (or RHEL/Rocky x86_64), passwordless sudo, and internet access. Full list → [Prerequisites](docs/quickstart/prerequisites.md).
+> **Prerequisites:** Ubuntu 22.04/24.04 (or RHEL/Rocky Linux), `git`, `sudo` rights (passwordless is easiest), internet access, and at least **32 CPU cores, 64 GB RAM and 300 GB disk** for a small model (16 cores, 32 GB, 200 GB for the platform alone). Details → [Prerequisites](docs/getting-started/prerequisites.md). Several machines or an existing cluster → [Getting Started](docs/getting-started/quickstart.md).
 
-### Step 1 - Pick your target
-
-| You want | Target | Then follow |
-|---|---|---|
-| An OpenAI-compatible LLM endpoint to build on | `inference` | [Deploy a Model](docs/deploy/deploy_models.md) |
-| A complete RAG application: document ingestion, vector search, chat UI | `erag` | [Getting Started with Intel® Chatbot Toolkit](docs/quickstart/getting_started_rag.md) |
-| Agent sandboxes, memory stores, and a governed LLM gateway for agents | `agent-toolkit` | [Getting Started with the Intel® Agent Toolkit](docs/quickstart/getting_started_agent_toolkit.md) |
-| To connect your own app, agent, or framework to the endpoint | `inference` | [Integration Guide](docs/customize/integration.md) |
-
-### Step 2 - Install
+### Prepare the machine
 
 ```bash
-git clone https://github.com/intel/enterprise-ai-solutions.git
-cd enterprise-ai-solutions
-
-./toolkit_manager.sh configure          # one-time machine prep (Python 3.11+, yq, kubectl, helm)
-./toolkit_manager.sh init inference     # swap in your target from Step 1
-./toolkit_manager.sh install inference  # deploys the target plus everything it depends on (~15-20 min)
+git clone https://github.com/intel/toolkit-manager.git
+cd toolkit-manager
+./toolkit_manager.sh configure      # once per machine (sudo, asks first): Python 3.11+, yq, kubectl, helm, .venv/
+./toolkit_manager.sh init platform  # creates env/local/ with your settings
 ```
 
-Point `kubectl` at the new cluster:
+> [!NOTE]
+> **Every configuration file you need is created in `env/local/`. Edit them there: there is nothing to change anywhere else in the repository.**
+
+**`env/local/global_config.yaml` holds the settings shared by every layer.** The defaults work as they are; edit before you install to change them. A few of its lines:
+
+```yaml
+base_domain_name: "inteltoolkits.ai"   # all URLs: grafana.<domain>, keycloak.<domain>, ...
+storage_backend: local-path            # local-path (single node) | nfs | ceph | netapp-trident | custom
+observability_enabled: true            # Grafana, Prometheus, Loki, Tempo
+headlamp_enabled: true                 # Kubernetes cluster dashboard (one sign-in, links every UI)
+# http_proxy: "http://your-proxy:8080" # behind a proxy: uncomment http_proxy, https_proxy and no_proxy
+# auth_type: "jwt"                     # API sign-in: jwt | litellm_vkey
+```
+
+**Each toolkit layer adds its own settings file** when you `init` it, with that layer's detailed options: `config.inference.yaml`, `config.agent-toolkit.yaml` or `config.erag.yaml`, next to `global_config.yaml`. A key set in both wins in `global_config.yaml`. All options and the full order → [Configuration Reference](docs/configuration/configuration.md#changing-values).
+
+### Layer 1: Infrastructure
+
+**What you get:** a Kubernetes cluster (built with Kubespray) and storage for the layers above. By default it is a **single node**, this machine; for several machines, set up **Multi-node** first.
+
+> [!TIP]
+> **Multi-node:** before installing, list your machines in `env/local/nodes.yaml` (reached over key-based, passwordless SSH) and set `storage_backend: nfs` (or `ceph`) in `global_config.yaml`, since `local-path` is single-node only:
+>
+> ```yaml
+> nodes_control_plane: [{ ip: 10.0.0.10, hostname: cp1 }]
+> nodes_workers:       [{ ip: 10.0.0.20, hostname: worker1 }]
+> nodes_ssh_user: "deploy"
+> nodes_ssh_key: "~/.ssh/id_rsa"
+> ```
+>
+> Add or remove machines later with `add-node` / `remove-node`. Full guide → [Multi-Node & BYO Cluster](docs/deployment/multi-node.md).
+
+```bash
+./toolkit_manager.sh install infrastructure  # ◀── may take a few minutes
+
+export KUBECONFIG=$(pwd)/env/local/kubeconfig.yaml   # check it
+kubectl get nodes                                    # STATUS Ready
+kubectl get storageclass                             # local-path
+```
+
+### Layer 2: Platform
+
+**What you get**, set up and connected:
+
+- **Front door:** Envoy Gateway, HTTPS for every service under your domain (IP from MetalLB, certificates from cert-manager)
+- **Sign-in:** Keycloak, for every web UI and for API tokens
+- **Kubernetes cluster dashboard** (Headlamp): one sign-in, with a link to every service UI
+- **Monitoring:** Grafana over Prometheus metrics, Loki logs and Tempo traces
+- **Data services:** PostgreSQL and SeaweedFS object storage (S3)
+- **Encrypted traffic** between services: Istio ambient mesh
+- **Node helpers:** Node Feature Discovery, NRI CPU balloons, metrics-server, the Intel GPU device plugin on Intel GPU nodes
+
+```bash
+./toolkit_manager.sh install platform        # ◀── may take a few minutes
+./toolkit_manager.sh status    # check it: pods per namespace and the service URLs
+
+# platform-admin's temporary password (you change it at first login)
+kubectl -n keycloak get secret platform-bootstrap-admin -o jsonpath='{.data.value}' | base64 -d; echo
+```
+
+**In the browser:** sign in as `platform-admin` at the Kubernetes cluster dashboard, `https://headlamp.inteltoolkits.ai`, which links every service UI → [Kubernetes cluster dashboard](docs/configuration/headlamp.md). Grafana takes the same account (**Sign in with Keycloak**). The Keycloak admin console, where you add users, has its own `admin` login → [Keycloak admin console](docs/configuration/configuration.md#keycloak-admin-console). Browser access (`/etc/hosts`, certificate) → [Access the services](docs/getting-started/quickstart.md#access-the-services). More: [Observability](docs/configuration/observability.md), [Network Architecture](docs/reference/networking.md).
+
+### Layer 3: Intel® Inference Toolkit
+
+**What you get:** models served on Intel® platforms (KServe with vLLM and OpenVINO™ Model Server) behind one OpenAI-compatible endpoint, `https://inference.inteltoolkits.ai/v1`; the Envoy AI Gateway sends each request to the model it names. `model-manager` deploys and removes models in one command.
+
+**API sign-in:** to change it, uncomment `auth_type` in `env/local/global_config.yaml` before you install: `jwt` (default, Keycloak tokens) or `litellm_vkey` ([LiteLLM virtual keys](docs/deployment/install-platform.md#option-b--litellm-virtual-keys-auth_type-litellm_vkey)).
+
+1. Add the layer:
+
+   ```bash
+   ./toolkit_manager.sh init inference   # downloads the Inference Toolkit into ext/; adds config.inference.yaml and models.yaml (the model catalog)
+   ```
+
+2. Optional: deploy a model during the install (`qwen3-0-6b` fits the minimum machine). In `env/local/config.inference.yaml`, set `llm_services_deploy_models: true`; in `env/local/models.yaml`, add `autodeploy: true` to the model's entry:
+
+   ```yaml
+     - name: qwen3-0-6b
+       model_id: Qwen/Qwen3-0.6B
+       # ...the entry's other lines stay as they are
+       autodeploy: true          # ◀── add
+   ```
+
+   Mark several entries to deploy several. A model that fails to deploy only prints a warning; the install still finishes. Or skip this step and deploy after the install with `model-manager` (below).
+
+3. Install:
+
+   ```bash
+   ./toolkit_manager.sh install inference       # ◀── may take a few minutes
+   ```
+
+**Say hello:** deploy `qwen3-0-6b` (skip if you marked it `autodeploy`), get a Keycloak token and call the model (`auth_type: jwt`, the default):
 
 ```bash
 export KUBECONFIG=$(pwd)/env/local/kubeconfig.yaml
-kubectl get nodes   # should show Ready
+./model-manager deploy qwen3-0-6b --wait     # ◀── first start downloads the weights, a few minutes
+
+source ./ext/enterprise.ai-inference/model_manager/scripts/get-keycloak-token.sh   # sets TOKEN, GATEWAY_IP, GATEWAY_DOMAIN, GATEWAY_URL
+curl -s --noproxy '*' --cacert env/local/logs/ai-solutions-ca.crt \
+  --resolve "${GATEWAY_DOMAIN}:443:${GATEWAY_IP}" \
+  -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+  -d '{"model":"qwen3-0-6b","messages":[{"role":"user","content":"Hello!"}],"max_tokens":32}' \
+  "${GATEWAY_URL}/v1/chat/completions"
 ```
 
-Settings live in `env/local/global_config.yaml` and, for the inference layer (including `auth_type`), `env/local/config.inference.yaml`, both created by `init`. Defaults are a single local node with Keycloak OIDC auth. See [Configuration Reference](docs/customize/configuration.md) for every option, and [Deployment Guide](docs/deploy/install_platform.md) for multi-node, bastion, bring-your-own-cluster, and the alternative `litellm_vkey` (LiteLLM virtual key) auth type.
+A JSON reply with `choices` means the model is serving; any OpenAI client works. With `auth_type: litellm_vkey`, call `https://litellm.inteltoolkits.ai/v1/chat/completions` with a virtual key instead → [With `auth_type: litellm_vkey`](docs/getting-started/deploy-models.md#with-auth_type-litellm_vkey).
 
-> [!TIP]
-> `--env` defaults to `local`. Install and teardown are environment-scoped: what you installed with `--env prod` must be torn down with `--env prod`. Remove everything (config preserved) with `./toolkit_manager.sh teardown infrastructure`.
+| Symptom | Fix |
+|---|---|
+| `curl` exits with code 60 (certificate problem) | Pass `--cacert env/local/logs/ai-solutions-ca.crt` |
+| `401` "Jwt is expired" or "Jwt is missing" | Tokens last 15 minutes: `source` the script again |
+| `401` "Authentication Error" (`litellm_vkey`) | Wrong, expired or revoked virtual key |
+| `404` "No matching route found", or `400` "Invalid model name" (`litellm_vkey`) | The `model` field must be the deploy name: `./model-manager list --deployed` |
+| `deploy` stops at a pre-flight check, or the pod stays `Pending` | Not enough free CPU or memory: `kubectl describe pod -n llm-inference -l app.kubernetes.io/name=qwen3-0-6b` |
 
-### Step 3 - Serve a model and call it
+More: [Deploy a Model](docs/getting-started/deploy-models.md) (gated models, the Python SDK), [Integration Guide](docs/reference/integration.md), [Troubleshooting](docs/faq-and-troubleshooting/troubleshooting.md).
 
-`model-manager` downloads the weights, picks serving parameters, and creates the pod - no YAML needed:
+**In the browser:** the Kubernetes cluster dashboard gains a **Models** page to deploy and remove models, plus LiteLLM and Langfuse when LiteLLM is on → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
+
+### Layer 4: Intel® Agent Toolkit or Intel® Chatbot Toolkit
+
+Optional applications on top of layer 3: a safe place to run AI agents, or a chatbot that answers from your documents.
+
+#### Intel® Agent Toolkit
+
+**What you get:** agents in isolated sandboxes (optionally Kata microVMs), with Redis Stack and pgvector as memory stores, reaching models through a LiteLLM gateway with per-agent virtual keys, a content-safety guardrail, a hybrid router and Langfuse tracing. It deploys `qwen2-5-coder-14b` (chat) and `qwen3guard` (guard), about 112 GiB of memory together.
 
 ```bash
-./model-manager deploy qwen3-0-6b --wait
+./toolkit_manager.sh init agent-toolkit      # downloads the Agent Toolkit (and inference, if missing) into ext/; adds config.agent-toolkit.yaml
+./toolkit_manager.sh install agent-toolkit   # ◀── may take a few minutes
 ```
 
-The helper script discovers the gateway address and Keycloak credentials from the cluster and exports a JWT:
+API sign-in becomes LiteLLM virtual keys (`auth_type: litellm_vkey` in `config.agent-toolkit.yaml`). Optional extras: OpenShell (`openshell_enabled`) and KubeRay (`kuberay_enabled`) in that file, Kata microVMs in `global_config.yaml`.
+
+**Check it:** list the models through LiteLLM with its admin key:
 
 ```bash
-source ./ext/enterprise.ai-inference/model_manager/scripts/get-keycloak-token.sh
-# Exports: TOKEN, GATEWAY_IP, GATEWAY_DOMAIN
+export KUBECONFIG=$(pwd)/env/local/kubeconfig.yaml
+GATEWAY_IP=$(kubectl get svc -n envoy-gateway-system -l gateway.envoyproxy.io/owning-gateway-name=eg-gateway \
+  -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
+DOMAIN=$(yq '.base_domain_name' env/local/global_config.yaml)
+MK=$(kubectl get secret litellm-master-key -n litellm -o jsonpath='{.data.master_key}' | base64 -d)
 
-curl -sk --noproxy '*' \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  --resolve "$GATEWAY_DOMAIN:443:$GATEWAY_IP" \
-  -d '{"model":"qwen3-0-6b","messages":[{"role":"user","content":"Hello!"}],"max_tokens":64}' \
-  "https://$GATEWAY_DOMAIN/v1/chat/completions"
+curl -s --noproxy '*' --cacert env/local/logs/ai-solutions-ca.crt --resolve "litellm.$DOMAIN:443:$GATEWAY_IP" \
+  -H "Authorization: Bearer $MK" "https://litellm.$DOMAIN/v1/models"   # lists qwen2-5-coder-14b and hybrid-router
 ```
 
-Everything speaks the OpenAI-compatible API, so any client that works with OpenAI works here. Gated models, ad-hoc Hugging Face deployments, the Python SDK, and the `litellm` access flow are covered in [Deploy a Model](docs/deploy/deploy_models.md). Building the RAG application instead? Continue with [Getting Started with Intel® Chatbot Toolkit](docs/quickstart/getting_started_rag.md).
+Keep the admin key to yourself; give each application or agent its own virtual key. More: [Getting Started with the Intel® Agent Toolkit](docs/getting-started/agent-toolkit.md) (every component and its switch), [virtual keys](docs/getting-started/deploy-models.md#access-the-model).
+
+**In the browser:** the LiteLLM admin UI (virtual keys, spend) at `https://litellm-ui.inteltoolkits.ai/ui/` and Langfuse (agent traces) at `https://langfuse.inteltoolkits.ai`; the Kubernetes cluster dashboard links both → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
+
+#### Intel® Chatbot Toolkit
+
+**What you get:** a chat web UI at `https://inteltoolkits.ai` that answers from your own documents: document ingestion, a vector database, the RAG pipeline and chat history.
+
+```bash
+./toolkit_manager.sh init erag
+./toolkit_manager.sh install erag            # ◀── may take a few minutes
+```
+
+More: [Getting Started with Intel® Chatbot Toolkit](docs/getting-started/chatbot-toolkit.md) (prerequisites, sign-in, pipelines).
+
+### Remove or start again
+
+```bash
+./toolkit_manager.sh teardown inference        # one layer and those above it; the layers below stay
+./toolkit_manager.sh teardown infrastructure   # everything
+```
+
+Your settings in `env/local/` are kept. Environments are separate (`--env`, default `local`): tear down with the `--env` you installed with.
 
 ---
 
-## Advanced
+## Documentation
 
-The Quick Start gets you running with single-node defaults. From here you can tailor almost everything — TLS and authentication, multi-node or bring-your-own cluster, storage backends, RAG pipelines, model catalogs, autoscaling, proxies, and which components to enable or swap.
+Everything beyond the Quick Start, grouped by task. The [Documentation Index](docs/README.md) lists every guide.
 
-| Goal | Guide |
+| Task | Guide |
 |---|---|
-| All configuration options | [Configuration Reference](docs/customize/configuration.md) |
-| Multi-node cluster or BYO Kubernetes | [Topologies](docs/deploy/topologies.md) |
-| Rack-scale: a cluster on a dedicated high-speed fabric | [Rack-scale Deployment](docs/rack-scale-deployment.md) |
-| Deploy and manage models | [Deploy Models](docs/deploy/deploy_models.md) |
-| Deploy Intel® Chatbot Toolkit | [Getting Started with Intel® Chatbot Toolkit](docs/quickstart/getting_started_rag.md) |
-| Connect your app or framework | [Integration Guide](docs/customize/integration.md) |
-| CLI commands and flags | [CLI Reference](docs/customize/cli.md) |
-| Architecture deep-dive | [Architecture](docs/reference/architecture.md) |
-| Common questions | [FAQ](docs/faq.md) |
-| Terminology | [Glossary](docs/glossary.md) |
-| Network topology and ingress | [Network Architecture](docs/deploy/networking.md) |
-| Trident + ONTAP | [NetApp ONTAP and Trident](docs/deploy/netapp_ontap.md) |
-| Workload placement (multi-node) | [Node Topology](docs/customize/node_topology.md) |
-| NUMA-aware CPU pinning | [NRI CPU Balloons](docs/customize/nri_cpu_balloons.md) |
-| Add or remove nodes from a running cluster | [Node Scaling](docs/customize/node_scaling.md) |
+| **Deploy and operate** | |
+| The Quick Start for several machines or an existing cluster, with web UI access | [Getting Started](docs/getting-started/quickstart.md) |
+| Install step by step: multi-node, bastion host, bring-your-own cluster, auth types | [Deployment Guide](docs/deployment/install-platform.md) |
+| Spread the cluster over several machines, or use an existing cluster | [Multi-Node & BYO Cluster](docs/deployment/multi-node.md) |
+| Build a cluster on a dedicated high-speed fabric | [Rack-scale Deployment](docs/deployment/rack-scale.md) |
+| Add or remove nodes on a running cluster | [Node Scaling](docs/deployment/node-scaling.md) |
+| Upgrade, back up and restore a layer | [Upgrade a Layer](docs/deployment/upgrade.md) |
+| Use the Kubernetes cluster dashboard and platform sign-in | [Kubernetes Cluster Dashboard and Platform Sign-in](docs/configuration/headlamp.md) |
+| Open Grafana and read the dashboards | [Observability](docs/configuration/observability.md) |
+| Install on OpenShift | [Deploy on OpenShift](docs/deployment/openshift.md) |
+| Use NetApp ONTAP and Trident for storage | [NetApp ONTAP and Trident](docs/deployment/netapp-ontap.md) |
+| **Tune** | |
+| Place platform and inference workloads on different nodes | [Node Topology](docs/configuration/node-topology.md) |
+| Pin inference pods to CPU cores (NUMA-aware) | [NRI CPU Balloons](docs/configuration/nri-cpu-balloons.md) |
+| **Understand** | |
+| What the platform is and why | [Meet Toolkit Manager](docs/overview/meet.md) |
+| How it is built: layers, execution flow, repositories | [Architecture](docs/reference/architecture.md) |
+| How a request reaches a model; IPs, DNS and ingress | [Network Architecture](docs/reference/networking.md) |
+| Every command and flag | [CLI Reference](docs/reference/cli.md) |
+| Pod Security and mesh labels on each namespace | [Namespace Security Labels](docs/reference/labels.md) |
+| **Extend and contribute** | |
+| Plug in your own solution layer | [Adding Solution Layers](docs/reference/adding-solutions.md) |
+| Report a problem or send a change | [Contributing](CONTRIBUTING.md) |
+| Check the install and fix common problems | [Troubleshooting](docs/faq-and-troubleshooting/troubleshooting.md) |
+| Short answers and terms | [FAQ](docs/faq-and-troubleshooting/frequently-asked-questions.md) · [Glossary](docs/reference/glossary.md) |
 
 ---
 
@@ -145,13 +278,13 @@ Licensed under the [Apache License, Version 2.0](LICENSE).
 ## Links
 
 - [Documentation Index](docs/README.md)
-- [GitHub Repository](https://github.com/intel/enterprise-ai-solutions)
-- [Intel® Inference Toolkit](https://github.com/intel/enterprise-inference)
-- [Intel® Chatbot Toolkit](https://github.com/intel/enterprise-rag)
-- [Intel® Agent Toolkit](https://github.com/intel/enterprise-agent-toolkit)
-- [Meet Toolkit Manager](docs/meet/meet.md)
+- [GitHub Repository](https://github.com/intel/toolkit-manager)
+- [Intel® Inference Toolkit](https://github.com/intel/inference-toolkit)
+- [Intel® Chatbot Toolkit](https://github.com/intel/chatbot-toolkit)
+- [Intel® Agent Toolkit](https://github.com/intel/agent-toolkit)
+- [Meet Toolkit Manager](docs/overview/meet.md)
 - [Architecture](docs/reference/architecture.md)
 
 ---
 
-*Intel®, Intel® Xeon®, and Intel® Arc™ are registered trademarks of Intel Corporation or its subsidiaries. Licensed under the Apache License, Version 2.0.*
+*Intel® and Intel® Arc™ are registered trademarks of Intel Corporation or its subsidiaries.*

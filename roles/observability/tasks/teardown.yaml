@@ -277,6 +277,16 @@
       when: _obs_keep_namespace | bool
       failed_when: false
 
+    - name: "observability | olm | Delete the out-of-mesh exceptions"
+      ansible.builtin.include_role:
+        name: istio
+        tasks_from: out_of_mesh_exception.yaml
+      vars:
+        istio_out_of_mesh_exception_state: absent
+        istio_out_of_mesh_exception_namespace: "{{ observability_namespace }}"
+        istio_out_of_mesh_exception_workloads: "{{ _observability_olm_out_of_mesh_exceptions }}"
+      when: _obs_keep_namespace | bool
+
 # ── Both stacks: credentials, PVCs and the namespace ─────────────────────────
 
 - name: "observability | Credentials, PVCs and namespace"
