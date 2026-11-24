@@ -32,7 +32,7 @@
 # realm first. Skips Headlamp before anything is created, with the config ready to apply.
 
 - name: "headlamp | BYO cluster: API server trust"
-  when: __headlamp_byo_pending | bool
+  when: not (headlamp_installs | mandatory | bool)   # set by resolve.yaml in preflight
   block:
     - name: "headlamp | Render the authentication config for the cluster owner"
       ansible.builtin.template:

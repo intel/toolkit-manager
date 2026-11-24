@@ -4,11 +4,11 @@
 # =============================================================================
 
 - name: "headlamp | validate | Skipped on BYO until API server trust is set up"
-  when: __headlamp_byo_pending | bool
+  when: not (headlamp_installs | mandatory | bool)
   block:
     - name: "headlamp | validate | Not installed"
       ansible.builtin.debug:
-        msg: "NOTICE: Headlamp not validated: set headlamp_auth_mode: gateway or headlamp_byo_apiserver_trusted: true (docs/deploy/headlamp.md)."
+        msg: "NOTICE: Headlamp not validated: the install skipped it on this BYO cluster; see its WARNING for the fix."
 
     - name: "headlamp | validate | Skip the checks"
       ansible.builtin.meta: end_role

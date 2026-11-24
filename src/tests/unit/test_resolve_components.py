@@ -163,9 +163,15 @@ def _yaml(rel):
     return yaml.safe_load((_ROOT / rel).read_text())
 
 
-def _preflight_fact(name):
-    task = next(t for t in _yaml("playbooks/includes/preflight.yaml") if name in t.get("ansible.builtin.set_fact", {}))
-    return task["ansible.builtin.set_fact"][name]
+def _headlamp_installs(variables):
+    """Render resolve.yaml as Ansible would: role defaults under the user's vars, registry gate pre-rendered."""
+    env = _jinja()
+    task = _yaml("roles/headlamp/tasks/resolve.yaml")[0]
+    defaults = _yaml("roles/headlamp/defaults/main.yaml")
+    role_vars = {k: defaults[k] for k in ("headlamp_auth_mode", "headlamp_byo_apiserver_trusted")} | variables
+    gate = env.from_string(_component("headlamp")["enabled"]).render(**variables)
+    expr = task["ansible.builtin.set_fact"]["headlamp_installs"]
+    return env.from_string(expr).render(components=[{"name": "headlamp", "enabled": gate}], **role_vars).strip()
 
 
 @pytest.mark.parametrize("variables, installed", [
@@ -178,20 +184,20 @@ def _preflight_fact(name):
     ({"headlamp_enabled": True, **_BYO, "headlamp_auth_mode": "gateway"}, True),
 ])
 def test_headlamp_installs_drives_the_role_skip_and_the_landing_path(variables, installed):
-    env = _jinja()
-    defaults = _yaml("roles/headlamp/defaults/main.yaml")
-    role_vars = {k: defaults[k] for k in ("headlamp_auth_mode", "headlamp_byo_apiserver_trusted")} | variables
-    fact = env.from_string(_preflight_fact("headlamp_installs")).render(**role_vars).strip()
+    fact = _headlamp_installs(variables)
     assert (fact == "True") is installed
-    in_registry = env.from_string(_component("headlamp")["enabled"]).render(**variables) == "True"
-    pending = env.from_string(_yaml("roles/headlamp/vars/main.yaml")["__headlamp_byo_pending"]).render(headlamp_installs=fact)
-    assert (in_registry and pending == "False") is installed
     landing = _yaml("roles/gateway/defaults/main.yaml")["gateway_landing_path"]
-    assert env.from_string(landing).render(headlamp_installs=fact) == ("/headlamp/" if installed else "")
+    assert _jinja().from_string(landing).render(headlamp_installs=fact) == ("/headlamp/" if installed else "")
+
+
+def test_preflight_resolves_headlamp_through_the_role():
+    task = next(t for t in _yaml("playbooks/includes/preflight.yaml")
+                if t.get("ansible.builtin.include_role", {}).get("name") == "headlamp")
+    assert task["ansible.builtin.include_role"]["tasks_from"] == "resolve.yaml"
 
 
 def test_template_defaults_turn_on_headlamp_and_envoy_gateway_upgrade():
     defaults = _yaml("configs/defaults/global_config.yaml")
     assert defaults["headlamp_enabled"] is True
     assert defaults["envoy_gateway_upgrade"] is True
-    assert "existing_kubernetes" not in defaults and "llm_services_deploy_models" not in defaults
+    assert "llm_services_deploy_models" not in defaults

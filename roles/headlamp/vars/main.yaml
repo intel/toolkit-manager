@@ -7,8 +7,6 @@ __headlamp_issuer_internal: "{{ keycloak_platform_issuer_internal }}"
 __headlamp_check_secret_name: "{{ keycloak_platform_realm }}-{{ __headlamp_check_client_id }}-client"
 __headlamp_check_client_id: "{{ headlamp_oidc_client_id }}-check"
 __headlamp_apiserver_mode: "{{ headlamp_auth_mode == 'apiserver' }}"
-# The role runs only where headlamp_enabled and not OpenShift, so this is the BYO case.
-__headlamp_byo_pending: "{{ not headlamp_installs | default(true) | bool }}"
 # Headlamp's own callback (apiserver mode) and the gateway's (gateway mode); both
 # are registered so switching modes needs no change in Keycloak.
 __headlamp_redirect_uris: ["{{ headlamp_url }}/oidc-callback", "{{ headlamp_url }}/oauth2/callback"]

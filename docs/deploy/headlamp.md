@@ -91,13 +91,14 @@ kubectl -n team-a create rolebinding headlamp-team-a \
 
 With `existing_kubernetes` set, the installer does not change the API server. In
 `apiserver` mode the API server must trust the `platform` realm, or sign-in
-works but every Kubernetes call in Headlamp returns 401. So the Headlamp install
-stops early, before creating anything, until you choose one:
+works but every Kubernetes call in Headlamp returns 401. So the install skips
+Headlamp with a warning, before creating anything, and carries on with the rest
+of the platform, until you choose one:
 
 **Option A: configure the API server (per-person access and audit).**
 
-1. Install Headlamp. It stops with the issuer to trust and writes a ready-made
-   configuration to `env/<name>/logs/headlamp-authentication-config.yaml`.
+1. Install the platform (or Headlamp). The warning names the issuer to trust, and a ready-made
+   configuration is written to `env/<name>/logs/headlamp-authentication-config.yaml`.
 2. Copy that file to every control-plane node (for example to
    `/etc/kubernetes/authn/authentication-config.yaml`, mode `0600`) and start
    kube-apiserver with `--authentication-config=<that path>`. Mount the
@@ -116,7 +117,7 @@ stops early, before creating anything, until you choose one:
 
 On a managed cluster (EKS, AKS, GKE and others), use the provider's OIDC
 identity-provider setting with the same values: issuer from the installer's
-stop message, client ID `headlamp`, username claim `preferred_username`, groups claim
+warning, client ID `headlamp`, username claim `preferred_username`, groups claim
 `groups`, and prefix `oidc:` for both.
 
 **Option B: no API server change.** Set `headlamp_auth_mode: gateway`. Only

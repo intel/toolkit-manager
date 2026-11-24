@@ -65,16 +65,11 @@
 - name: "Preflight - Platform"
   ansible.builtin.include_tasks: preflight_platform.yaml
 
-# Read by the headlamp role (BYO skip) and gateway_landing_path, so they agree.
-# BYO in apiserver mode needs API server trust first; the role then skips itself.
-- name: "Preflight - Whether Headlamp installs"
-  ansible.builtin.set_fact:
-    headlamp_installs: >-
-      {{ headlamp_enabled | default(false) | bool
-         and cluster_distribution | default('kubernetes') != 'openshift'
-         and (existing_kubernetes | default('', true) | length == 0
-              or headlamp_byo_apiserver_trusted | default(false) | bool
-              or headlamp_auth_mode | default('apiserver') != 'apiserver') }}
+# headlamp_installs: read by the headlamp role (BYO skip) and gateway_landing_path.
+- name: "Preflight - Headlamp: resolve whether it installs"
+  ansible.builtin.include_role:
+    name: headlamp
+    tasks_from: resolve.yaml
 
 # ── OpenShift: settings the platform decides ─────────────────────────────────
 # One global_config.yaml serves both platforms. global_config.yaml is passed as
