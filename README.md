@@ -19,6 +19,8 @@
 
 Toolkit Manager is the installer for the Intel® toolkits. One script, `toolkit_manager.sh`, installs Kubernetes, the shared services, and the toolkit you pick, and ends with secured, OpenAI-compatible endpoints. Start with the defaults, then change what you need.
 
+> Want the full picture? See [Meet Toolkit Manager](docs/overview/meet.md) and [Architecture](docs/reference/architecture.md).
+
 ## Architecture
 
 The stack is built in **layers**, each on top of the one before. You pick a **target** (the top layer you want), and the installer adds every layer below it for you.
