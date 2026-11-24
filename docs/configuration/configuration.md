@@ -443,6 +443,23 @@ kubectl get secret -n keycloak keycloak-admin-secret \
 Grafana's admin signs in on Grafana's own login form; see
 [Observability](observability.md#sign-in).
 
+### Keycloak admin console
+
+The console is where you add users and put them in the `platform-admins` or
+`platform-viewers` group. Its `admin` account lives in the `master` realm, so it is a
+separate login from `platform-admin`, which has no Keycloak admin rights.
+
+1. Open `https://keycloak.<domain>/admin/master/console/` (path mode:
+   `https://<domain>/keycloak/admin/master/console/`). Headlamp's Keycloak link opens the same page.
+2. Sign in as `admin` with the password from `keycloak-admin-secret` (above).
+3. Switch to the `platform` realm (realm list, top left).
+4. **Users** → **Add user**, then set a password under **Credentials** (turn on
+   **Temporary** so the user changes it at first login).
+5. Open the user's **Groups** tab → **Join group** → `platform-admins` (full access) or
+   `platform-viewers` (read-only). See [Who gets in](headlamp.md#who-gets-in).
+
+The group takes effect at the user's next sign-in.
+
 To choose the passwords yourself, set them **before the first install** (once a Secret exists, its
 password is kept), either in `global_config.yaml`:
 

@@ -125,7 +125,7 @@ kubectl get storageclass                             # local-path
 kubectl -n keycloak get secret platform-bootstrap-admin -o jsonpath='{.data.value}' | base64 -d; echo
 ```
 
-**In the browser:** sign in once as `platform-admin` at the Kubernetes cluster dashboard, `https://headlamp.inteltoolkits.ai`; it links Keycloak and Grafana on the same sign-in → [Kubernetes cluster dashboard](docs/configuration/headlamp.md). Browser access (`/etc/hosts`, certificate) → [Access the services](docs/getting-started/quickstart.md#access-the-services). More: [Observability](docs/configuration/observability.md), [Network Architecture](docs/reference/networking.md).
+**In the browser:** sign in as `platform-admin` at the Kubernetes cluster dashboard, `https://headlamp.inteltoolkits.ai`, which links every service UI → [Kubernetes cluster dashboard](docs/configuration/headlamp.md). Grafana takes the same account (**Sign in with Keycloak**). The Keycloak admin console, where you add users, has its own `admin` login → [Keycloak admin console](docs/configuration/configuration.md#keycloak-admin-console). Browser access (`/etc/hosts`, certificate) → [Access the services](docs/getting-started/quickstart.md#access-the-services). More: [Observability](docs/configuration/observability.md), [Network Architecture](docs/reference/networking.md).
 
 ### Layer 3: Intel® Inference Toolkit
 

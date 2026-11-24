@@ -65,7 +65,8 @@ Two Keycloak groups come with the `platform` realm:
 | `platform-admins` | `cluster-admin` | Admin | `proxy_admin` |
 | `platform-viewers` | `view`: read-only, no Secrets | Viewer | not admitted |
 
-Add people to a group in the Keycloak admin console (realm `platform`, Groups).
+Add people to a group in the Keycloak admin console (realm `platform`); see
+[Keycloak admin console](configuration.md#keycloak-admin-console).
 A signed-in user in neither group gets 403 at Headlamp and the LiteLLM admin
 UI, and is a Viewer in Grafana and Langfuse.
 
