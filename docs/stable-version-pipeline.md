@@ -9,8 +9,10 @@ Kubernetes cluster.
 
 Renovate reads the default branch of each configured repository. It inspects
 recognized Helm charts, Helm values, Dockerfiles, Docker Compose files, and pip
-requirements. Custom rules additionally cover the Agent Sandbox version and
-the vendored Redis Stack server image tag. Matching files in a repository can
+requirements. Custom rules cover Agent Sandbox, the vendored Redis Stack server
+image tag, CloudNativePG, MetalLB, KEDA, Metrics Server, SeaweedFS, Langfuse,
+and Node Feature Discovery. Some rules may not match if the monitored branch
+uses a different file layout or variable name. Matching files in a repository can
 include disabled components and dependencies unrelated to the deployed stack.
 The discovery report is not an inventory of what is actually running.
 
@@ -42,21 +44,28 @@ environments.
    inspection. Do not copy environment-specific proxy credentials into Git.
 3. Create a Jenkins **Secret text** credential with ID
    `renovate-github-token`. Use a dedicated GitHub bot with read access to
-   repository contents and metadata. To create pull requests, grant it contents
-   write and pull request read/write access to each target repository. Use
-   organization-approved credentials and permissions. A read-only token is
-   sufficient for an initial discovery-only run.
+   repository contents and metadata. A read-only token is sufficient for an
+   initial discovery-only run. For PR creation use a personal access token
+   authorized to create or use forks, push branches to those forks, and open
+   pull requests against the parent repositories. Repository and organization
+   policies can restrict these operations; use organization-approved
+   credentials and confirm permissions before enabling PR creation.
 4. Create a Pipeline job using **Pipeline script from SCM** and select
    `Jenkinsfile.stable-versions` as the script path. Restrict who can configure
    or run the job and access its artifacts. Never expose the credential to
    untrusted pull request builds or untrusted repository configurations.
 5. Run with `CREATE_PRS=false` first. Set `REPOSITORIES` to the exact GitHub
    repositories the bot may access, in `owner/repo,owner/repo` format with no
-   spaces. Check the `stable-discovery.jsonl` artifact and reconcile its
+   spaces. Defaults use the canonical repository names `intel/toolkit-manager`,
+   `intel/inference-toolkit`, and `intel/agent-toolkit`; use canonical names
+   rather than aliases so that report keys match. Check the
+   `stable-discovery.jsonl` artifact and reconcile its
    extracted dependencies with the intended component inventory.
 6. After reviewing coverage, run with `CREATE_PRS=true`. Renovate opens or
-   updates its pull requests in the respective repositories. It does not
-   merge them. Each target must permit the bot to push branches and create
+   updates pull requests against the parent repositories using Renovate's
+   experimental fork mode. It can create missing forks and update a fork's default branch;
+   use dedicated bot-owned forks rather than forks containing personal work.
+   It does not merge PRs. Target repositories must permit the bot to create
    pull requests. The configured repository default branch is the base; arrange
    a repository-specific base branch policy if another branch is needed.
 7. Once the dry run and pull requests are verified, set an approved Jenkins
@@ -77,4 +86,8 @@ before relying on it as a complete inventory.
 
 Pull requests require human review and a separate compatibility, deployment,
 and validation workflow. Renovate is configured not to automerge; this pipeline
-does not provide test, compatibility, backup, or rollback gates.
+does not provide test, compatibility, backup, or rollback gates. In particular,
+Istio's four chart dependencies must match and their chart lock and appVersion
+need review. KServe and platform Envoy Gateway versions are cross-repository
+dependencies and must be coordinated manually. Do not treat grouped proposals
+as proof of compatibility or artifact availability.
