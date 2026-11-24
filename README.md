@@ -17,6 +17,8 @@
 
 ## What is Toolkit Manager?
 
+A production AI stack needs more than a model endpoint: LLM inference, RAG and agents, plus security, routing and observability, all connected.
+
 Toolkit Manager is the installer for the Intel® toolkits. One script, `toolkit_manager.sh`, installs Kubernetes, the shared services, and the toolkit you pick, and ends with secured, OpenAI-compatible endpoints. Start with the defaults, then change what you need.
 
 > Want the full picture? See [Meet Toolkit Manager](docs/overview/meet.md) and [Architecture](docs/reference/architecture.md).
