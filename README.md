@@ -119,6 +119,9 @@ curl -s --noproxy '*' --cacert env/local/logs/toolkit-manager-ca.crt \
 
 A JSON reply with `choices` means the model is serving; any OpenAI client works. Using LiteLLM virtual keys (`auth_type: litellm_vkey`) instead? → [With `auth_type: litellm_vkey`](docs/getting-started/deploy-models.md#with-auth_type-litellm_vkey).
 
+<details>
+<summary><b>Something went wrong?</b></summary>
+
 | Symptom | Fix |
 |---|---|
 | `curl` exits with code 60 (certificate problem) | Pass `--cacert env/local/logs/toolkit-manager-ca.crt` |
@@ -127,13 +130,17 @@ A JSON reply with `choices` means the model is serving; any OpenAI client works.
 | `404` "No matching route found", or `400` "Invalid model name" (`litellm_vkey`) | The `model` field must be the deploy name: `./model-manager list --deployed` |
 | `deploy` stops at a pre-flight check, or the pod stays `Pending` | Not enough free CPU or memory: `kubectl describe pod -n llm-inference -l app.kubernetes.io/name=qwen3-0-6b` |
 
+</details>
+
 More: [Deploy a Model](docs/getting-started/deploy-models.md) (gated models, the Python SDK), [Integration Guide](docs/reference/integration.md), [Troubleshooting](docs/faq-and-troubleshooting/troubleshooting.md).
 
 **In the browser:** the Kubernetes cluster dashboard gains a **Models** page to deploy and remove models, plus LiteLLM and Langfuse when LiteLLM is on → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
 
-### Agents
+---
 
-Intel® Agent Toolkit runs AI agents safely. It installs on top of layer 3.
+## Agents
+
+> **Intel® Agent Toolkit runs AI agents safely.** It installs on top of layer 3.
 
 **What you get:** agents in isolated sandboxes (optionally Kata microVMs), with Redis Stack and pgvector as memory stores, reaching models through a LiteLLM gateway with per-agent virtual keys, a content-safety guardrail, a hybrid router and Langfuse tracing. It deploys `qwen2-5-coder-14b` (chat) and `qwen3guard` (guard), about 112 GiB of memory together.
 
@@ -161,9 +168,11 @@ Keep the admin key to yourself; give each application or agent its own virtual k
 
 **In the browser:** the LiteLLM admin UI (virtual keys, spend) at `https://litellm-ui.inteltoolkits.ai/ui/` and Langfuse (agent traces) at `https://langfuse.inteltoolkits.ai`; the Kubernetes cluster dashboard links both → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
 
-### Chatbot
+---
 
-Intel® Chatbot Toolkit is a chatbot that answers from your own documents. It installs on top of layer 3.
+## Chatbot
+
+> **Intel® Chatbot Toolkit is a chatbot that answers from your own documents.** It installs on top of layer 3.
 
 **What you get:** a chat web UI at `https://inteltoolkits.ai` that answers from your own documents: document ingestion, a vector database, the RAG pipeline and chat history.
 
@@ -174,7 +183,9 @@ Intel® Chatbot Toolkit is a chatbot that answers from your own documents. It in
 
 More: [Getting Started with Intel® Chatbot Toolkit](docs/getting-started/chatbot-toolkit.md) (prerequisites, sign-in, pipelines).
 
-### Remove or start again
+---
+
+## Remove or start again
 
 ```bash
 ./toolkit_manager.sh teardown inference        # one layer and those above it; the layers below stay
