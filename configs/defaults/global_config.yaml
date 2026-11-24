@@ -67,6 +67,7 @@ keda_enabled: false                       # event-driven autoscaling (Custom Met
 velero_enabled: false                     # backup and restore; needs CSI-snapshot storage
 kata_containers_enabled: false            # microVM runtime for the Agent Sandbox (agent-toolkit)
 kata_runtime: "kata-fc"                   # kata-fc | kata-qemu | both
+kata_confidential_runtime: ""             # "" | kata-qemu-coco-dev (test, no TDX) | kata-qemu-tdx
 
 
 # ─── 5. Storage ──────────────────────────────────────────────────────────────
