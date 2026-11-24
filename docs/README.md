@@ -32,6 +32,7 @@ Start with the table. Each row is one job and one page. The sections under it ar
 | See how the installer is built | [Architecture](reference/architecture.md) |
 | Check a namespace's security labels | [Namespace security labels](reference/labels.md) |
 | Plug in my own solution layer | [Adding solution layers](reference/adding-solutions.md) |
+| Check the install, or fix a failure | [Troubleshooting](faq-and-troubleshooting/troubleshooting.md) |
 | Get a short answer | [FAQ](faq-and-troubleshooting/frequently-asked-questions.md) |
 | Look up a term | [Glossary](reference/glossary.md) |
 | Report a bug or change Toolkit Manager | [Contributing](../CONTRIBUTING.md) |
@@ -45,7 +46,7 @@ Start with the table. Each row is one job and one page. The sections under it ar
 | `deployment/` | Other layouts, platforms and storage, scaling and upgrades |
 | `configuration/` | YAML you edit after the first install, and the web UIs it turns on |
 | `reference/` | Commands, architecture, networking and terms |
-| `faq-and-troubleshooting/` | Answers |
+| `faq-and-troubleshooting/` | Health checks, symptoms and fixes, answers |
 
 ## First install
 
@@ -99,6 +100,7 @@ Edit the YAML under `env/<name>/` and re-run `install`.
 
 | Guide | What it covers |
 |---|---|
+| [Troubleshooting](faq-and-troubleshooting/troubleshooting.md) | `status` and `validate`, the logs, and symptoms with their fix |
 | [FAQ](faq-and-troubleshooting/frequently-asked-questions.md) | Short answers to the questions that come up most |
 
 ## Contribute

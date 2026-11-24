@@ -138,7 +138,7 @@ The Keycloak and Grafana admin passwords are generated on the first install and 
 
 ### How do I check the deployment is healthy?
 
-`./toolkit_manager.sh status --env <name>` for namespaces, pods, and endpoints, and `validate <target>` to run the health checks for a layer or component.
+`./toolkit_manager.sh status --env <name>` for namespaces, pods, and endpoints, and `validate <target>` to run the health checks for a layer or component. See [Troubleshooting](troubleshooting.md#check-the-install).
 
 ### Where are the logs?
 
@@ -164,4 +164,4 @@ Yes, that is the intended extension point: register it in the component registry
 
 ### Something is broken and this list does not cover it.
 
-Check the run log in `env/<name>/logs/`, then `status` and `validate`. The [Deployment Guide](../deployment/install-platform.md) and [Network Architecture](../reference/networking.md) cover the failure modes that come up most, such as ingress and DNS.
+See [Troubleshooting](troubleshooting.md): the health checks, the logs, and symptoms with their fix. The [Deployment Guide](../deployment/install-platform.md) and [Network Architecture](../reference/networking.md) cover the failure modes that come up most, such as ingress and DNS.
