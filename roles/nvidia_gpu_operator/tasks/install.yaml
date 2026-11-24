@@ -105,6 +105,12 @@
         values:
           driver:
             enabled: "{{ nvidia_gpu_operator_driver_enabled | bool }}"
+            # A driver upgrade deletes the GPU pods on each node first. Model pods have
+            # emptyDir volumes, which the chart's default refuses, and the node would
+            # then stay cordoned in upgrade-failed.
+            upgradePolicy:
+              gpuPodDeletion:
+                deleteEmptyDir: true
           toolkit:
             enabled: "{{ nvidia_gpu_operator_toolkit_enabled | bool }}"
           devicePlugin:
@@ -140,6 +146,35 @@
       delay: 10
       ignore_errors: true
       when: nvidia_gpu_operator_nfd_enabled | bool
+
+    # The toolkit restarts containerd on each GPU node when its old pod stops and again a few
+    # seconds after the new one is Ready, which breaks the next components' execs there. The
+    # validator's checks pass only after that. Helm's wait covers only the operator, and the
+    # ClusterPolicy still says ready from before an upgrade. Best effort, like the NFD wait
+    # above; validate reports the operands.
+    - name: "nvidia_gpu_operator | nvidia | Read the validator version"
+      kubernetes.core.k8s_info:
+        api_version: nvidia.com/v1
+        kind: ClusterPolicy
+        name: cluster-policy
+      register: _gpu_cluster_policy
+
+    - name: "nvidia_gpu_operator | nvidia | Wait for that validator on every GPU node"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: DaemonSet
+        name: nvidia-operator-validator
+        namespace: "{{ nvidia_gpu_operator_namespace }}"
+      register: _gpu_validator_ds
+      until:
+        - _gpu_validator_ds.resources | default([]) | length > 0
+        - _gpu_validator_ds.resources[0].spec.template.spec.containers[0].image.endswith(':' ~ _gpu_cluster_policy.resources[0].spec.validator.version)
+        - _gpu_validator_ds.resources[0].status.observedGeneration | default(0) == _gpu_validator_ds.resources[0].metadata.generation
+        - _gpu_validator_ds.resources[0].status.updatedNumberScheduled | default(0) == _gpu_validator_ds.resources[0].status.desiredNumberScheduled
+        - (_gpu_validator_ds.resources[0].status.numberReady | default(0)) == _gpu_validator_ds.resources[0].status.desiredNumberScheduled
+      retries: 60
+      delay: 10
+      ignore_errors: true
 
     - name: "nvidia_gpu_operator | nvidia | Verify GPU Operator pods"
       kubernetes.core.k8s_info:

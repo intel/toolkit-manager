@@ -40,7 +40,7 @@
       {
         "current": {},
         "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-        "definition": "label_values(DCGM_FI_DEV_GPU_UTIL, Hostname)",
+        "definition": "label_values(DCGM_FI_DEV_GPU_UTIL, hostname)",
         "hide": 0,
         "includeAll": true,
         "label": "Host",
@@ -48,7 +48,7 @@
         "name": "Hostname",
         "options": [],
         "query": {
-          "query": "label_values(DCGM_FI_DEV_GPU_UTIL, Hostname)",
+          "query": "label_values(DCGM_FI_DEV_GPU_UTIL, hostname)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -59,7 +59,7 @@
       {
         "current": {},
         "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-        "definition": "label_values(DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$Hostname\"}, gpu)",
+        "definition": "label_values(DCGM_FI_DEV_GPU_UTIL{hostname=~\"$Hostname\"}, gpu)",
         "hide": 0,
         "includeAll": true,
         "label": "GPU",
@@ -67,7 +67,7 @@
         "name": "gpu",
         "options": [],
         "query": {
-          "query": "label_values(DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$Hostname\"}, gpu)",
+          "query": "label_values(DCGM_FI_DEV_GPU_UTIL{hostname=~\"$Hostname\"}, gpu)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -123,7 +123,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "count(DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$Hostname\", gpu=~\"$gpu\"})",
+          "expr": "count(DCGM_FI_DEV_GPU_UTIL{hostname=~\"$Hostname\", gpu=~\"$gpu\"})",
           "legendFormat": "GPUs",
           "refId": "A"
         }
@@ -167,7 +167,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "max(DCGM_FI_DEV_FB_USED{Hostname=~\"$Hostname\", gpu=~\"$gpu\"} / (DCGM_FI_DEV_FB_USED{Hostname=~\"$Hostname\", gpu=~\"$gpu\"} + DCGM_FI_DEV_FB_FREE{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}))",
+          "expr": "max(DCGM_FI_DEV_FB_USED{hostname=~\"$Hostname\", gpu=~\"$gpu\"} / (DCGM_FI_DEV_FB_USED{hostname=~\"$Hostname\", gpu=~\"$gpu\"} + DCGM_FI_DEV_FB_FREE{hostname=~\"$Hostname\", gpu=~\"$gpu\"}))",
           "legendFormat": "peak mem",
           "refId": "A"
         }
@@ -209,7 +209,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "max(DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$Hostname\", gpu=~\"$gpu\"})",
+          "expr": "max(DCGM_FI_DEV_GPU_TEMP{hostname=~\"$Hostname\", gpu=~\"$gpu\"})",
           "legendFormat": "max temp",
           "refId": "A"
         }
@@ -247,7 +247,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "sum(DCGM_FI_DEV_POWER_USAGE{Hostname=~\"$Hostname\", gpu=~\"$gpu\"})",
+          "expr": "sum(DCGM_FI_DEV_POWER_USAGE{hostname=~\"$Hostname\", gpu=~\"$gpu\"})",
           "legendFormat": "total power",
           "refId": "A"
         }
@@ -288,7 +288,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "sum(DCGM_FI_DEV_XID_ERRORS{Hostname=~\"$Hostname\", gpu=~\"$gpu\"})",
+          "expr": "sum(DCGM_FI_DEV_XID_ERRORS{hostname=~\"$Hostname\", gpu=~\"$gpu\"}) or vector(0)",
           "legendFormat": "XID errors",
           "refId": "A"
         }
@@ -343,8 +343,8 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_GPU_UTIL{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
-          "legendFormat": "{{Hostname}} gpu{{gpu}} ({{modelName}})",
+          "expr": "DCGM_FI_DEV_GPU_UTIL{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "legendFormat": "{{hostname}} gpu{{gpu}} ({{modelName}})",
           "refId": "A"
         }
       ],
@@ -398,7 +398,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_FB_USED{Hostname=~\"$Hostname\", gpu=~\"$gpu\"} / (DCGM_FI_DEV_FB_USED{Hostname=~\"$Hostname\", gpu=~\"$gpu\"} + DCGM_FI_DEV_FB_FREE{Hostname=~\"$Hostname\", gpu=~\"$gpu\"})",
+          "expr": "DCGM_FI_DEV_FB_USED{hostname=~\"$Hostname\", gpu=~\"$gpu\"} / (DCGM_FI_DEV_FB_USED{hostname=~\"$Hostname\", gpu=~\"$gpu\"} + DCGM_FI_DEV_FB_FREE{hostname=~\"$Hostname\", gpu=~\"$gpu\"})",
           "legendFormat": "gpu{{gpu}} {{namespace}}/{{pod}}",
           "refId": "A"
         }
@@ -444,14 +444,14 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_FB_USED{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_FB_USED{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} used",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_FB_FREE{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_FB_FREE{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} free",
           "refId": "B"
         }
@@ -505,7 +505,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_GPU_TEMP{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_GPU_TEMP{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} ({{modelName}})",
           "refId": "A"
         }
@@ -551,7 +551,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_POWER_USAGE{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_POWER_USAGE{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}}",
           "refId": "A"
         }
@@ -597,21 +597,21 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_XID_ERRORS{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_XID_ERRORS{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} XID",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} remap (correctable)",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} remap (uncorrectable)",
           "refId": "C"
         }
@@ -665,14 +665,14 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_ECC_SBE_VOL_TOTAL{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_ECC_SBE_VOL_TOTAL{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} SBE volatile",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_ECC_DBE_VOL_TOTAL{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_ECC_DBE_VOL_TOTAL{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} DBE volatile",
           "refId": "B"
         }
@@ -718,14 +718,14 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_ECC_SBE_AGG_TOTAL{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_ECC_SBE_AGG_TOTAL{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} SBE aggregate",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_ECC_DBE_AGG_TOTAL{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_DEV_ECC_DBE_AGG_TOTAL{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} DBE aggregate",
           "refId": "B"
         }
@@ -743,7 +743,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "description": "Clock throttle reasons bitmask per GPU. Non-zero means the GPU is being held below boost frequency. Common bits: 0x2=SW thermal, 0x4=HW thermal, 0x8=power.",
+      "description": "Clock events per GPU in the exporter's 5-minute window, for the reasons that hold the GPU below boost frequency: power_cap, hw_slowdown, sw_thermal, hw_thermal and hw_power_brake.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -779,12 +779,12 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_DEV_CLOCK_THROTTLE_REASONS{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
-          "legendFormat": "gpu{{gpu}} throttle reasons",
+          "expr": "DCGM_EXP_CLOCK_EVENTS_COUNT{hostname=~\"$Hostname\", gpu=~\"$gpu\", clock_event=~\"power_cap|hw_slowdown|sw_thermal|hw_thermal|hw_power_brake\"}",
+          "legendFormat": "gpu{{gpu}} {{clock_event}}",
           "refId": "A"
         }
       ],
-      "title": "Clock Throttle Reasons (bitmask)",
+      "title": "Clock events (last 5 min)",
       "type": "timeseries"
     },
     {
@@ -826,7 +826,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_PROF_SM_ACTIVE{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_PROF_SM_ACTIVE{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} SM active",
           "refId": "A"
         }
@@ -873,7 +873,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
           "editorMode": "code",
-          "expr": "DCGM_FI_PROF_SM_OCCUPANCY{Hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
+          "expr": "DCGM_FI_PROF_SM_OCCUPANCY{hostname=~\"$Hostname\", gpu=~\"$gpu\"}",
           "legendFormat": "gpu{{gpu}} SM occupancy",
           "refId": "A"
         }
