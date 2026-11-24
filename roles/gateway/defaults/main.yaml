@@ -150,9 +150,9 @@ gateway_s3_tls_secret_name: "gateway-s3-tls"
 # solution listeners) chains to this root, so operators import ONE cert
 # (exported to gateway_ca_export_path) to trust every hostname.
 gateway_ca_bootstrap_issuer_name: "gateway-ca-bootstrap"
-gateway_ca_cert_name: "ai-solutions-ca"
-gateway_ca_secret_name: "ai-solutions-ca"
-gateway_ca_common_name: "AI Solutions Root CA"
+gateway_ca_cert_name: "toolkit-manager-ca"
+gateway_ca_secret_name: "toolkit-manager-ca"
+gateway_ca_common_name: "Toolkit Manager Root CA"
 gateway_ca_duration: "87600h"         # 10y root
 gateway_ca_renew_before: "720h"       # 30d
 gateway_ca_export_path: "{{ log_dir }}/{{ gateway_ca_cert_name }}.crt"

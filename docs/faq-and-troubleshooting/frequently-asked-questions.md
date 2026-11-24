@@ -90,7 +90,7 @@ Keycloak is always deployed and handles sign-in in both modes; `auth_type` only 
 
 ### Can I use my own TLS certificates?
 
-Yes. `gateway_tls_mode: custom` with a certificate and key covering `*.<base_domain_name>`. With the default `selfsigned`, cert-manager creates an internal CA and exports it to `env/<name>/logs/ai-solutions-ca.crt` so you can trust it once instead of clicking through warnings.
+Yes. `gateway_tls_mode: custom` with a certificate and key covering `*.<base_domain_name>`. With the default `selfsigned`, cert-manager creates an internal CA and exports it to `env/<name>/logs/toolkit-manager-ca.crt` so you can trust it once instead of clicking through warnings.
 
 ### Does it work behind a corporate proxy?
 
@@ -134,7 +134,7 @@ Yes. KServe also serves scikit-learn, XGBoost, PyTorch, TensorFlow, ONNX, and Tr
 
 ### Where are the credentials?
 
-The Keycloak and Grafana admin passwords are generated on the first install and kept in Kubernetes Secrets; [Admin passwords](../configuration/configuration.md#admin-passwords) shows the `kubectl` commands that read them. The generated CA certificate is written to `env/<name>/logs/ai-solutions-ca.crt`. The Intel® Chatbot Toolkit also writes its user passwords to `env/<name>/logs/rag/default_credentials.txt`.
+The Keycloak and Grafana admin passwords are generated on the first install and kept in Kubernetes Secrets; [Admin passwords](../configuration/configuration.md#admin-passwords) shows the `kubectl` commands that read them. The generated CA certificate is written to `env/<name>/logs/toolkit-manager-ca.crt`. The Intel® Chatbot Toolkit also writes its user passwords to `env/<name>/logs/rag/default_credentials.txt`.
 
 ### How do I check the deployment is healthy?
 

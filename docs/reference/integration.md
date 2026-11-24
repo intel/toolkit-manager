@@ -38,7 +38,7 @@ First point `kubectl` at the cluster and find the gateway:
 ```bash
 ENV=local                                   # the --env you installed with
 export KUBECONFIG=$(pwd)/env/$ENV/kubeconfig.yaml
-CA=$(pwd)/env/$ENV/logs/ai-solutions-ca.crt # the installer's CA (selfsigned TLS)
+CA=$(pwd)/env/$ENV/logs/toolkit-manager-ca.crt # the installer's CA (selfsigned TLS)
 
 # Gateway LoadBalancer IP (from MetalLB)
 GATEWAY_IP=$(kubectl get svc -n envoy-gateway-system \
@@ -704,7 +704,7 @@ The rare cases:
 | `404 Not Found` | Wrong hostname for the mode (e.g. `inference.<base>` in `litellm_vkey` mode), or no route for that host | Use the endpoint for your `auth_type` and `routing_mode`; `kubectl get httproute -A` |
 | Error that the model does not exist | Model not deployed, or a different name | `./model-manager list`, then `./model-manager deploy <name>` |
 | `503` / `upstream connect error` | Model pod not ready | `kubectl get pods -n llm-inference`; check the model container's logs |
-| TLS verification failure | Selfsigned certificate not trusted | Pass `--cacert env/<env>/logs/ai-solutions-ca.crt` (or `verify=<that file>`); or use `gateway_tls_mode: custom` with your own certificate |
+| TLS verification failure | Selfsigned certificate not trusted | Pass `--cacert env/<env>/logs/toolkit-manager-ca.crt` (or `verify=<that file>`); or use `gateway_tls_mode: custom` with your own certificate |
 | HTML error page instead of JSON | The request went to your corporate proxy | Add `--noproxy '*'`, or put the domain in `no_proxy` |
 | Connection hangs from outside the cluster | The hostname does not resolve to the gateway IP | Add a DNS record (or `--resolve` for curl) → `${GATEWAY_IP}` |
 
