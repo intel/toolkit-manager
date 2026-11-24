@@ -76,12 +76,14 @@ def test_dedicated_nics_by_name_or_mapping_get_the_default_mtu():
 
 
 def test_default_roce_settings():
-    assert settings(none_rack()) == {"dscp": 26, "priority": 3, "pfc": True, "ecn": True}
+    assert settings(none_rack()) == {"dscp": 26, "priority": 3, "pfc": True, "ecn": True,
+                                     "subnet": "", "pod_range": ""}
 
 
 def test_site_roce_settings_replace_the_defaults():
     profile = none_rack(mtu=4200, dscp=34, priority=4, pfc=False, ecn=False)
-    assert settings(profile) == {"dscp": 34, "priority": 4, "pfc": False, "ecn": False}
+    assert settings(profile) == {"dscp": 34, "priority": 4, "pfc": False, "ecn": False,
+                                 "subnet": "", "pod_range": ""}
     assert hosts(profile)["all"]["hosts"]["w1"]["node_rdma_nics"][0]["mtu"] == 4200
 
 
@@ -210,3 +212,55 @@ def test_rdma_nics_shape_is_checked():
 
 def test_summary_has_the_netplan_renderer():
     assert parse(none_rack())["summary"]["netplan_renderer"] == "networkd"
+
+
+def test_pod_range_is_part_of_the_subnet():
+    profile = none_rack(subnet="192.168.40.0/24", pod_range="192.168.40.128/26")
+    assert errors(profile) == []
+    assert settings(profile)["subnet"] == "192.168.40.0/24"
+    assert settings(profile)["pod_range"] == "192.168.40.128/26"
+    assert errors(none_rack(subnet="192.168.40.0/24", pod_range="192.168.41.0/26")) == [
+        "network.rdma.pod_range 192.168.41.0/26 is not inside network.rdma.subnet 192.168.40.0/24"]
+    assert errors(none_rack(subnet="192.168.40.0/24", pod_range="fd00::/64")) == [
+        "network.rdma.pod_range fd00::/64 is not inside network.rdma.subnet 192.168.40.0/24"]
+    assert errors(none_rack(pod_range="192.168.40.128/26")) == [
+        "network.rdma.pod_range needs network.rdma.subnet, the network it is part of"]
+    assert errors(none_rack(subnet=None, pod_range="192.168.40.128/26")) == [
+        "network.rdma.subnet: 'None' is not a valid CIDR network"]
+    assert errors(none_rack(subnet="192.168.40.0/24", pod_range="pods")) == [
+        "network.rdma.pod_range: 'pods' is not a valid CIDR network"]
+
+
+def test_pod_range_holds_no_node_rdma_ip():
+    profile = none_rack(subnet="192.168.40.0/24", pod_range="192.168.40.0/25")
+    node(profile, "w1")["rdma_nics"] = [{"nic": "ens28np0", "rdma_ip": "192.168.40.11"}]
+    assert errors(profile) == [
+        "node 'w1' RDMA NIC 'ens28np0' rdma_ip 192.168.40.11 is inside network.rdma.pod_range "
+        "192.168.40.0/25, which is for pods"]
+
+
+def test_a_nic_name_is_on_one_rdma_network_on_every_node():
+    profile = none_rack()  # NIC names that differ between nodes, one per network
+    node(profile, "w1")["rdma_nics"] = ["ens785np0"]
+    node(profile, "w2")["rdma_nics"] = ["ens6np0", "ens28np0"]
+    assert errors(profile) == []
+    node(profile, "w1")["rdma_nics"] = ["ens28np0"]
+    assert errors(profile) == [
+        "RDMA NIC 'ens28np0' is on more than one RDMA network (network 0 on w1; network 1 on w2): the RDMA "
+        "device plugin finds NICs by name, so a NIC name must be on the same network on every node "
+        "(network i is each node's i-th dedicated RDMA NIC)"]
+
+
+def test_a_shared_nic_name_is_no_dedicated_nic_elsewhere():
+    profile = clos_rack()
+    node(profile, "cp1")["rdma_nics"] = ["eth2"]
+    assert errors(profile) == []
+    node(profile, "cp1")["rdma_nics"] = ["eth1"]
+    assert errors(profile) == []  # a fabric NIC on both nodes: shared on both
+    profile["racks"]["rack-01"]["nodes"]["w2"] = {
+        "hostname": "w2", "mgmt_ip": "192.0.2.21", "roles": ["kube_node"],
+        "fabric_nics": [{"nic": "eth2", "fabric_ip": "10.10.1.21"}], "rdma_nics": ["eth1"]}
+    assert errors(profile) == [
+        "RDMA NIC 'eth1' is on more than one RDMA network (network 0 on w2; shared on cp1, w1): the RDMA "
+        "device plugin finds NICs by name, so a NIC name must be on the same network on every node "
+        "(network i is each node's i-th dedicated RDMA NIC)"]

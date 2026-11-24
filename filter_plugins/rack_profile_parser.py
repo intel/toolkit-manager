@@ -65,7 +65,7 @@ VALID_FABRIC_NIC_KEYS = {
 }
 VALID_RDMA_NIC_KEYS = {"nic", "rdma_ip"}
 RDMA_DEFAULTS = {"mtu": 9000, "dscp": 26, "priority": 3, "pfc": True, "ecn": True}
-VALID_RDMA_KEYS = {"subnet", *RDMA_DEFAULTS}
+VALID_RDMA_KEYS = {"subnet", "pod_range", *RDMA_DEFAULTS}
 KNOWN_CPU_FAMILIES = {"cpu-gnr-ap", "cpu-gnr-sp", "cpu-cwf", "cpu-spr"}
 VALID_ACCELERATOR_VENDORS = {"nvidia", "intel", "amd"}
 KNOWN_ROLES = {
@@ -426,14 +426,14 @@ def _ceph_address_faults(all_nodes, public_net, cluster_net, cp_on_fabric):
 
 
 def _rdma_settings(block, errors):
-    """network.rdma with its defaults; subnet is None when not set."""
+    """network.rdma with its defaults; subnet and pod_range are None when not set."""
     if block is None:
         block = {}
     if not isinstance(block, dict):
         errors.append(f"network.rdma must be a mapping, got {type(block).__name__}")
-        return {**RDMA_DEFAULTS, "subnet": None}
+        return {**RDMA_DEFAULTS, "subnet": None, "pod_range": None}
     _check_keys(block, VALID_RDMA_KEYS, "network.rdma", errors)
-    rdma = {**RDMA_DEFAULTS, "subnet": None, **block}
+    rdma = {**RDMA_DEFAULTS, "subnet": None, "pod_range": None, **block}
     for key, lo, hi in (("mtu", 1280, 65535), ("dscp", 0, 63), ("priority", 0, 7)):
         if not _whole(rdma[key], lo, hi):
             errors.append(f"network.rdma.{key} must be a whole number from {lo} to {hi}, "
@@ -450,6 +450,19 @@ def _rdma_settings(block, errors):
         elif rdma["subnet"] is not None and rdma["subnet"].prefixlen > 30:
             errors.append(f"network.rdma.subnet {rdma['subnet']} leaves no addresses for the nodes: "
                           f"use /30 or larger")
+    # The addresses pods get on the dedicated RDMA networks: part of the subnet,
+    # so that pods reach the nodes' rdma_ip on the link.
+    if rdma["pod_range"] is not None:
+        pod_range = _safe_ip_network(rdma["pod_range"], "network.rdma.pod_range", errors)
+        rdma["pod_range"] = None
+        if pod_range is not None and "subnet" not in block:
+            errors.append("network.rdma.pod_range needs network.rdma.subnet, the network it is part of")
+        elif pod_range is not None and rdma["subnet"] is not None:
+            if pod_range.version != rdma["subnet"].version or not pod_range.subnet_of(rdma["subnet"]):
+                errors.append(f"network.rdma.pod_range {pod_range} is not inside network.rdma.subnet "
+                              f"{rdma['subnet']}")
+            else:
+                rdma["pod_range"] = pod_range
     return rdma
 
 
@@ -486,15 +499,20 @@ def _rdma_faults(all_nodes, rdma, fabric_mtu, fabric_prefix, pod_cidr, service_c
 
     A dedicated RDMA NIC is the default. An RDMA NIC that is also one of the
     node's fabric NICs is shared: RDMA runs on its fabric_ip and fabric MTU.
+    RDMA network i is each node's i-th dedicated RDMA NIC.
     """
     errors = []
-    subnet = rdma["subnet"]
+    subnet, pod_range = rdma["subnet"], rdma["pod_range"]
+    networks = {}  # NIC name -> {"shared" or network index: [nodes]}
     for name, node in sorted(all_nodes.items()):
         fabric = {fn["nic"] for fn in node.get("fabric_nics", [])}
+        dedicated = 0
         for rn in node.get("rdma_nics", []):
             where = f"node '{name}' RDMA NIC '{rn['nic']}'"
             rn["shared"] = rn["nic"] in fabric
             rn["mtu"] = fabric_mtu if rn["shared"] else rdma["mtu"]
+            networks.setdefault(rn["nic"], {}).setdefault("shared" if rn["shared"] else dedicated, []).append(name)
+            dedicated += not rn["shared"]
             if not rn.get("rdma_ip"):
                 continue
             ip = ipaddress.ip_address(rn["rdma_ip"])
@@ -508,6 +526,9 @@ def _rdma_faults(all_nodes, rdma, fabric_mtu, fabric_prefix, pod_cidr, service_c
             elif ip in (subnet.network_address, subnet.broadcast_address):
                 errors.append(f"{where} rdma_ip {ip} is the network or broadcast address of "
                               f"{subnet} — not assignable")
+            elif pod_range is not None and ip in pod_range:
+                errors.append(f"{where} rdma_ip {ip} is inside network.rdma.pod_range {pod_range}, "
+                              f"which is for pods")
             else:
                 rn["prefix"] = subnet.prefixlen
         with_ip = [rn["nic"] for rn in node.get("rdma_nics", []) if rn.get("rdma_ip") and not rn["shared"]]
@@ -515,6 +536,15 @@ def _rdma_faults(all_nodes, rdma, fabric_mtu, fabric_prefix, pod_cidr, service_c
             errors.append(f"node '{name}' has rdma_ip on {', '.join(with_ip)}: network.rdma has one "
                           f"subnet, so a node gets at most one dedicated RDMA NIC with rdma_ip "
                           f"(per-rail subnets are not supported yet)")
+
+    # The RDMA device plugin finds a NIC by its name, with one name list per network.
+    for nic, seen in sorted(networks.items()):
+        if len(seen) > 1:
+            where = "; ".join(f"{'shared' if net == 'shared' else f'network {net}'} on {', '.join(nodes)}"
+                              for net, nodes in sorted(seen.items(), key=lambda kv: str(kv[0])))
+            errors.append(f"RDMA NIC '{nic}' is on more than one RDMA network ({where}): the RDMA device "
+                          f"plugin finds NICs by name, so a NIC name must be on the same network on every "
+                          f"node (network i is each node's i-th dedicated RDMA NIC)")
 
     if subnet is not None:
         for sup in _fabric_supernets(all_nodes, fabric_prefix):
@@ -1623,7 +1653,8 @@ def _build_summary(ctx):
         "fabric_mtu": ctx["fabric_mtu"],
         "fabric_cidrs": _fabric_cidrs(ctx),
         "node_count": len(all_nodes),
-        "rdma": {k: ctx["rdma"][k] for k in ("dscp", "priority", "pfc", "ecn")},
+        "rdma": {**{k: ctx["rdma"][k] for k in ("dscp", "priority", "pfc", "ecn")},
+                 **{k: str(ctx["rdma"][k] or "") for k in ("subnet", "pod_range")}},
         "netplan_renderer": ctx["netplan_renderer"],
         "gpu_vendor": gpu_vendor,
         "gpu_model": gpu_model,
