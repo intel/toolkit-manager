@@ -4,7 +4,7 @@
 
 > **One automated workflow connecting Intel's AI portfolio — self-hosted, on-premises, and ready to deploy.**
 
-Toolkit Manager is an open source, Kubernetes-based platform that removes the complexity of deploying self-hosted AI on Intel® Xeon® processors and Intel® GPUs — on-premises, air-gapped, or in your own private cloud, with no data leaving your infrastructure.
+Toolkit Manager is an open source, Kubernetes-based platform that removes the complexity of deploying self-hosted AI on Intel® Xeon® processors and Intel® GPUs — on-premises or in your own private cloud, with no data leaving your infrastructure.
 
 The repository acts as the integration and automation layer across Intel's AI portfolio. It connects the infrastructure, inference engines, models, retrieval services, security, and observability required to deploy complete AI solutions — through a consistent, automated workflow.
 

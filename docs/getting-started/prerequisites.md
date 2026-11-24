@@ -2,7 +2,7 @@
 
 [← Docs index](../README.md)
 
-Everything needed before running the Toolkit Manager installer, whether you're deploying on-premises, air-gapped, or on a single bare-metal box.
+Everything needed before running the Toolkit Manager installer, whether you're deploying on-premises, in a private cloud, or on a single bare-metal box. The install needs internet access (directly or through a proxy); air-gapped installs are not supported yet.
 
 ---
 
