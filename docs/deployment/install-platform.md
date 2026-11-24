@@ -624,7 +624,7 @@ The domain (default `inteltoolkits.ai`) is usually not in your DNS. That is why 
 env/<name>/logs/ai-solutions-ca.crt
 ```
 
-Import this into your browser or OS trust store to open the web UIs (Keycloak, Grafana, Langfuse) without certificate warnings. The `curl` commands below pass it with `--cacert`; for Python/SDK clients, set `SSL_CERT_FILE` to it:
+Copy it to each machine that opens the web UIs and trust it there ([Trust the self-signed CA](../configuration/configuration.md#trust-the-self-signed-ca-in-your-browser)), so Keycloak, Grafana and Langfuse open without certificate warnings. The `curl` commands below pass it with `--cacert`; for Python/SDK clients, set `SSL_CERT_FILE` to it:
 
 ```bash
 CA=$(pwd)/env/<env>/logs/ai-solutions-ca.crt
