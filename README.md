@@ -19,7 +19,7 @@
 
 A production AI stack needs more than a model endpoint: LLM inference, RAG and agents, plus security, routing and observability, all connected.
 
-Toolkit Manager is the installer for the Intel® toolkits. One script, `toolkit_manager.sh`, installs Kubernetes, the shared services, and the toolkit you pick, and ends with secured, OpenAI-compatible endpoints. Start with the defaults, then change what you need.
+Toolkit Manager wires these together in a pre-integrated, customizable Kubernetes stack optimized for Intel® platforms. One installer, `toolkit_manager.sh`, takes bare-metal machines through Kubernetes, platform services, model serving and the AI gateway, and ends with secured, OpenAI-compatible endpoints. Start with the defaults, then configure or extend as needed.
 
 > Want the full picture? See [Meet Toolkit Manager](docs/overview/meet.md) and [Architecture](docs/reference/architecture.md).
 
@@ -41,8 +41,6 @@ The stack is built in **layers**, each on top of the one before. You pick a **ta
 <p align="center">
   <img src="docs/assets/toolkit-manager-architecture.png" alt="Toolkit Manager architecture" />
 </p>
-
-> See the [Architecture deep-dive](docs/reference/architecture.md) for the full component list, execution flow, and cross-repo layering.
 
 ---
 
