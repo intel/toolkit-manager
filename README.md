@@ -138,9 +138,9 @@ More: [Deploy a Model](docs/getting-started/deploy-models.md) (gated models, the
 
 ---
 
-## Layer 4: Agents
+## Layer 4: Agents or Chatbot
 
-> **Run AI agents safely, or a chatbot that answers from your own documents.** Both install on top of layer 3.
+> **Run AI agents safely, or a chatbot that answers from your own documents.** Either one installs on top of layer 3.
 
 ### Intel® Agent Toolkit
 
