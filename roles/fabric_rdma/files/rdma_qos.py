@@ -20,6 +20,7 @@ import sys
 STATE = "/etc/rack-rdma-qos.json"
 CONFIGFS = "/sys/kernel/config/rdma_cm"
 SYSCTL = "/proc/sys/net/ipv4/conf/%s/arp_%s"
+NET = "/sys/class/net"
 
 
 def run(args):
@@ -32,6 +33,14 @@ def run(args):
         return res.returncode, res.stdout.strip()
     except (OSError, subprocess.SubprocessError) as exc:
         return -1, str(exc)
+
+
+def rdma_dev(nic, cfg):
+    """The NIC's RDMA device as named now: rdma-core renames it (irdma0 to rocep...) after install."""
+    try:
+        return sorted(os.listdir(os.path.join(NET, nic, "device", "infiniband")))[0]
+    except (OSError, IndexError):
+        return cfg["dev"]
 
 
 def apply(nic, cfg):
@@ -49,13 +58,13 @@ def apply(nic, cfg):
         if rc:
             problems.append("%s: DSCP %d to priority %d: %s" % (nic, dscp, prio, out))
     if cfg.get("tos"):
-        dev = os.path.join(CONFIGFS, cfg["dev"])
+        dev = rdma_dev(nic, cfg)
         try:
-            os.makedirs(dev, exist_ok=True)
-            with open(os.path.join(dev, "ports", str(cfg["port"]), "default_roce_tos"), "w") as f:
+            os.makedirs(os.path.join(CONFIGFS, dev), exist_ok=True)
+            with open(os.path.join(CONFIGFS, dev, "ports", str(cfg["port"]), "default_roce_tos"), "w") as f:
                 f.write(str(dscp * 4))
         except OSError as exc:
-            problems.append("%s: RDMA-CM default ToS on %s: %s" % (nic, cfg["dev"], exc))
+            problems.append("%s: RDMA-CM default ToS on %s: %s" % (nic, dev, exc))
     if cfg.get("arp"):
         problems += set_arp(nic, ignore=1, announce=2)
         # Entries learnt from the wrong NIC before this would linger.
@@ -82,7 +91,7 @@ def undo(nic, cfg):
         run(["dcb", "app", "del", "dev", nic, "dscp-prio", "%d:%d" % (cfg["dscp"], cfg["priority"])])
     if cfg.get("tos"):
         try:
-            os.rmdir(os.path.join(CONFIGFS, cfg["dev"]))
+            os.rmdir(os.path.join(CONFIGFS, rdma_dev(nic, cfg)))
         except OSError:
             pass
     if cfg.get("arp"):

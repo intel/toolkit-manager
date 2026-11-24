@@ -168,7 +168,7 @@ def test_bw_pairs_keep_networks_apart_and_skip_unusable_nics():
     rec = record("a", "b")
     rec.update(record("c", "d", mode="shared", network="10.201.0.0/24"))
     rec["e"] = record("e", usable=False)["e"]
-    assert [(p["client"], p["server"]) for p in pairs_of(rec)] == [
+    assert sorted((p["client"], p["server"]) for p in pairs_of(rec)) == [
         ("a", "b"), ("b", "a"), ("c", "d"), ("d", "c")]
     assert pairs_of(record("a")) == []
 
@@ -374,3 +374,21 @@ def test_qos_arp_apply_and_undo(monkeypatch, tmp_path):
     qos.undo("ens28np0", cfg)
     assert ((tmp_path / "ens28np0.arp_ignore").read_text(), (tmp_path / "ens28np0.arp_announce").read_text()) == (
         "0", "0")
+
+
+def test_bw_pairs_never_cross_subnets_on_dual_homed_shared_nics():
+    rec = record("a", "b", mode="shared", network="10.201.0.0/16")
+    for h in rec:
+        rec[h]["ens28f0"] = dict(rec[h]["ens6np0"], network="10.202.0.0/16")
+    assert sorted((p["client_nic"], p["server_nic"]) for p in pairs_of(rec)) == [
+        ("ens28f0", "ens28f0"), ("ens28f0", "ens28f0"), ("ens6np0", "ens6np0"), ("ens6np0", "ens6np0")]
+
+
+def test_qos_follows_a_renamed_rdma_device(monkeypatch, tmp_path):
+    monkeypatch.setattr(qos, "NET", str(tmp_path / "net"))
+    monkeypatch.setattr(qos, "CONFIGFS", str(tmp_path / "rdma_cm"))
+    (tmp_path / "net" / "ens6f0" / "device" / "infiniband" / "rocep42s0f0").mkdir(parents=True)
+    (tmp_path / "rdma_cm" / "rocep42s0f0" / "ports" / "1").mkdir(parents=True)
+    cfg = {"dscp": 26, "priority": 3, "dev": "irdma0", "port": 1, "pfc": False, "dscp_map": False, "tos": True}
+    assert qos.apply("ens6f0", cfg) == []
+    assert (tmp_path / "rdma_cm" / "rocep42s0f0" / "ports" / "1" / "default_roce_tos").read_text() == "104"

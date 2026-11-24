@@ -181,18 +181,17 @@ def rdma_qos_plan(readbacks, expected, settings):
 
 
 def rdma_bw_pairs(record, hosts):
-    """The ib_write_bw runs: a ring over the NICs of each RDMA network.
+    """The ib_write_bw runs: a ring over the NICs of each subnet.
 
-    The NICs of one network are those whose addresses share a subnet; shared NICs are all
-    one network, the fabric. Each NIC sends to the next NIC in the ring that is on another
-    node, so every NIC is tested.
+    Each NIC sends to the next NIC in the ring that is on another node, so every NIC is
+    tested. Within a subnet the traffic leaves by the NIC being tested; across subnets the
+    route could pick another of the node's NICs.
     """
     groups = {}
     for h, host in enumerate(hosts):
         for pos, (nic, rec) in enumerate((record.get(host) or {}).items()):
             if rec.get("usable"):
-                key = "fabric" if rec["mode"] == "shared" else rec.get("network")
-                groups.setdefault(key, []).append(((pos, h), host, nic, rec))
+                groups.setdefault(rec.get("network"), []).append(((pos, h), host, nic, rec))
     pairs = []
     for key in sorted(groups, key=str):
         ring = [m[1:] for m in sorted(groups[key], key=lambda m: m[0])]

@@ -622,6 +622,13 @@ installer never configures switches: give your network team this table.
   install it again.
 - Teardown removes the RDMA netplan file and its addresses but leaves the NIC up
   at its MTU; reboot, or `ip link set <nic> down`.
+- The first PFC and DSCP settings on an Intel E810 reset its link for about 10 s.
+  On a shared NIC that interrupts the fabric (BGP, Ceph, the API) once, at
+  install, add-node and boot.
+- Ubuntu 22.04's in-tree E810 driver (kernel 5.15) may not run RDMA at all
+  (dmesg: "Couldn't create ib_mad QP1"; validate: "ib_write_bw measured
+  nothing"), and keeps the DSCP map after teardown until a reboot. Intel's
+  ice/irdma driver package works.
 
 **Nodes:** `add-node` sets up RDMA on the added node(s) only and checks their
 RDMA NICs; with one added node there is no second node to measure against.
@@ -661,9 +668,9 @@ installer sets it, or the management NIC. Settings that differ from
 `network.rdma` are warnings.
 
 It then runs `ib_write_bw` over RDMA-CM, marked with the RoCE DSCP and pinned to
-each NIC's NUMA node, in a ring over the NICs of each RDMA network (the NICs
-whose addresses share a subnet; shared NICs are one network, the fabric): each
-NIC sends to the next NIC in the ring on another node, so every NIC is tested. Each run is reported against the lower of the
+each NIC's NUMA node, in a ring over the NICs of each subnet: each NIC sends to
+the next NIC in the ring on another node, so every NIC is tested. On Clos that
+is each leaf's subnet: RoCE across the spines is not measured. Each run is reported against the lower of the
 link speed and the PCIe link (a 400G NIC on PCIe Gen4 x16 tops out near
 250 Gb/s); one under half of it is a warning. The NIC counters before and after
 show how the network behaved:
