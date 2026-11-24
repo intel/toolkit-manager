@@ -60,7 +60,7 @@ Cluster-side logs are in Loki, browsable from Grafana.
 |---------|--------------------|
 | The page does not load ("site can't be reached") | The host name does not resolve to the gateway IP. Add every host to `/etc/hosts` (wildcards do not work there): [Access the services](../getting-started/quickstart.md#access-the-services). |
 | The page loads directly on the node but not from your laptop | The browser sends the request to the corporate proxy. Add `<domain>` and `*.<domain>` to its proxy bypass list. |
-| Certificate warning | Self-signed CA. Import `env/<env>/logs/ai-solutions-ca.crt` into the browser or OS. |
+| Certificate warning | Self-signed CA. Copy `env/<env>/logs/toolkit-manager-ca.crt` from the deploy node to your machine and trust it: [Trust the self-signed CA](../configuration/configuration.md#trust-the-self-signed-ca-in-your-browser). |
 | The sign-in redirects to `keycloak.<domain>` and that page does not load | The Keycloak host needs its own `/etc/hosts` entry and proxy bypass, like the service host. |
 | The LiteLLM UI redirects to `http://` and fails | The trailing slash is required: `https://litellm-ui.<domain>/ui/`. |
 

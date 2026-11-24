@@ -197,7 +197,7 @@ The gateway terminates all external HTTPS traffic. There is no plain-HTTP mode.
 
 | `gateway_tls_mode` | What happens |
 |---|---|
-| `selfsigned` (default) | cert-manager creates a private root CA and signs a certificate for `<base_domain_name>` and `*.<base_domain_name>` with it. After install the CA is saved to `env/<name>/logs/ai-solutions-ca.crt`. Import it once (below) to stop browser warnings |
+| `selfsigned` (default) | cert-manager creates a private root CA and signs a certificate for `<base_domain_name>` and `*.<base_domain_name>` with it. After install the CA is saved to `env/<name>/logs/toolkit-manager-ca.crt`. Trust it once to stop browser warnings: [Trust the self-signed CA](#trust-the-self-signed-ca-in-your-browser) |
 | `custom` | You supply the certificate and key |
 
 **Use your own certificate:**
@@ -209,14 +209,35 @@ gateway_tls_key_file:  "/path/to/key.pem"
 # gateway_tls_ca_file: "/path/to/ca.pem"     # optional: the private CA that signed it
 ```
 
-**Import the self-signed CA:**
+### Trust the self-signed CA in your browser
+
+With `gateway_tls_mode: selfsigned` the install writes the CA certificate to
+`env/<name>/logs/toolkit-manager-ca.crt`, in the Toolkit Manager folder on the deploy node. It is
+not in git. Trust it once on every machine that opens the web UIs.
+
+**1. Copy it to the machine that runs the browser** (skip this when the browser runs on the
+deploy node). From that machine, in a terminal (PowerShell on Windows):
+
+```bash
+scp <user>@<deploy-node>:<toolkit-manager-folder>/env/<name>/logs/toolkit-manager-ca.crt .
+```
+
+**2. Trust it:**
 
 | Where | How |
 |---|---|
-| Firefox | Settings → Privacy & Security → Certificates → View Certificates → Authorities → Import |
-| Chrome / Edge | Settings → Privacy → Security → Manage certificates → Authorities → Import |
-| Linux, system-wide | `sudo cp env/<name>/logs/ai-solutions-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates` |
-| macOS | `sudo security add-trusted-cert -d -k /Library/Keychains/System.keychain env/<name>/logs/ai-solutions-ca.crt` |
+| Windows (Chrome, Edge) | Double-click `toolkit-manager-ca.crt` → **Install Certificate** → **Local Machine** → **Place all certificates in the following store** → **Trusted Root Certification Authorities** → **Finish**. Or, in an administrator PowerShell: `certutil -addstore -f Root toolkit-manager-ca.crt` |
+| macOS (Safari, Chrome, Edge) | `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain toolkit-manager-ca.crt` |
+| Linux, system-wide (`curl`, Python, most tools) | `sudo cp toolkit-manager-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates` |
+| Linux (Chrome, Edge) | Settings → **Privacy and security** → **Security** → **Manage certificates** → import it as a trusted authority |
+| Firefox (any OS) | Settings → **Privacy & Security** → **Certificates** → **View Certificates** → **Authorities** → **Import**, and tick **Trust this CA to identify websites** |
+
+**3. Check it:** restart the browser and open `https://grafana.<base_domain_name>` (path mode:
+`https://<base_domain_name>/grafana/`). It loads with no certificate warning.
+
+The CA's private key stays in the cluster, but anyone with admin rights there can issue
+certificates your machine then trusts for any site. Remove the CA (listed as **Toolkit Manager
+Root CA**) when you tear the environment down; a fresh install creates a new one to import.
 
 ---
 
