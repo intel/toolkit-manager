@@ -9,9 +9,9 @@
 # no supports.upgrade) is never written over or deleted, and a teardown never
 # creates one. A layer that declares supports.upgrade has its legacy record
 # replaced by core's on the first write.
-- name: "upgrade_checks | Read the {{ upgrade_record_layer }} record"
+- name: "layer_checks | Read the {{ upgrade_record_layer }} record"
   block:
-    - name: "upgrade_checks | Read the {{ upgrade_record_layer }} record"
+    - name: "layer_checks | Read the {{ upgrade_record_layer }} record"
       kubernetes.core.k8s_info:
         api_version: v1
         kind: ConfigMap
@@ -19,13 +19,13 @@
         namespace: "{{ upgrade_record_namespace }}"
       register: _record_now
   rescue:
-    - name: "upgrade_checks | Fail the {{ upgrade_record_layer }} record read with a recovery hint"
+    - name: "layer_checks | Fail the {{ upgrade_record_layer }} record read with a recovery hint"
       ansible.builtin.fail:
         msg: >-
           Could not read the {{ upgrade_record_layer }} deployment record:
           check the cluster connection and retry. This stops the run outright; --force does not pass it.
 
-- name: "upgrade_checks | Write the {{ upgrade_record_layer }} record"
+- name: "layer_checks | Write the {{ upgrade_record_layer }} record"
   vars:
     _raw: "{{ _record_now.resources[0].data['manifest.yaml'] | from_yaml if _record_now.resources else {} }}"
     _now: "{{ now(utc=true).strftime('%Y-%m-%dT%H:%M:%SZ') }}"
@@ -67,7 +67,7 @@
     - not (_raw | record_owned_by_layer(_layer_supports_upgrade[upgrade_record_layer]))
     - _raw | length > 0 or upgrade_record_status in ['in-progress', 'complete', 'halted', 'deleting']
   block:
-    - name: "upgrade_checks | Delete the {{ upgrade_record_layer }} record"
+    - name: "layer_checks | Delete the {{ upgrade_record_layer }} record"
       kubernetes.core.k8s:
         state: absent
         api_version: v1
@@ -76,7 +76,7 @@
         namespace: "{{ upgrade_record_namespace }}"
       when: upgrade_record_status == 'absent'
 
-    - name: "upgrade_checks | Write the {{ upgrade_record_layer }} record as {{ upgrade_record_status }}"
+    - name: "layer_checks | Write the {{ upgrade_record_layer }} record as {{ upgrade_record_status }}"
       kubernetes.core.k8s:
         state: present
         # Replace, not merge: a legacy record taken over must lose the labels its layer wrote.
@@ -95,7 +95,7 @@
       when: upgrade_record_status != 'absent'
 
 # A lower layer completed earlier in this run is newer than its record read at preflight.
-- name: "upgrade_checks | Note {{ upgrade_record_layer }} as completed in this run"
+- name: "layer_checks | Note {{ upgrade_record_layer }} as completed in this run"
   ansible.builtin.set_fact:
     _layers_completed: >-
       {{ _layers_completed | default({}) | combine({upgrade_record_layer: {'version': _layer_release[upgrade_record_layer] | default(none)}}) }}

@@ -611,7 +611,7 @@ verdict per check to `_upgrade_verdicts` (here `_issues` is a list of problems e
 the file collected):
 
 ```yaml
-- name: "upgrade_checks | mylayer configuration"
+- name: "layer_checks | mylayer configuration"
   ansible.builtin.set_fact:
     _upgrade_verdicts: >-
       {{ _upgrade_verdicts + [{'layer': upgrade_check_layer, 'check': 'configuration',

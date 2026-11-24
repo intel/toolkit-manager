@@ -1,6 +1,6 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-"""Unit tests for filter_plugins/upgrade_checks.py (no cluster)."""
+"""Unit tests for filter_plugins/layer_checks.py (no cluster)."""
 
 import os
 import subprocess
@@ -12,7 +12,7 @@ import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "filter_plugins"))
 
-from upgrade_checks import (  # noqa: E402
+from layer_checks import (  # noqa: E402
     check_layers,
     claim_layer_dirs,
     classify_run,
@@ -88,8 +88,8 @@ def test_installer_layers_never_look_up_a_version_file(tmp_path):
     from jinja2 import Environment
 
     (tmp_path / "version.yaml").write_text("solution_version: 3.1.0\n")
-    task = next(t for t in _task_file("roles/upgrade_checks/tasks/run.yaml")
-                if t["name"] == "upgrade_checks | Classify and check the install")
+    task = next(t for t in _task_file("roles/layer_checks/tasks/run.yaml")
+                if t["name"] == "layer_checks | Classify and check the install")
     resolve = next(t for t in task["block"] if t["name"].endswith("Resolve each planned layer's release version"))
     env = Environment()
     env.filters.update(CoreFilters().filters())
@@ -155,7 +155,7 @@ def test_core_record_not_legacy_and_kept():
 
 def test_record_write_replaces_the_configmap():
     # A merge patch would keep the labels of a legacy record core takes over.
-    tasks = _task_file("roles/upgrade_checks/tasks/record.yaml")
+    tasks = _task_file("roles/layer_checks/tasks/record.yaml")
     block = next(t for t in tasks if t["name"].endswith("Write the {{ upgrade_record_layer }} record"))["block"]
     write = next(t for t in block if t["kubernetes.core.k8s"]["state"] == "present")
     assert write["kubernetes.core.k8s"]["force"] is True
@@ -164,7 +164,7 @@ def test_record_write_replaces_the_configmap():
 
 def test_record_write_runs_for_deleting_with_no_prior_record():
     # A halted teardown of a layer core never recorded must still leave a marker.
-    tasks = _task_file("roles/upgrade_checks/tasks/record.yaml")
+    tasks = _task_file("roles/layer_checks/tasks/record.yaml")
     block_task = next(t for t in tasks if t["name"].endswith("Write the {{ upgrade_record_layer }} record"))
     status_cond = next(c for c in block_task["when"] if "upgrade_record_status in" in c)
     assert "deleting" in status_cond
@@ -181,7 +181,7 @@ def test_halted_write_keeps_the_reason_the_caller_gives(given, component, expect
     from jinja2 import Environment
 
     path = os.path.join(os.path.dirname(__file__), "..", "..", "..",
-                        "roles", "upgrade_checks", "tasks", "record.yaml")
+                        "roles", "layer_checks", "tasks", "record.yaml")
     with open(path) as f:
         tasks = yaml.safe_load(f)
     task_vars = next(t for t in tasks if t["name"].endswith("Write the {{ upgrade_record_layer }} record"))["vars"]
@@ -200,7 +200,7 @@ def test_supports_upgrade_is_coerced_once_for_gate_and_record():
     from ansible.plugins.filter.mathstuff import FilterModule as MathFilters
     from jinja2 import Environment
 
-    tasks = _task_file("roles/upgrade_checks/tasks/run.yaml")
+    tasks = _task_file("roles/layer_checks/tasks/run.yaml")
     task = next(t for t in tasks if t["name"].endswith("Note which layers declare supports.upgrade"))
     env = Environment()
     env.filters.update(CoreFilters().filters(), **MathFilters().filters())
@@ -221,7 +221,7 @@ def test_probe_warning_names_the_refusal_only_with_a_gating_layer_planned(planne
     from ansible.plugins.filter.mathstuff import FilterModule as MathFilters
     from jinja2 import Environment
 
-    task = next(t for t in _task_file("roles/upgrade_checks/tasks/run.yaml")
+    task = next(t for t in _task_file("roles/layer_checks/tasks/run.yaml")
                 if t["name"].endswith("did not answer"))
     env = Environment()
     env.filters.update(CoreFilters().filters(), **MathFilters().filters())
@@ -475,14 +475,14 @@ def test_layer_fully_planned(planned, expected):
 
 def test_installer_commit_computed_once_with_argv():
     # A shell string run once per record write becomes one argv command in run.yaml.
-    run_tasks = _task_file("roles/upgrade_checks/tasks/run.yaml")
+    run_tasks = _task_file("roles/layer_checks/tasks/run.yaml")
     commit_task = next(t for t in run_tasks if t["name"].endswith("Note the installer commit"))
     argv = commit_task["ansible.builtin.command"]["argv"]
     assert argv == ["git", "-C", "{{ role_path }}", "rev-parse", "HEAD"]
     assert commit_task["changed_when"] is False and commit_task["failed_when"] is False
 
-    record_tasks = _task_file("roles/upgrade_checks/tasks/record.yaml")
-    write = next(t for t in record_tasks if t["name"].startswith("upgrade_checks | Write the"))
+    record_tasks = _task_file("roles/layer_checks/tasks/record.yaml")
+    write = next(t for t in record_tasks if t["name"].startswith("layer_checks | Write the"))
     assert "lookup(" not in write["vars"]["_changes"]["in-progress"]["installedBy"]["installerCommit"]
     assert "_installer_commit" in write["vars"]["_changes"]["in-progress"]["installedBy"]["installerCommit"]
 
@@ -519,7 +519,7 @@ def test_cluster_probe_does_not_refuse_with_no_gating_layer_planned():
 def test_cluster_probe_lists_configmaps_not_the_namespace():
     # the probe needs exactly the permission that writing the record needs, and lists
     # rather than gets, so a namespace that does not exist yet still answers.
-    tasks = _task_file("roles/upgrade_checks/tasks/run.yaml")
+    tasks = _task_file("roles/layer_checks/tasks/run.yaml")
     probe = next(t for t in tasks if t["name"].endswith("Check that the cluster answers"))
     assert probe["kubernetes.core.k8s_info"]["kind"] == "ConfigMap"
     assert "name" not in probe["kubernetes.core.k8s_info"]
@@ -531,7 +531,7 @@ def test_cluster_probe_lists_configmaps_not_the_namespace():
 def test_cluster_probe_keeps_the_error_text():
     # The warning and the cluster-probe verdict quote _record_probe.msg; failed_when: false
     # drops msg on ansible-core 2.19, ignore_errors keeps it.
-    tasks = _task_file("roles/upgrade_checks/tasks/run.yaml")
+    tasks = _task_file("roles/layer_checks/tasks/run.yaml")
     probe = next(t for t in tasks if t["name"].endswith("Check that the cluster answers"))
     assert probe.get("ignore_errors") is True
     assert "failed_when" not in probe
@@ -612,7 +612,7 @@ def test_run_layer_rescue_path_stops_the_run_on_a_failing_component(tmp_path):
 def test_record_read_failure_gives_the_recovery_hint_not_the_raw_error():
     # A denied or timed-out read must point at the same recovery as a failed cluster probe,
     # not surface the raw Kubernetes error.
-    tasks = _task_file("roles/upgrade_checks/tasks/record.yaml")
+    tasks = _task_file("roles/layer_checks/tasks/record.yaml")
     read = next(t for t in tasks if t["name"].endswith("Read the {{ upgrade_record_layer }} record"))
     rescue = next(t for t in read["rescue"])
     msg = rescue["ansible.builtin.fail"]["msg"]
@@ -623,8 +623,8 @@ def test_record_read_failure_gives_the_recovery_hint_not_the_raw_error():
 
 
 def test_deployment_records_read_failure_gives_the_recovery_hint_not_the_raw_error():
-    tasks = _task_file("roles/upgrade_checks/tasks/run.yaml")
-    block_task = next(t for t in tasks if t["name"] == "upgrade_checks | Classify and check the install")
+    tasks = _task_file("roles/layer_checks/tasks/run.yaml")
+    block_task = next(t for t in tasks if t["name"] == "layer_checks | Classify and check the install")
     read = next(t for t in block_task["block"] if t["name"].endswith("Read the deployment records"))
     rescue = next(t for t in read["rescue"])
     msg = rescue["ansible.builtin.fail"]["msg"]
@@ -731,7 +731,7 @@ def test_upgrade_path_blocks_a_conflict_whose_recorded_version_does_not_parse(st
 def test_old_upgrade_reports_are_pruned_like_env_log_dir():
     # Same rule as ENV_LOG_DIR's logs (toolkit_manager.sh): keep the most recent, drop the rest.
     path = os.path.join(os.path.dirname(__file__), "..", "..", "..",
-                        "roles", "upgrade_checks", "tasks", "report.yaml")
+                        "roles", "layer_checks", "tasks", "report.yaml")
     with open(path) as f:
         tasks = yaml.safe_load(f)
     listing = next(t for t in tasks if t["name"].endswith("List the {{ upgrade_record_layer }} upgrade reports"))
@@ -743,7 +743,7 @@ def test_old_upgrade_reports_are_pruned_like_env_log_dir():
 
 # Backup freshness
 
-from upgrade_checks import backup_freshness_verdict, fresh_backups  # noqa: E402
+from layer_checks import backup_freshness_verdict, fresh_backups  # noqa: E402
 
 NOW = "2026-10-28T12:00:00Z"
 LABEL = "erag.example/version"
@@ -1096,7 +1096,7 @@ def test_compatibility_judges_every_class():
 # Configuration tracking
 
 DENY = yaml.safe_load(open(os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "roles", "upgrade_checks", "defaults", "main.yaml")))["config_tracking_deny"]
+    os.path.dirname(__file__), "..", "..", "..", "roles", "layer_checks", "defaults", "main.yaml")))["config_tracking_deny"]
 TRACKING = """
 files: [config.erag.yaml, models-rag.yaml]
 rules:
@@ -1296,19 +1296,19 @@ def test_two_layers_setting_one_fact_are_refused():
 def test_config_tracking_judges_the_resume_of_a_failed_upgrade():
     # The save runs only after a successful run, so the resume must set the fired rules' facts again.
     defaults = yaml.safe_load(open(os.path.join(os.path.dirname(__file__), "..", "..", "..", "roles",
-                                                "upgrade_checks", "defaults", "main.yaml")))
+                                                "layer_checks", "defaults", "main.yaml")))
     classes = {"erag": "resume", "inference": "reinstall"}
     assert check_layers(classes, "config_tracking", defaults["upgrade_checks_every_class"],
                         defaults["upgrade_checks_also_classes"]["config_tracking"]) == ["erag"]
 
 
 def test_tracked_configuration_is_kept_in_a_secret():
-    save, delete = _task_file("roles/upgrade_checks/tasks/config_tracking.yaml")
+    save, delete = _task_file("roles/layer_checks/tasks/config_tracking.yaml")
     assert save["kubernetes.core.k8s"]["definition"]["kind"] == "Secret"
     assert save["kubernetes.core.k8s"]["definition"]["data"]["config.yaml"].rstrip().endswith("| b64encode }}")
     assert delete["kubernetes.core.k8s"]["kind"] == "Secret"
     assert "_current" not in save["when"]  # a None var is a string on ansible-core 2.17
-    read, verdict = _task_file("roles/upgrade_checks/tasks/checks/config_tracking.yaml")[:2]
+    read, verdict = _task_file("roles/layer_checks/tasks/checks/config_tracking.yaml")[:2]
     assert read["block"][0]["kubernetes.core.k8s_info"]["kind"] == "Secret"
     assert "data['config.yaml'] | b64decode" in verdict["vars"]["_result"]
     assert save["no_log"] is True and read["block"][0]["no_log"] is True

@@ -4,7 +4,7 @@
 # Included from preflight after the plan is resolved, before anything mutates.
 # Notes whether the cluster holds records; on install, reads them, classifies
 # each planned layer against the version of this release and runs the checks.
-- name: "upgrade_checks | Note the planned layers"
+- name: "layer_checks | Note the planned layers"
   ansible.builtin.set_fact:
     _upgrade_layers: "{{ _active_components | map(attribute='layer') | unique | list }}"
     _installer_version: "{{ lookup('ansible.builtin.file', role_path ~ '/../../VERSION') | trim }}"
@@ -17,14 +17,14 @@
     _layer_check_files: []
     _config_tracking_facts: {}
 
-- name: "upgrade_checks | Note the installer commit"
+- name: "layer_checks | Note the installer commit"
   ansible.builtin.command:
     argv: ["git", "-C", "{{ role_path }}", "rev-parse", "HEAD"]
   register: _installer_commit_cmd
   changed_when: false
   failed_when: false
 
-- name: "upgrade_checks | Note the installer commit as a fact"
+- name: "layer_checks | Note the installer commit as a fact"
   ansible.builtin.set_fact:
     _installer_commit: "{{ _installer_commit_cmd.stdout | default('') if _installer_commit_cmd.rc | default(1) == 0 else '' }}"
 
@@ -33,7 +33,7 @@
 # A list of the deployment-manifest ConfigMaps, not a get of the namespace itself: it needs
 # exactly the permission that writing the record needs, and it returns an empty list rather
 # than an error when the namespace does not exist yet.
-- name: "upgrade_checks | Check that the cluster answers"
+- name: "layer_checks | Check that the cluster answers"
   kubernetes.core.k8s_info:
     api_version: v1
     kind: ConfigMap
@@ -46,12 +46,12 @@
 
 # Coerced once: a templated declaration renders as the string "False", which
 # the gate, the record write and the consistency verdict must all read as false.
-- name: "upgrade_checks | Note which layers declare supports.upgrade"
+- name: "layer_checks | Note which layers declare supports.upgrade"
   ansible.builtin.set_fact:
     _layer_supports_upgrade: >-
       {{ dict(layers | map(attribute='name') | zip(layers | map(attribute='supports.upgrade', default=false) | map('bool'))) }}
 
-- name: "upgrade_checks | Warn that the cluster of an existing kubeconfig did not answer"
+- name: "layer_checks | Warn that the cluster of an existing kubeconfig did not answer"
   ansible.builtin.debug:
     msg: >-
       WARNING: the kubeconfig {{ kubernetes_kubeconfig }} exists, but the cluster did not answer
@@ -65,16 +65,16 @@
     - _record_probe.resources is not defined
     - kubernetes_kubeconfig | default('') is file
 
-- name: "upgrade_checks | Note whether records are read and written"
+- name: "layer_checks | Note whether records are read and written"
   ansible.builtin.set_fact:
     _record_cluster: "{{ _record_probe.resources is defined }}"
 
-- name: "upgrade_checks | Classify and check the install"
+- name: "layer_checks | Classify and check the install"
   when: component_action == 'install'
   block:
     # A verdict per planned layer, the same shape a check produces: the gate below already
     # refuses it for a layer that declares supports.upgrade, and --force already bypasses it.
-    - name: "upgrade_checks | Note that the cluster probe failed"
+    - name: "layer_checks | Note that the cluster probe failed"
       ansible.builtin.set_fact:
         _upgrade_verdicts: >-
           {{ _upgrade_verdicts + [item | cluster_probe_verdict(_record_probe.msg | default('no error text'))] }}
@@ -85,9 +85,9 @@
         - not _record_cluster
         - kubernetes_kubeconfig | default('') is file
 
-    - name: "upgrade_checks | Read the deployment records"
+    - name: "layer_checks | Read the deployment records"
       block:
-        - name: "upgrade_checks | Read the deployment records"
+        - name: "layer_checks | Read the deployment records"
           kubernetes.core.k8s_info:
             api_version: v1
             kind: ConfigMap
@@ -96,14 +96,14 @@
           loop: "{{ layers | map(attribute='name') | list }}"
           register: _record_reads
       rescue:
-        - name: "upgrade_checks | Fail the deployment record read with a recovery hint"
+        - name: "layer_checks | Fail the deployment record read with a recovery hint"
           ansible.builtin.fail:
             msg: >-
               Could not read a deployment record: check the cluster connection and retry.
               This stops the run outright; --force does not pass it.
       when: _record_cluster
 
-    - name: "upgrade_checks | Lift the deployment records"
+    - name: "layer_checks | Lift the deployment records"
       ansible.builtin.set_fact:
         _layer_records: >-
           {{ _layer_records | combine({item.item: item.resources[0].data['manifest.yaml'] | from_yaml | lift_layer_record}) }}
@@ -111,7 +111,7 @@
       loop_control:
         label: "{{ item.item }}"
 
-    - name: "upgrade_checks | Resolve each planned layer's release version"
+    - name: "layer_checks | Resolve each planned layer's release version"
       ansible.builtin.set_fact:
         _layer_release: "{{ _layer_release | combine({item: _release}) }}"
         _layer_version_data: "{{ _layer_version_data | combine({item: _version_data}) }}"
@@ -127,7 +127,7 @@
              else _version_data | layer_release_version }}
       loop: "{{ _upgrade_layers }}"
 
-    - name: "upgrade_checks | Run the checks"
+    - name: "layer_checks | Run the checks"
       ansible.builtin.include_tasks: "checks/{{ check }}.yaml"
       vars:
         _check_layers: "{{ _layer_class | check_layers(check, upgrade_checks_every_class, upgrade_checks_also_classes.get(check, [])) }}"
@@ -136,7 +136,7 @@
         loop_var: check
 
     # The contract for these files is in docs/reference/adding-solutions.md (Upgrades).
-    - name: "upgrade_checks | Find each layer's own pre-run checks"
+    - name: "layer_checks | Find each layer's own pre-run checks"
       ansible.builtin.set_fact:
         _layer_check_files: >-
           {{ _layer_check_files +
@@ -148,7 +148,7 @@
         label: "{{ item }}"
       when: (_layer_dirs[item] | default('')) | length > 0
 
-    - name: "upgrade_checks | Run each layer's own pre-run checks"
+    - name: "layer_checks | Run each layer's own pre-run checks"
       ansible.builtin.include_tasks: run_layer_check.yaml
       vars:
         upgrade_check_layer: "{{ _layer_check[0] }}"
@@ -160,19 +160,19 @@
 
     # On every class, so a broken file fails before anything changes, not at the save after the run;
     # config_tracking_capture raises on a broken file and otherwise returns a mapping or None.
-    - name: "upgrade_checks | Validate each layer's config_tracking.yaml and tracked files"
+    - name: "layer_checks | Validate each layer's config_tracking.yaml and tracked files"
       ansible.builtin.assert:
         that: (_layer_dirs[item] | config_tracking_capture(env_dir, config_tracking_deny) | default({}, true)) is mapping
         quiet: true
       loop: "{{ _upgrade_layers }}"
       when: (_layer_dirs[item] | default('')) | length > 0
 
-    - name: "upgrade_checks | Decide which verdicts gate the run"
+    - name: "layer_checks | Decide which verdicts gate the run"
       ansible.builtin.set_fact:
         _upgrade_gate: >-
           {{ _upgrade_verdicts | upgrade_gate(_layer_supports_upgrade, _upgrade_force | default(false) | bool, _layer_class) }}
 
-    - name: "upgrade_checks | Show the run class and the checks"
+    - name: "layer_checks | Show the run class and the checks"
       ansible.builtin.debug:
         msg: |-
           {% for layer in _upgrade_layers %}
@@ -182,7 +182,7 @@
           {% endfor %}
           {% endfor %}
 
-    - name: "upgrade_checks | Refuse a run a gating check blocks"
+    - name: "layer_checks | Refuse a run a gating check blocks"
       ansible.builtin.fail:
         msg: |-
           Upgrade checks refuse this install; nothing was changed.
