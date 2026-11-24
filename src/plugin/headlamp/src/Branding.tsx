@@ -3,7 +3,7 @@
 
 import { Typography } from '@mui/material';
 
-export const BRAND = 'Toolkit Manager';
+export const BRAND = 'Toolkit Manager Cluster Dashboard';
 
 // Top-bar logo: the product name instead of Headlamp's mark.
 export function BrandLogo(props: { logoType?: 'small' | 'large' }) {

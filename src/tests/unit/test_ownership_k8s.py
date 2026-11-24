@@ -17,7 +17,7 @@ _spec = importlib.util.spec_from_file_location("ownership_k8s", _MODULE)
 own = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(own)
 
-PREFIX = "ai-solutions.intel.com"
+PREFIX = "toolkit-manager.intel.com"
 COMPONENT = f"{PREFIX}/component"
 
 
@@ -152,6 +152,7 @@ class Module:
 def params(tmp_path, component="app", **extra):
     return dict({"state_file": str(tmp_path / "ownership-uids.json"), "env": "local", "layer": "platform",
                  "component": component, "declared": {}, "skip_resources": [], "label_prefix": PREFIX,
+                 "legacy_label_prefixes": ["ai-solutions.intel.com"],
                  "restore_resources": ["namespaces", "nodes"], "timeout": 1, "component_failed": False,
                  "teardown": False, "predates_labels": False}, **extra)
 
@@ -263,6 +264,96 @@ def test_u4_teardown_leaves_pvcs_and_takes_the_certificate_secret(tmp_path):
     assert not api.exists(cert_secret)
     assert all(api.exists(u) for u in pvcs + [unrelated])
     assert sorted(result["deleted"]) == ["Certificate shared/tls", "Secret shared/tls-secret", "StatefulSet shared/db"]
+
+
+def test_teardown_matches_the_legacy_prefix(tmp_path):
+    api, p = FakeApi(), params(tmp_path)
+    old = api.add("Secret", "old", "shared", labels={"ai-solutions.intel.com/env": "local",
+                                                     "ai-solutions.intel.com/component": "app"})
+    new = api.add("Secret", "new", "shared", labels={f"{PREFIX}/env": "local", COMPONENT: "app"})
+
+    result = own.delete(api, p, Module())
+
+    assert result["left"] == []
+    assert not api.exists(old) and not api.exists(new)
+
+
+LEGACY = "ai-solutions.intel.com"
+LEGACY_MINE = {f"{LEGACY}/env": "local", f"{LEGACY}/component": "app"}
+
+
+def test_mixed_prefixes_delete_in_one_phase_order(tmp_path):
+    api, p = FakeApi(), params(tmp_path)
+    api.add("Namespace", "app", labels={f"{PREFIX}/env": "local", COMPONENT: "app"})
+    api.add("Secret", "old", "shared", labels=LEGACY_MINE)
+
+    own.delete(api, p, Module())
+
+    deletes = [path for method, path in api.calls if method == "DELETE"]
+    assert deletes == ["/api/v1/namespaces/shared/secrets/old", "/api/v1/namespaces/app"]
+
+
+def test_mixed_prefixes_stop_on_a_legacy_object_left(tmp_path, monkeypatch):
+    api, p = FakeApi(), params(tmp_path)
+    ns = api.add("Namespace", "app", labels={f"{PREFIX}/env": "local", COMPONENT: "app"})
+    api.add("Certificate", "stuck", "shared", labels=LEGACY_MINE, spec={})
+    monkeypatch.setattr(own, "_exists", lambda api, res, meta: meta["name"] == "stuck")
+
+    result = own.delete(api, p, Module())
+
+    assert result["left"] == ["Certificate shared/stuck"] and result["phase"] == "custom"
+    assert api.exists(ns)
+
+
+def test_legacy_labels_before_are_restored(tmp_path):
+    api, p = FakeApi(), params(tmp_path)
+    key = f"{LEGACY}/labels-before.local.app"
+    ns = api.add("Namespace", "customer", labels={"team": "a", "istio.io/dataplane-mode": "ambient"},
+                 annotations={key: json.dumps({"istio.io/dataplane-mode": [None, "ambient"]})})
+
+    result = own.delete(api, p, Module())
+
+    assert api.labels(ns) == {"team": "a"}
+    assert key not in api.get(ns)["metadata"]["annotations"]
+    assert result["restored"] == ["Namespace customer: istio.io/dataplane-mode"]
+
+
+def test_rerun_keeps_legacy_ownership(tmp_path):
+    # A legacy-labelled Namespace a rerun reports is ours: no new labels, no labels-before record.
+    api, p = FakeApi(), params(tmp_path, restore_resources=["namespaces"])
+    ns = api.add("Namespace", "app", labels=dict(LEGACY_MINE, team="a"))
+    own.snapshot(api, p, Module())
+    api.labels(ns)["istio.io/dataplane-mode"] = "ambient"
+    record(p, type="object", uid=ns, kind="Namespace", name="app", method="update")
+
+    result = own.label(api, p, Module())
+
+    assert result["labelled"] == [] and result["recorded"] == []
+    assert COMPONENT not in api.labels(ns)
+
+
+def test_upgrade_of_a_legacy_labelled_release_stays_ours(tmp_path):
+    api, p = FakeApi(), params(tmp_path)
+    v1 = helm_secret(api, "app", "app", 1)
+    api.labels(v1).update(LEGACY_MINE)
+    own.snapshot(api, p, Module())
+
+    v2 = helm_secret(api, "app", "app", 2)
+    record(p, type="release", name="app", namespace="app")
+    own.label(api, p, Module())
+
+    assert api.labels(v2)[COMPONENT] == "app"
+
+
+def test_certificate_secret_another_component_labelled_is_kept(tmp_path):
+    api, p = FakeApi(), params(tmp_path)
+    api.add("Certificate", "tls", "shared", labels=LEGACY_MINE, spec={"secretName": "tls-secret"})
+    theirs = api.add("Secret", "tls-secret", "shared", labels={f"{PREFIX}/env": "local", COMPONENT: "other"},
+                     annotations={"cert-manager.io/certificate-name": "tls"})
+
+    own.delete(api, p, Module())
+
+    assert api.exists(theirs)
 
 
 def test_failed_component_carries_unclaimed_objects(tmp_path):

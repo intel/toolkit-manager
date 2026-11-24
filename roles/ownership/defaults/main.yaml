@@ -11,7 +11,10 @@ ownership_enabled: true
 
 # Label keys: <prefix>/env, <prefix>/layer, <prefix>/component. Teardown matches on
 # env + component, so two envs on one cluster never remove each other's objects.
-ownership_label_prefix: "ai-solutions.intel.com"
+ownership_label_prefix: "toolkit-manager.intel.com"
+# Earlier prefixes teardown still matches, so envs labelled before the rename tear down.
+ownership_legacy_label_prefixes:
+  - "ai-solutions.intel.com"
 
 # UIDs of the objects already on the cluster, rewritten after every component, and
 # the component that runs now (cleared once it is labelled).
