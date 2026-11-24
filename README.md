@@ -42,7 +42,7 @@ The stack is built in **layers**, each on top of the one before. You pick a **ta
   <img src="docs/assets/toolkit-manager-architecture.png" alt="Toolkit Manager architecture" />
 </p>
 
-Every component, the request flow, and how the repositories fit: [Architecture](docs/reference/architecture.md).
+> See the [Architecture deep-dive](docs/reference/architecture.md) for the full component list, execution flow, and cross-repo layering.
 
 ---
 
