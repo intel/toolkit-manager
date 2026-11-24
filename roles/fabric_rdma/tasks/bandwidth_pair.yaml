@@ -6,11 +6,13 @@
 # fabric_rdma — One ib_write_bw run: _pair.client -> _pair.server
 # =============================================================================
 # The server takes one connection and exits. The client retries while the
-# server starts: RDMA-CM has no TCP port to wait for.
+# server starts: RDMA-CM has no TCP port to wait for. With _pair.server_netns and
+# client_netns (the pod check) each end runs in a pod's network namespace.
 
 - name: "fabric_rdma | Bandwidth | Start the server on {{ _pair.server }}"
   ansible.builtin.command:
     cmd: >-
+      {{ ('nsenter --net=' ~ _pair.server_netns) if _pair.server_netns is defined else '' }}
       {{ ('taskset -c ' ~ _pair.server_cpus) if _pair.server_cpus else '' }}
       timeout {{ rack_scale_rdma_bw_seconds | int + 60 }} {{ _rdma_bw_cmd }} -d {{ _pair.server_dev }}
   delegate_to: "{{ _pair.server }}"
@@ -23,6 +25,7 @@
 - name: "fabric_rdma | Bandwidth | Run the client on {{ _pair.client }}"
   ansible.builtin.command:
     cmd: >-
+      {{ ('nsenter --net=' ~ _pair.client_netns) if _pair.client_netns is defined else '' }}
       {{ ('taskset -c ' ~ _pair.client_cpus) if _pair.client_cpus else '' }}
       timeout {{ rack_scale_rdma_bw_seconds | int + 30 }} {{ _rdma_bw_cmd }} -d {{ _pair.client_dev }} {{ _pair.server_ip }}
   delegate_to: "{{ _pair.client }}"

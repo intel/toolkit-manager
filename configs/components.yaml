@@ -83,6 +83,7 @@ components:
 
   # RoCE v2 on the nodes that list rdma_nics in rack-profile.yaml, with any
   # topology; a no-op when none does. After kubernetes: it labels the RDMA nodes.
+  # With network.rdma.pod_range also the pod networks on the dedicated RDMA NICs.
   - name: fabric_rdma
     layer: infrastructure
     teardown: role
@@ -147,6 +148,13 @@ components:
     layer: platform
     enabled: "{{ intel_gpu_plugin_enabled | default(true) | bool and cluster_distribution | default('kubernetes') != 'openshift' }}"
     depends_on: [node_feature_discovery]
+
+  # The cluster's one RDMA device plugin, on the nodes fabric_rdma labelled rdma-nics;
+  # a no-op when no node lists rdma_nics.
+  - name: rdma_device_plugin
+    layer: platform
+    enabled: "{{ rack_scale_enabled | default(false) | bool }}"
+    depends_on: []
 
   - name: cert_manager
     layer: platform

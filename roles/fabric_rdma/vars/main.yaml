@@ -29,3 +29,29 @@ rack_scale_rdma_qos_state: /etc/rack-rdma-qos.json
 rack_scale_rdma_qos_unit: rack-rdma-qos.service
 rack_scale_rdma_qos_unit_file: "/etc/systemd/system/{{ rack_scale_rdma_qos_unit }}"
 rack_scale_rdma_netplan_dest: /etc/netplan/99-rdma.yaml
+
+# Pods on the dedicated RDMA networks (network.rdma.pod_range). Multus and
+# whereabouts run in this namespace (fixed in the files/ manifests) with one
+# NetworkAttachmentDefinition rdma-net<i> per network. Each node has a CNI config
+# per network in the directory Multus reads for a NetworkAttachmentDefinition
+# with an empty spec.
+rack_scale_rdma_namespace: rdma-network
+rack_scale_rdma_cni_dir: /etc/cni/multus/net.d
+rack_scale_rdma_manifests:
+  - "multus-thin-{{ rack_scale_rdma_multus_version }}.yaml"
+  - "whereabouts-{{ rack_scale_rdma_whereabouts_version }}.yaml"
+rack_scale_rdma_pod_docs: "{{ query('ansible.builtin.file', *rack_scale_rdma_manifests) | map('from_yaml_all') | flatten(levels=1) | select | list }}"
+rack_scale_rdma_images:
+  kube-multus-ds: "{{ rack_scale_rdma_multus_image }}"
+  whereabouts: "{{ rack_scale_rdma_whereabouts_image }}"
+# What Multus and whereabouts write on the nodes, and the CNI configs: teardown
+# removes them, or the nodes' first CNI config would still call Multus.
+rack_scale_rdma_cni_host_files:
+  - /etc/cni/net.d/00-multus.conf
+  - /etc/cni/net.d/multus.d
+  - /etc/cni/net.d/whereabouts.d
+  - /etc/cni/multus
+  - /opt/cni/bin/multus
+  - /opt/cni/bin/passthru
+  - /opt/cni/bin/whereabouts
+rack_scale_rdma_ready_retries: 30

@@ -1,0 +1,15 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# The cluster's one RDMA device plugin (Mellanox/NVIDIA k8s-rdma-shared-dev-plugin; it
+# works with any RDMA NIC: Broadcom bnxt_re, Intel irdma, NVIDIA mlx5). It advertises
+# rdma/hca (every RDMA NIC of the node) and rdma/net<i> (its i-th dedicated RDMA NIC) on
+# the nodes that fabric_rdma labels rdma-nics. The NIC names come from rack-profile.yaml
+# through the inventory; nothing runs on the nodes over SSH.
+
+rdma_device_plugin_version: "network-operator-v26.10.0"
+rdma_device_plugin_manifest: "k8s-rdma-shared-dev-plugin-{{ rdma_device_plugin_version }}.yaml"
+# The amd64 digest of the tag above; replace both together when bumping the version.
+rdma_device_plugin_image_digest: "sha256:75cbcfeb6a0e2c1efa53a74bad1e4fcd673e12a5bdeeb584a9079f6055c76f08"
+rdma_device_plugin_image: "nvcr.io/nvidia/mellanox/k8s-rdma-shared-dev-plugin:{{ rdma_device_plugin_version }}@{{ rdma_device_plugin_image_digest }}"

@@ -1,0 +1,14 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# The namespace, DaemonSet and ConfigMap names are fixed in the vendored manifest.
+
+rdma_device_plugin_namespace: rdma-device-plugin
+# fabric_rdma's rack_scale_rdma_label: the nodes whose RDMA NICs it set up and checked.
+rdma_device_plugin_node_label: rdma-nics
+# Pods per node that can share each RDMA resource, and how often (seconds) the plugin
+# looks for the NICs' RDMA devices again.
+rdma_device_plugin_hca_max: 64
+rdma_device_plugin_interval: 300
+rdma_device_plugin_ready_retries: 30

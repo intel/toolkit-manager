@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # =============================================================================
-# fabric_rdma — The RDMA nodes this run covers (install and validate)
+# fabric_rdma — The RDMA nodes this run covers, and the pod networks (install and validate)
 # =============================================================================
 # _fabric_scope_nodes: add-node and remove-node set up or take down the
 # added or removed node(s) only.
@@ -16,3 +16,12 @@
 - name: "fabric_rdma | Skip — no node lists rdma_nics"
   ansible.builtin.meta: end_role
   when: _rdma_hosts | length == 0
+
+# The whole rack's, also on add-node: network i is each node's i-th dedicated RDMA NIC.
+- name: "fabric_rdma | Pod networks on the dedicated RDMA NICs"
+  ansible.builtin.set_fact:
+    _rdma_networks: >-
+      {{ dict(_all | zip(_all | map('extract', hostvars, 'node_rdma_nics'))) | rdma_networks
+         if rack_scale_rdma_pod_range | default('') | length > 0 else [] }}
+  vars:
+    _all: "{{ groups['rdma_nodes'] | default([]) }}"

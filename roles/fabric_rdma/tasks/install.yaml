@@ -6,7 +6,8 @@
 # fabric_rdma — Install
 # =============================================================================
 # Kernel modules stay loaded on teardown; only the file that loads them at
-# boot goes.
+# boot goes. With network.rdma.pod_range, the pod networks on the dedicated
+# RDMA NICs come last (pod_networks.yaml).
 
 - name: "fabric_rdma | install | RDMA nodes"
   ansible.builtin.import_tasks: scope.yaml
@@ -100,3 +101,15 @@
   loop_control:
     label: "{{ item.key }}"
   changed_when: true
+
+# After the label: Multus and whereabouts follow it.
+- name: "fabric_rdma | install | Pod networks on the dedicated RDMA NICs"
+  ansible.builtin.include_tasks: pod_networks.yaml
+  when: _rdma_networks | length > 0
+
+# add-node: the new node may not be Ready yet; validate fabric_rdma checks the rack.
+- name: "fabric_rdma | install | RDMA between pods"
+  ansible.builtin.include_tasks: pod_check.yaml
+  when:
+    - _rdma_networks | length > 0
+    - _fabric_scope_nodes is not defined

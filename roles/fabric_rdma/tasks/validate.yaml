@@ -18,3 +18,11 @@
 
 - name: "fabric_rdma | validate | Report"
   ansible.builtin.import_tasks: report.yaml
+
+# install runs it itself, once the pod networks are set up.
+- name: "fabric_rdma | validate | RDMA between pods"
+  ansible.builtin.include_tasks: pod_check.yaml
+  when:
+    - component_action == 'validate'
+    - _rdma_networks | length > 0
+    - _fabric_scope_nodes is not defined

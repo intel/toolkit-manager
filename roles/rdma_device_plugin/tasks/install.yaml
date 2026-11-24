@@ -1,0 +1,89 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# A no-op unless a node lists rdma_nics in rack-profile.yaml. The DaemonSet follows
+# fabric_rdma's rdma-nics label, so add-node needs no step here. One config for the
+# whole rack: the plugin selects NICs by name.
+
+- name: "rdma_device_plugin | Install"
+  environment:
+    KUBECONFIG: "{{ kubernetes_kubeconfig }}"
+  block:
+    - name: "rdma_device_plugin | RDMA nodes"
+      ansible.builtin.import_tasks: nodes.yaml
+
+    - name: "rdma_device_plugin | Skip — no node lists rdma_nics"
+      ansible.builtin.debug:
+        msg: "No node lists rdma_nics in rack-profile.yaml — RDMA device plugin not needed."
+      when: _rdma_dp_nics | length == 0
+
+    - name: "rdma_device_plugin | Install on the RDMA nodes"
+      when: _rdma_dp_nics | length > 0
+      block:
+        - name: "rdma_device_plugin | Warn — no node labelled yet"
+          ansible.builtin.debug:
+            msg: >-
+              WARNING: no node carries the {{ rdma_device_plugin_node_label }} label yet, so the plugin runs
+              nowhere. Install fabric_rdma (infrastructure layer): it sets up and labels the RDMA nodes.
+          when: _rdma_dp_labelled | length == 0
+
+        # Two plugins on one node fight over the kubelet's device-plugin socket and the
+        # resource names (a copy another branch ships, the NVIDIA Network Operator).
+        - name: "rdma_device_plugin | Look for a plugin installed elsewhere"
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: DaemonSet
+            field_selectors:
+              - metadata.name=rdma-shared-dp-ds
+          register: _rdma_dp_existing
+
+        - name: "rdma_device_plugin | Stop on a plugin from another install"
+          ansible.builtin.fail:
+            msg: >-
+              An RDMA shared device plugin DaemonSet already runs in
+              {{ _rdma_dp_elsewhere | map(attribute='metadata.namespace') | unique | join(', ') }}. Two plugins on
+              one node fight over the kubelet's device-plugin socket and the rdma/* resources. Delete it, then
+              re-run: install rdma_device_plugin
+          vars:
+            _rdma_dp_elsewhere: "{{ _rdma_dp_existing.resources | rejectattr('metadata.namespace', 'equalto', rdma_device_plugin_namespace) | list }}"
+          when: _rdma_dp_elsewhere | length > 0
+
+        - name: "rdma_device_plugin | Load the vendored manifests"
+          ansible.builtin.set_fact:
+            _rdma_dp_docs: "{{ lookup('ansible.builtin.file', rdma_device_plugin_manifest) | from_yaml_all | select | list }}"
+            _rdma_dp_config: >-
+              {{ _rdma_dp_nics | rdma_device_plugin_config(rdma_device_plugin_hca_max, rdma_device_plugin_interval) | to_nice_json(indent=2) }}
+
+        - name: "rdma_device_plugin | Render the manifests"
+          ansible.builtin.set_fact:
+            _rdma_dp_rendered: >-
+              {{ _rdma_dp_docs | rejectattr('kind', 'equalto', 'DaemonSet') | list + [_rdma_dp_configmap, _rdma_dp_ds] }}
+          vars:
+            _rdma_dp_configmap:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata: {name: rdma-devices, namespace: "{{ rdma_device_plugin_namespace }}"}
+              data: {config.json: "{{ _rdma_dp_config }}"}
+            _rdma_dp_ds: >-
+              {{ _rdma_dp_docs | selectattr('kind', 'equalto', 'DaemonSet') | first
+                 | rdma_daemonset(rdma_device_plugin_image, rdma_device_plugin_node_label)
+                 | combine({'spec': {'template': {'metadata': {'annotations': {
+                     'rdma-device-plugin/config-sha1': _rdma_dp_config | hash('sha1')}}}}}, recursive=true) }}
+
+        - name: "rdma_device_plugin | Apply the manifests"
+          kubernetes.core.k8s:
+            state: present
+            definition: "{{ item }}"
+          loop: "{{ _rdma_dp_rendered }}"
+          loop_control:
+            label: "{{ item.kind }}/{{ item.metadata.name }}"
+
+        - name: "rdma_device_plugin | Wait for the plugin and the RDMA resources"
+          ansible.builtin.include_tasks: check.yaml
+
+        - name: "rdma_device_plugin | ━━━ DONE ━━━"
+          ansible.builtin.debug:
+            msg: >-
+              RDMA device plugin {{ rdma_device_plugin_version }} in the {{ rdma_device_plugin_namespace }} namespace:
+              {% for node in _rdma_dp_labelled %}{{ node }} {{ _rdma_dp_nics.get(node, []) | rdma_node_resources }}{{ '; ' if not loop.last }}{% endfor %}

@@ -1,0 +1,148 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — RDMA between two pods on each pod network (install and validate)
+# =============================================================================
+# Two busybox pods per network, on its first two nodes, each with a net1 on it.
+# ib_write_bw runs on the hosts inside the pods' network namespaces (nsenter):
+# RDMA devices are shared across network namespaces and net1's address has its
+# own RoCE v2 GID, so the check needs no RDMA image and no device plugin.
+
+- name: "fabric_rdma | pods | Pairs to measure"
+  ansible.builtin.set_fact:
+    _rdma_pod_pairs: "{{ _rdma_networks | rdma_pod_pairs(_rdma_eval.record) }}"
+    _rdma_bw: []
+
+- name: "fabric_rdma | pods | RDMA between pods"
+  when: _rdma_pod_pairs | length > 0
+  block:
+    - name: "fabric_rdma | pods | Start the check pods"
+      kubernetes.core.k8s:
+        state: present
+        kubeconfig: "{{ kubernetes_kubeconfig }}"
+        wait: true
+        wait_condition: {type: Ready, status: "True"}
+        wait_timeout: 180
+        definition:
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: "rdma-check-{{ item.0.network }}-{{ item.1 }}"
+            namespace: "{{ rack_scale_rdma_namespace }}"
+            annotations:
+              k8s.v1.cni.cncf.io/networks: "{{ rack_scale_rdma_namespace }}/{{ item.0.network }}"
+          spec:
+            nodeName: "{{ item.0[item.1] }}"
+            automountServiceAccountToken: false
+            terminationGracePeriodSeconds: 0
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 65534
+              seccompProfile: {type: RuntimeDefault}
+            containers:
+              - name: check
+                image: "{{ rack_scale_rdma_check_image }}"
+                command: ["sleep", "3600"]
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities: {drop: [ALL]}
+      loop: "{{ _rdma_pod_pairs | product(['server', 'client']) | list }}"
+      loop_control:
+        label: "{{ item.0.network }} {{ item.1 }} on {{ item.0[item.1] }}"
+      register: _rdma_check_pods
+
+    # Multus records the pod's interfaces in its network-status annotation.
+    - name: "fabric_rdma | pods | Address of each pod on its RDMA network"
+      ansible.builtin.set_fact:
+        _rdma_check_ips: >-
+          {%- set out = {} -%}
+          {%- for r in _rdma_check_pods.results -%}
+          {%- set status = r.result.metadata.annotations['k8s.v1.cni.cncf.io/network-status'] | default('[]') | from_json -%}
+          {%- set net1 = status | selectattr('interface', 'defined') | selectattr('interface', 'equalto', 'net1') | list -%}
+          {%- set _ = out.update({r.result.metadata.name: (net1[0].ips | default([]) | first | default('')) if net1 else ''}) -%}
+          {%- endfor -%}
+          {{ out }}
+
+    - name: "fabric_rdma | pods | Fail if a pod has no address on its RDMA network"
+      ansible.builtin.fail:
+        msg: >-
+          {{ _rdma_check_ips | dict2items | rejectattr('value') | map(attribute='key') | join(', ') }} got no net1:
+          Multus or whereabouts did not attach the RDMA network. Check
+          kubectl describe pod -n {{ rack_scale_rdma_namespace }} and the kube-multus-ds and whereabouts logs.
+      when: _rdma_check_ips | dict2items | rejectattr('value') | list | length > 0
+
+    - name: "fabric_rdma | pods | Network namespace of each pod"
+      ansible.builtin.shell: |
+        for ns in /run/netns/*; do
+          addrs=$(nsenter --net="$ns" ip -4 -o addr show dev net1 2>/dev/null) || continue
+          if [[ "$addrs" == *" {{ _rdma_check_ips[item.result.metadata.name] }}/"* ]]; then
+            echo "$ns"; exit 0
+          fi
+        done
+        exit 1
+      args:
+        executable: /bin/bash
+      delegate_to: "{{ item.result.spec.nodeName }}"
+      become: true
+      loop: "{{ _rdma_check_pods.results }}"
+      loop_control:
+        label: "{{ item.result.metadata.name }}"
+      register: _rdma_check_netns
+      changed_when: false
+
+    - name: "fabric_rdma | pods | ib_write_bw between the pods"
+      ansible.builtin.include_tasks: bandwidth_pair.yaml
+      loop: >-
+        {%- set ns = dict(_rdma_check_netns.results | map(attribute='item.result.metadata.name')
+                          | zip(_rdma_check_netns.results | map(attribute='stdout'))) -%}
+        {%- set out = [] -%}
+        {%- for p in _rdma_pod_pairs -%}
+        {%- set pod = 'rdma-check-' ~ p.network ~ '-' -%}
+        {%- set _ = out.append(p | combine({'server_ip': _rdma_check_ips[pod ~ 'server'],
+              'server_netns': ns[pod ~ 'server'], 'client_netns': ns[pod ~ 'client']})) -%}
+        {%- endfor -%}
+        {{ out }}
+      loop_control:
+        loop_var: _pair
+        label: "{{ _pair.network }}: {{ _pair.client }} -> {{ _pair.server }}"
+
+  always:
+    - name: "fabric_rdma | pods | Delete the check pods"
+      kubernetes.core.k8s:
+        state: absent
+        kubeconfig: "{{ kubernetes_kubeconfig }}"
+        api_version: v1
+        kind: Pod
+        namespace: "{{ rack_scale_rdma_namespace }}"
+        name: "rdma-check-{{ item.0.network }}-{{ item.1 }}"
+        wait: true
+      loop: "{{ _rdma_pod_pairs | product(['server', 'client']) | list }}"
+      loop_control:
+        label: "rdma-check-{{ item.0.network }}-{{ item.1 }}"
+
+- name: "fabric_rdma | pods | Report"
+  ansible.builtin.set_fact:
+    _rdma_pod_report: "{{ _rdma_bw | rdma_bw_report({}, rack_scale_rdma_bw_low | float) }}"
+
+- name: "fabric_rdma | pods | Bandwidth between pods"
+  ansible.builtin.debug:
+    msg: >-
+      {{ ((_rdma_pod_report.lines if _rdma_pod_pairs else [])
+          + (['not measured, each needs a working NIC on two nodes: ' ~ _unmeasured | join(', ')] if _unmeasured else []))
+         | join(' | ') }}
+  vars:
+    _unmeasured: "{{ _rdma_networks | map(attribute='name') | difference(_rdma_pod_pairs | map(attribute='network')) | sort }}"
+
+- name: "fabric_rdma | pods | Warnings"
+  ansible.builtin.debug:
+    msg: "WARNING: {{ item }}"
+  loop: "{{ _rdma_pod_report.warnings }}"
+  loop_control:
+    label: "{{ item | truncate(60) }}"
+
+- name: "fabric_rdma | pods | Fail if RDMA does not work between pods"
+  ansible.builtin.fail:
+    msg: "RDMA does not work between pods: {{ _rdma_pod_report.errors | join('; ') }}"
+  when: _rdma_pod_report.errors | length > 0

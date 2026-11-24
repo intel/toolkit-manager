@@ -560,6 +560,7 @@ network:
     pfc: true                  # PFC on that priority only
     ecn: true                  # warn when the NIC's ECN is off (read on ConnectX only)
     subnet: 192.168.40.0/24    # no default: needed only when an rdma_nics entry has rdma_ip
+    pod_range: 192.168.40.128/26  # no default: pods' addresses on the dedicated RDMA NICs (below)
 
 racks:
   rack-01:
@@ -587,6 +588,8 @@ node lists `rdma_nics`):
 - Applies the RoCE settings on the hosts that have none (below).
 - Reads back every RDMA NIC and measures it node to node (Validation).
 - Labels the RDMA nodes `rdma-nics=<count>`; RDMA workloads select on it.
+- With `network.rdma.pod_range`, sets up the pods' networks on the dedicated RDMA
+  NICs ([RDMA for pods](#rdma-for-pods)).
 
 **RoCE settings on the hosts: which value wins.**
 
@@ -622,7 +625,7 @@ installer never configures switches: give your network team this table.
 - A shared NIC on `star`: traffic between spokes is forwarded by the hub's
   kernel, without PFC.
 - To change `network.rdma` or a node's `rdma_nics`, tear down `fabric_rdma`, then
-  install it again.
+  install it again, then `install rdma_device_plugin`.
 - One `network.rdma.subnet`: give a node at most one dedicated NIC with `rdma_ip`.
   Several NICs of a node on one subnet (one per GPU) need per-rail subnets, which
   are not supported yet: the kernel sends to the subnet through one of the NICs,
@@ -646,8 +649,101 @@ installer never configures switches: give your network team this table.
 
 **Nodes:** `add-node` sets up RDMA on the added node(s) only and checks their
 RDMA NICs; with one added node there is no second node to measure against.
-`remove-node` takes RDMA down on the removed node(s).
-`./toolkit_manager.sh validate fabric_rdma --env <env>` measures the whole rack again.
+It also writes their pod networks' CNI configs; the device plugin, Multus and
+whereabouts follow the `rdma-nics` label. `remove-node` takes RDMA down on the
+removed node(s). `./toolkit_manager.sh validate fabric_rdma --env <env>` measures
+the whole rack again, between pods too.
+
+### RDMA for pods
+
+Two pieces, both a no-op when no node lists `rdma_nics`:
+
+- **`rdma_device_plugin`** (platform layer): the cluster's one RDMA device plugin,
+  [k8s-rdma-shared-dev-plugin](https://github.com/Mellanox/k8s-rdma-shared-dev-plugin)
+  (NVIDIA's build `network-operator-v26.10.0`; it works with Broadcom, Intel and NVIDIA
+  NICs). It runs on the nodes labelled `rdma-nics`, in the `rdma-device-plugin`
+  namespace, and advertises:
+
+  | Resource | The node's RDMA devices of | For |
+  |---|---|---|
+  | `rdma/hca` | every RDMA NIC, shared or dedicated | `hostNetwork` pods (the only way to use a shared NIC) |
+  | `rdma/net<i>` | its i-th dedicated RDMA NIC | pods on pod network `rdma-net<i>` |
+
+  Each node advertises 64 of each, shared by its pods. A pod gets the RDMA devices
+  (`/dev/infiniband`) only with the resource; the resource also places it on a node
+  that has the network.
+- **Pod networks** (`fabric_rdma`, with `network.rdma.pod_range`): network `rdma-net<i>`
+  is each node's i-th dedicated RDMA NIC, so a NIC name must be on the same network on
+  every node (the parser checks it). Pods get a second interface, `net1`, as an ipvlan
+  L2 child of the NIC, with a `pod_range` address and the `subnet` prefix, so they reach
+  the nodes' `rdma_ip` on the link. `fabric_rdma` installs thin
+  [Multus](https://github.com/k8snetworkplumbingwg/multus-cni) v4.3.2 and
+  [whereabouts](https://github.com/k8snetworkplumbingwg/whereabouts) v0.9.4 (unique
+  addresses across the rack) on the RDMA nodes, in the `rdma-network` namespace, a
+  NetworkAttachmentDefinition `rdma-network/rdma-net<i>` per network, and on each node
+  `/etc/cni/multus/net.d/rdma-net<i>.conf` naming its own NIC. Pods without the
+  annotation are unchanged.
+
+A pod on a dedicated RDMA network:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rdma-app
+  annotations:
+    k8s.v1.cni.cncf.io/networks: rdma-network/rdma-net0
+spec:
+  containers:
+    - name: app
+      image: <image with rdma-core and your RDMA application>
+      resources:
+        limits:
+          rdma/net0: 1
+      env:
+        - {name: NCCL_IB_TC, value: "104"}           # network.rdma.dscp x 4
+        - {name: UCX_IB_TRAFFIC_CLASS, value: "104"}
+```
+
+On a shared NIC use `hostNetwork: true` and `rdma/hca: 1` instead of the annotation;
+`hostNetwork` needs a namespace with the `privileged` Pod Security level.
+
+- **Marking:** PFC and the DSCP map are the NIC's, so they apply to pod traffic too.
+  RDMA-CM applications inherit the node's default ToS. Verbs applications set their
+  own: `NCCL_IB_TC` and `UCX_IB_TRAFFIC_CLASS` = DSCP x 4 (104 with the defaults);
+  without them their traffic is not on the RoCE priority. If the library picks the
+  wrong RoCE GID, set `NCCL_IB_GID_INDEX` or `UCX_IB_GID_INDEX` to the GID of the
+  pod's `net1` address.
+- **Pod Security:** a pod on `net1` needs no capability and can run as non-root
+  (`/dev/infiniband/uverbs*` and `rdma_cm` are world-accessible; containerd gives
+  containers unlimited locked memory).
+- **Validation:** install and `validate fabric_rdma` start two busybox pods per pod
+  network on its first two nodes and run `ib_write_bw` between their `net1` addresses,
+  inside the pods' network namespaces, and print the results (the record holds the
+  node-to-node runs only).
+  `validate rdma_device_plugin` checks that every labelled node advertises its resources.
+
+**Limits:**
+
+- Pod networks are on dedicated NICs only, and without `network.rdma.pod_range`
+  there are none (`rdma/net<i>` is still advertised, for `hostNetwork` pods).
+- The plugin selects NICs by name on every RDMA node: a node that has a NIC of a
+  name another node lists, without listing it itself, gets that NIC brought up and
+  advertised.
+- `add-node` of a node with NIC names, or more dedicated RDMA NICs, than the other
+  nodes: run `install rdma_device_plugin` after it.
+- All pod networks share `subnet`: give a pod one RDMA network. An ipvlan pod cannot
+  reach its own node's address on that NIC.
+- `pod_range` must hold addresses nothing else on the RDMA network uses; whereabouts
+  frees a removed node's pod addresses at its daily reconcile.
+- Calico NetworkPolicy does not apply to `net1` or to RDMA.
+- RDMA devices are shared: a pod with an RDMA resource can use any GID of the device,
+  other pods' included. Fine for a single-tenant rack.
+- The RDMA network namespace mode must be `shared`, the kernel default: the plugin
+  refuses `exclusive`.
+- `fabric_rdma` owns Multus on the cluster: do not enable Kubespray's
+  (`kube_network_plugin_multus`). Its teardown removes the NetworkAttachmentDefinition
+  CRD and the nodes' Multus files; running pods keep their `net1` until deleted.
 
 ---
 
@@ -758,7 +854,8 @@ fabric_inventory → kubernetes → fabric_validate (labels only) → storage
 ```
 fabric_netplan, fabric_sysctl, fabric_bgp all skip. No fabric network — rack-profile used for inventory and GPU labels only.
 
-**With RDMA NICs** (any topology), `fabric_rdma` runs after `kubernetes`.
+**With RDMA NICs** (any topology), `fabric_rdma` runs after `kubernetes`, and
+`rdma_device_plugin` in the platform layer.
 
 **Platform layer**, after the infrastructure layer: NFD comes first on every cluster, and on a rack-scale env
 **with NVIDIA GPU nodes** (any topology) the GPU operator follows it:

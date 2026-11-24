@@ -1,0 +1,17 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Removes the plugin whether or not nodes still list rdma_nics. Once its sockets are
+# gone the kubelet advertises 0 of each rdma/* resource; running pods keep their
+# devices until they are deleted.
+
+- name: "rdma_device_plugin | teardown | Delete the plugin namespace"
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ rdma_device_plugin_namespace }}"
+    state: absent
+    wait: true
+  environment:
+    KUBECONFIG: "{{ kubernetes_kubeconfig }}"

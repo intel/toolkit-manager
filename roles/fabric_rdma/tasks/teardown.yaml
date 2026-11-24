@@ -6,10 +6,11 @@
 # fabric_rdma — Teardown
 # =============================================================================
 # Every cluster node, not only today's rdma_nodes: the profile may have dropped
-# a node's rdma_nics since the install. Removes only what install added: the
-# label, the RoCE settings rack-rdma-qos applied, the RDMA netplan file and its
-# addresses, the boot-time module list. NIC settings the site applied, and the
-# packages, stay.
+# a node's rdma_nics since the install. Removes only what install added: the pod
+# networks (Multus, whereabouts, the NetworkAttachmentDefinitions and the nodes'
+# CNI files), the label, the RoCE settings rack-rdma-qos applied, the RDMA netplan
+# file and its addresses, the boot-time module list. NIC settings the site
+# applied, and the packages, stay. Running pods keep their net1 until deleted.
 
 - name: "fabric_rdma | teardown | Cluster nodes"
   ansible.builtin.set_fact:
@@ -20,7 +21,8 @@
          | union(groups.get('rdma_nodes', []))
          | reject('equalto', 'localhost') | unique) }}
 
-# A re-run after the Kubernetes reset finds no API: the label went with the cluster.
+# A re-run after the Kubernetes reset finds no API: the label and the pod
+# networks' objects went with the cluster.
 - name: "fabric_rdma | teardown | Kubernetes API"
   kubernetes.core.k8s_info:
     kind: Namespace
@@ -28,6 +30,40 @@
     kubeconfig: "{{ kubernetes_kubeconfig }}"
   register: _rdma_api
   failed_when: false
+
+# First, so that no Multus pod writes its files on the nodes again.
+- name: "fabric_rdma | teardown | Multus, whereabouts and the NetworkAttachmentDefinitions"
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ rack_scale_rdma_namespace }}"
+    state: absent
+    wait: true
+    kubeconfig: "{{ kubernetes_kubeconfig }}"
+  when: _fabric_scope_nodes is not defined and _rdma_api.resources is defined
+
+# A node whose first CNI config still calls Multus could not start pods.
+- name: "fabric_rdma | teardown | Remove the pod networks' files from the nodes"
+  ansible.builtin.file:
+    path: "{{ item.1 }}"
+    state: absent
+  delegate_to: "{{ item.0 }}"
+  become: true
+  loop: "{{ _rdma_all_nodes | product(rack_scale_rdma_cni_host_files) | list }}"
+  loop_control:
+    label: "{{ item.0 }}: {{ item.1 }}"
+
+- name: "fabric_rdma | teardown | Their cluster-wide objects (CRDs, ClusterRoles)"
+  kubernetes.core.k8s:
+    api_version: "{{ item.apiVersion }}"
+    kind: "{{ item.kind }}"
+    name: "{{ item.metadata.name }}"
+    state: absent
+    kubeconfig: "{{ kubernetes_kubeconfig }}"
+  loop: "{{ rack_scale_rdma_pod_docs | rejectattr('metadata.namespace', 'defined') | rejectattr('kind', 'equalto', 'Namespace') | list }}"
+  loop_control:
+    label: "{{ item.kind }}/{{ item.metadata.name }}"
+  when: _fabric_scope_nodes is not defined and _rdma_api.resources is defined
 
 - name: "fabric_rdma | teardown | Remove the rdma-nics label"
   ansible.builtin.command:
