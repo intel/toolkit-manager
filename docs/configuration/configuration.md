@@ -196,7 +196,7 @@ The gateway terminates all external HTTPS traffic. There is no plain-HTTP mode.
 
 | `gateway_tls_mode` | What happens |
 |---|---|
-| `selfsigned` (default) | cert-manager creates a private root CA and signs a certificate for `<base_domain_name>` and `*.<base_domain_name>` with it. After install the CA is saved to `env/<name>/logs/toolkit-manager-ca.crt` (`ai-solutions-ca.crt` on a cluster installed before the rename, which keeps its CA). Trust it once to stop browser warnings: [Trust the self-signed CA](#trust-the-self-signed-ca-in-your-browser) |
+| `selfsigned` (default) | cert-manager creates a private root CA and signs a certificate for `<base_domain_name>` and `*.<base_domain_name>` with it. After install the CA is saved to `env/<name>/logs/toolkit-manager-ca.crt`. Trust it once to stop browser warnings: [Trust the self-signed CA](#trust-the-self-signed-ca-in-your-browser) |
 | `custom` | You supply the certificate and key |
 
 **Use your own certificate:**
