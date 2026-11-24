@@ -161,6 +161,13 @@ gateway_ca_export_path: "{{ log_dir }}/{{ gateway_ca_cert_name }}.crt"
 # secret, which is cert-manager's cluster-resource-namespace.
 certmanager_namespace: "cert-manager"
 
+# Extra wildcard domains under base_domain_name, each with its own HTTPS
+# listener (*.<domain>, named https-<domain, . as ->) and, in selfsigned
+# mode, its own certificate: the base wildcard covers one label only. Set by
+# layers whose clients need a deeper wildcard (agent-toolkit SPACE's E2B API).
+# In custom mode the operator certificate must cover them.
+gateway_extra_wildcard_domains: []
+
 # Platform listener leaves (selfsigned mode), one per enabled listener host;
 # _all names every leaf the role can create, for pruning.
 _gw_platform_certs: >-
@@ -168,7 +175,12 @@ _gw_platform_certs: >-
      + ([{'host': '*.' ~ base_domain_name, 'secret': gateway_wildcard_tls_secret_name}]
         if _gw_wildcard_on | bool else [])
      + ([{'host': gateway_s3_hostname, 'secret': gateway_s3_tls_secret_name}]
-        if gateway_s3_listener_enabled | bool else []) }}
+        if gateway_s3_listener_enabled | bool else [])
+     + _gw_extra_wildcard_certs }}
+_gw_extra_wildcard_certs: >-
+  {{ gateway_extra_wildcard_domains
+     | map('regex_replace', '^(.*)$', '{"host": "*.\1", "secret": "gateway-\1-wildcard-tls"}')
+     | map('from_json') | list }}
 _gw_platform_certs_all:
   - "{{ gateway_tls_secret_name }}"
   - "{{ gateway_wildcard_tls_secret_name }}"

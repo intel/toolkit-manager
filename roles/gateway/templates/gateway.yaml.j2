@@ -42,6 +42,22 @@ spec:
         namespaces:
           from: All
 {% endif %}
+{% for w in _gw_extra_wildcard_certs %}
+    # Extra wildcard domain (gateway_extra_wildcard_domains): *.<base> covers one
+    # label only, so a deeper wildcard needs its own listener and certificate.
+    - name: https-{{ w.host[2:] | replace('.', '-') }}
+      protocol: HTTPS
+      port: 443
+      hostname: "{{ w.host }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: {{ w.secret if gateway_tls_mode == 'selfsigned' else gateway_tls_secret_name }}
+      allowedRoutes:
+        namespaces:
+          from: All
+{% endfor %}
     # Apex listener — the bare base_domain_name. In path mode every service
     # lives here, so only labelled namespaces attach (paths checked at admission).
     - name: https-apex

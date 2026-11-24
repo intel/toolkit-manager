@@ -159,6 +159,19 @@ gateway_tls_cert_file: "/path/to/cert.pem"   # must cover <base_domain> and *.<b
 gateway_tls_key_file:  "/path/to/key.pem"
 ```
 
+**Deeper wildcard hosts.** The base wildcard covers one label
+(`grafana.<base_domain_name>`). A layer whose clients need hosts one level
+deeper lists that domain in `gateway_extra_wildcard_domains`; the agent toolkit
+sets it for SPACE's E2B API (`e2b.<base_domain_name>`, with sandbox hosts such
+as `49983-<id>.e2b.<base_domain_name>`).
+
+| Setting | Default | Description |
+|---|---|---|
+| `gateway_extra_wildcard_domains` | `[]` | Domains under `base_domain_name`. Each gets its own HTTPS listener on the platform Gateway, `https-<domain, . as ->` on `*.<domain>`, and in `selfsigned` mode its own certificate from the stack's CA. In `custom` mode the operator certificate must also cover `*.<domain>`. |
+
+Routes for those hosts attach to that listener by `sectionName`. Removing a
+domain removes its listener; its certificate stays until deleted.
+
 **Import the self-signed CA:**
 
 | Target | How |
@@ -424,6 +437,13 @@ Workers that pass are labelled `node.kubernetes.io/space-enabled=true`. Like
 Kata, `space_node` is not supported on a BYO cluster or on OpenShift. Teardown
 removes the RuntimeClass, the PriorityClasses and the labels, and leaves the host
 setup in place.
+
+With SPACE on, the platform also gives it:
+- a PostgreSQL database `space` whose login has CREATEROLE and CREATEDB (the
+  `postgresql_databases` fields `createrole` and `createdb`), not superuser:
+  PostgreSQL 16+ limits it to the roles it creates;
+- the object-store buckets `space-snapshots` and `space-templates`;
+- the gateway listener for `*.e2b.<base_domain_name>` (`gateway_extra_wildcard_domains`, see [TLS](#tls)).
 
 ---
 

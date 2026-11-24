@@ -62,7 +62,8 @@
     _gw_cert_hosts: >-
       {{ [base_domain_name]
          + (['*.' ~ base_domain_name] if _gw_wildcard_on | bool else [])
-         + ([gateway_s3_hostname] if gateway_s3_listener_enabled | bool else []) }}
+         + ([gateway_s3_hostname] if gateway_s3_listener_enabled | bool else [])
+         + (_gw_extra_wildcard_certs | map(attribute='host') | list) }}
     _gw_cert_context: "platform listeners"
   when: gateway_tls_mode == 'custom' and gateway_create
 

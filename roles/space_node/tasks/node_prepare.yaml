@@ -89,7 +89,6 @@
         mode: "0644"
       loop: "{{ space_node_units }}"
 
-    # TODO(spike): confirm the Kind node layer runs unchanged on a real host
     - name: "space_node | {{ space_node }} | Enable and start the node layer units"
       ansible.builtin.systemd:
         name: "{{ item }}.service"
