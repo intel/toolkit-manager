@@ -7,7 +7,7 @@
 
 repos:
   - layer: "inference"
-    url: "https://github.com/intel/enterprise-inference"
+    url: "https://github.com/intel/inference-toolkit"
     dest: "enterprise.ai-inference"
     rev: "main"
     deployment_subdir: ""
@@ -16,7 +16,7 @@ repos:
     model_catalog: "model_manager/models.yaml"
 
   - layer: "agent-toolkit"
-    url: "https://github.com/intel/enterprise-agent-toolkit"
+    url: "https://github.com/intel/agent-toolkit"
     dest: "enterprise.agent-toolkit"
     rev: "agentic-toolkit-migration"
     deployment_subdir: ""
