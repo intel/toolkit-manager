@@ -4,7 +4,7 @@
 Ansible filter plugin — the layer deployment record, the run class of an
 install, and the gating of upgrade-check verdicts.
 
-Used by roles/upgrade_checks and playbooks/includes/run_layer.yaml.
+Used by roles/layer_checks and playbooks/includes/run_layer.yaml.
 
 A record a layer still writes itself (Intel Chatbot Toolkit 3.0.0, layer
 erag) nests its state under deployment: and has no top-level layer. It is lifted

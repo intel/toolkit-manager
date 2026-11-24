@@ -5,7 +5,7 @@
 #   config_tracking_layer:  layer whose tracked configuration is saved (install) or deleted (teardown)
 # Saved after every successful install of the whole layer, whatever its run class,
 # so the next upgrade compares against what last ran.
-- name: "upgrade_checks | Save the {{ config_tracking_layer }} tracked configuration"
+- name: "layer_checks | Save the {{ config_tracking_layer }} tracked configuration"
   vars:
     _current: "{{ _layer_dirs.get(config_tracking_layer) | config_tracking_capture(env_dir, config_tracking_deny) }}"
   no_log: true  # the result echoes the definition, which may hold a value the deny list misses
@@ -29,7 +29,7 @@
     component_action == 'install' and
     (_layer_dirs.get(config_tracking_layer) | config_tracking_capture(env_dir, config_tracking_deny)) is not none
 
-- name: "upgrade_checks | Delete the {{ config_tracking_layer }} tracked configuration"
+- name: "layer_checks | Delete the {{ config_tracking_layer }} tracked configuration"
   kubernetes.core.k8s:
     state: absent
     api_version: v1

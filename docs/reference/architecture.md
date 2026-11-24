@@ -77,7 +77,7 @@ playbooks/site.yaml (runs on localhost, against the cluster API)
 ├─ includes/resolve_target.yaml:
 │   ├─ Target → ordered component list (filter_plugins/resolve_components.py)
 │   ├─ Refuse layers this env was not inited for
-│   ├─ Run the upgrade checks (roles/upgrade_checks)
+│   ├─ Run the layer checks (roles/layer_checks)
 │   └─ Print the plan
 │
 ├─ role: ownership → records what is already on the cluster
@@ -433,7 +433,7 @@ All roles follow the same pattern: `defaults/main.yaml` for config, `tasks/main.
 | `nvidia_gpu_operator`, `gpu_observability` | NVIDIA GPU nodes on rack-scale: the GPU Operator, DCGM metrics and dashboards. |
 | `nri_cpu_balloons` | NRI CPU-balloons plugin. Generates per-node `BalloonsPolicy` CRs based on NUMA topology. Enabled only when `kubernetes_cpu_policy=nri-balloons` and `kubernetes_accelerator=cpu` ([NRI CPU Balloons](../configuration/nri-cpu-balloons.md)). |
 | `ownership` | Library role: labels what each component creates and deletes it on teardown. |
-| `upgrade_checks` | Library role: deployment records, run classes and the checks before an upgrade. |
+| `layer_checks` | Library role: deployment records, run classes and the checks before an install or teardown. |
 | `backup` | Library role used by `playbooks/backup.yaml`. |
 
 ### inference-toolkit — External Repo

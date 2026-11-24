@@ -5,13 +5,13 @@
 # caller (playbooks/includes/run_layer.yaml):
 #   upgrade_record_layer:  layer the report describes
 #   upgrade_report_outcome: complete | halted
-- name: "upgrade_checks | Create the report directory"
+- name: "layer_checks | Create the report directory"
   ansible.builtin.file:
     path: "{{ upgrade_report_dir }}"
     state: directory
     mode: "0755"
 
-- name: "upgrade_checks | Write the {{ upgrade_record_layer }} upgrade report"
+- name: "layer_checks | Write the {{ upgrade_record_layer }} upgrade report"
   vars:
     _now: "{{ now(utc=true).strftime('%Y-%m-%dT%H:%M:%SZ') }}"
     _forced: "{{ _upgrade_gate.forcedChecks | select('match', upgrade_record_layer ~ '/') | list }}"
@@ -32,17 +32,17 @@
     mode: "0644"
   register: _upgrade_report_file
 
-- name: "upgrade_checks | Show where the {{ upgrade_record_layer }} report is"
+- name: "layer_checks | Show where the {{ upgrade_record_layer }} report is"
   ansible.builtin.debug:
     msg: "Upgrade report: {{ _upgrade_report_file.dest }}"
 
-- name: "upgrade_checks | List the {{ upgrade_record_layer }} upgrade reports"
+- name: "layer_checks | List the {{ upgrade_record_layer }} upgrade reports"
   ansible.builtin.find:
     paths: "{{ upgrade_report_dir }}"
     patterns: "{{ upgrade_record_layer }}-upgrade-report-*.yaml"
   register: _upgrade_reports
 
-- name: "upgrade_checks | Prune old {{ upgrade_record_layer }} upgrade reports"
+- name: "layer_checks | Prune old {{ upgrade_record_layer }} upgrade reports"
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent

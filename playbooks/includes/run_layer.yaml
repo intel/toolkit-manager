@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 ---
 # Runs one layer's components between the writes of its deployment record
-# (roles/upgrade_checks/tasks/record.yaml). The record describes the layer, so
+# (roles/layer_checks/tasks/record.yaml). The record describes the layer, so
 # only a run that holds the layer's full component list writes it; an upgrade
 # or downgrade run also leaves one report per layer.
 - name: "Decide what the {{ layer }} run records"
@@ -33,7 +33,7 @@
 
 - name: "Record the {{ layer }} {{ component_action }} start"
   ansible.builtin.include_role:
-    name: upgrade_checks
+    name: layer_checks
     tasks_from: record.yaml
   vars:
     upgrade_record_layer: "{{ layer }}"
@@ -55,7 +55,7 @@
 
     - name: "Record the {{ layer }} {{ component_action }} end"
       ansible.builtin.include_role:
-        name: upgrade_checks
+        name: layer_checks
         tasks_from: record.yaml
       vars:
         upgrade_record_layer: "{{ layer }}"
@@ -70,7 +70,7 @@
 
     - name: "Save or delete the {{ layer }} tracked configuration"
       ansible.builtin.include_role:
-        name: upgrade_checks
+        name: layer_checks
         tasks_from: config_tracking.yaml
       vars:
         config_tracking_layer: "{{ layer }}"
@@ -88,7 +88,7 @@
 
     - name: "Record {{ layer }} as halted"
       ansible.builtin.include_role:
-        name: upgrade_checks
+        name: layer_checks
         tasks_from: record.yaml
       vars:
         upgrade_record_layer: "{{ layer }}"
@@ -107,7 +107,7 @@
   always:
     - name: "Report the {{ layer }} run"
       ansible.builtin.include_role:
-        name: upgrade_checks
+        name: layer_checks
         tasks_from: report.yaml
       vars:
         upgrade_record_layer: "{{ layer }}"

@@ -4,11 +4,11 @@
 # =============================================================================
 # backup | What the backup-freshness upgrade check needs about one layer
 # =============================================================================
-# Included by roles/upgrade_checks/tasks/checks/backup_freshness.yaml with
+# Included by roles/layer_checks/tasks/checks/backup_freshness.yaml with
 # backup_layer and backup_source_version (the recorded version), after
 # velero_server.yaml. Fails only when the cluster does not answer (an API error
 # must not read as "Velero absent"); otherwise it only adds _bk_freshness[backup_layer], which backup_freshness_verdict
-# (filter_plugins/upgrade_checks.py) turns into the verdict. The steps are
+# (filter_plugins/layer_checks.py) turns into the verdict. The steps are
 # verify.yaml's: Velero present, Completed backups of this version, within
 # upgrade_backup_max_age_hours, contents readable from the store.
 # =============================================================================
