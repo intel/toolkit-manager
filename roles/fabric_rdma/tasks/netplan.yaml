@@ -44,3 +44,26 @@
   loop_control:
     label: "{{ item.item }}"
   changed_when: true
+
+# A 400G link can take tens of seconds to train after netplan brings the NIC up.
+# A NIC that never gets link is reported by the read-back.
+- name: "fabric_rdma | netplan | Wait for link on the NICs"
+  vars:
+    _nics: "{{ hostvars[item.item].node_rdma_nics | selectattr('rdma_ip', 'defined') | map(attribute='nic') | list }}"
+  ansible.builtin.shell: |
+    for nic in {{ _nics | map('quote') | join(' ') }}; do
+      [ "$(cat "/sys/class/net/$nic/carrier" 2>/dev/null)" = 1 ] || exit 1
+    done
+  args:
+    executable: /bin/bash
+  delegate_to: "{{ item.item }}"
+  become: true
+  loop: "{{ _rdma_netplan_written.results | selectattr('changed') | list }}"
+  loop_control:
+    label: "{{ item.item }}"
+  register: _rdma_link
+  until: _rdma_link.rc == 0
+  retries: 30
+  delay: 2
+  changed_when: false
+  failed_when: false
