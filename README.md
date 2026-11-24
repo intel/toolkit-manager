@@ -138,9 +138,11 @@ More: [Deploy a Model](docs/getting-started/deploy-models.md) (gated models, the
 
 ---
 
-## Agents
+## Layer 4: Agents
 
-> **Intel® Agent Toolkit runs AI agents safely.** It installs on top of layer 3.
+> **Run AI agents safely, or a chatbot that answers from your own documents.** Both install on top of layer 3.
+
+### Intel® Agent Toolkit
 
 **What you get:** agents in isolated sandboxes (optionally Kata microVMs), with Redis Stack and pgvector as memory stores, reaching models through a LiteLLM gateway with per-agent virtual keys, a content-safety guardrail, a hybrid router and Langfuse tracing. It deploys `qwen2-5-coder-14b` (chat) and `qwen3guard` (guard), about 112 GiB of memory together.
 
@@ -168,11 +170,7 @@ Keep the admin key to yourself; give each application or agent its own virtual k
 
 **In the browser:** the LiteLLM admin UI (virtual keys, spend) at `https://litellm-ui.inteltoolkits.ai/ui/` and Langfuse (agent traces) at `https://langfuse.inteltoolkits.ai`; the Kubernetes cluster dashboard links both → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
 
----
-
-## Chatbot
-
-> **Intel® Chatbot Toolkit is a chatbot that answers from your own documents.** It installs on top of layer 3.
+### Intel® Chatbot Toolkit
 
 **What you get:** a chat web UI at `https://inteltoolkits.ai` that answers from your own documents: document ingestion, a vector database, the RAG pipeline and chat history.
 
