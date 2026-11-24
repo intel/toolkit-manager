@@ -1,8 +1,8 @@
 # Prerequisites
 
-[← Docs Index](../README.md)
+[← Docs index](../README.md)
 
-Everything needed before running the Toolkit Manager installer, whether you're deploying on-premises, air-gapped, or on a single bare-metal box.
+Everything needed before running the Toolkit Manager installer, whether you're deploying on-premises, in a private cloud, or on a single bare-metal box. The install needs internet access (directly or through a proxy); air-gapped installs are not supported yet.
 
 ---
 
@@ -14,7 +14,7 @@ Everything needed before running the Toolkit Manager installer, whether you're d
 | Ubuntu 24.04 | ✅ Supported |
 | RHEL 8 / Rocky Linux 8 (x86_64) | ✅ Supported |
 
-**No Docker on cluster nodes.** Kubespray uses containerd and, while installing it, deletes Docker and all its data (`/var/lib/docker`) on any node where Docker is installed. The installer refuses to install onto a node with a `docker.service` unit (for a single-node install, the installer host itself). Back up and uninstall Docker first, or use a different node. See [Node Scaling](../customize/node_scaling.md#built-into-add-nodes-pre-flight).
+**No Docker on cluster nodes.** Kubespray uses containerd and, while installing it, deletes Docker and all its data (`/var/lib/docker`) on any node where Docker is installed. The installer refuses to install onto a node with a `docker.service` unit (for a single-node install, the installer host itself). Back up and uninstall Docker first, or use a different node. See [Node Scaling](../deployment/node-scaling.md#built-into-add-nodes-pre-flight).
 
 ---
 
@@ -28,23 +28,25 @@ Everything needed before running the Toolkit Manager installer, whether you're d
 
 Intel® Xeon® processors are recommended for CPU-based inference. NUMA-aware pinning (NRI Balloons) and AMX acceleration are built into the platform for Xeon workloads.
 
+Intel® GPUs (Arc Pro B-Series) are optional. They need the `xe` kernel driver, which is in the Linux kernel; the platform installs the Intel GPU device plugin on those nodes: see [Intel GPUs](../deployment/install-platform.md).
+
 ---
 
 ## Access
 
 | Requirement | Single-node | Multi-node |
 |---|---|---|
-| Passwordless sudo on installer host | Required | Required |
-| Passwordless SSH from installer host to all nodes | — | Required |
-| Passwordless sudo on all target nodes | — | Required |
-| Installer host reaches the API server at `https://<control-plane-ip>:6443` (not only SSH to the nodes); see [Bastion (Jump Host)](../deploy/install_platform.md#option-c-bastion-jump-host) | — | Required |
+| `sudo` on the installer host (passwordless is easiest; otherwise Ansible asks for the password at the start of each run) | Required | Required |
+| Passwordless SSH (key-based) from the installer host to every node | — | Required |
+| `sudo` on every target node (passwordless, or the same password as the installer host) | — | Required |
+| Installer host reaches the API server at `https://<control-plane-ip>:6443` (not only SSH to the nodes); see [Bastion (Jump Host)](../deployment/install-platform.md#option-c-bastion-jump-host) | — | Required |
 
 ---
 
 ## Network
 
 - **Internet access** is required during install (package downloads, container images, model weights).
-- **Corporate proxy:** set `http_proxy`, `https_proxy`, and `no_proxy` in `env/<name>/global_config.yaml` before installing. See [Configuration](../customize/configuration.md#proxy).
+- **Corporate proxy:** set `http_proxy`, `https_proxy`, and `no_proxy` in `env/<name>/global_config.yaml` before installing. See [Configuration](../configuration/configuration.md#proxy).
 - **Time synchronization (multi-node only):** an NTP server (`chrony` or `systemd-timesyncd`) must be running and synced on every node before install. Clock skew causes intermittent etcd failures, TLS errors, and token authentication issues that are hard to diagnose.
 
 ---
@@ -94,7 +96,7 @@ done
 
 ## Tooling
 
-`./toolkit_manager.sh configure` installs the following pinned versions into `/usr/local/bin`. Run it once per machine before anything else. If these tools are already installed at compatible versions, `configure` skips them.
+`./toolkit_manager.sh configure` installs the tools below. Run it once per machine before anything else; it lists the changes and asks you to confirm (type `y`). Python comes from the OS package manager; `yq`, `kubectl` and `helm` are downloaded at the pinned versions into `/usr/local/bin`. A tool that is already on your `PATH` is kept as it is, with a warning to check that its version is at least the pinned one. `configure` also creates the installer's Python environment in `.venv/`.
 
 | Tool | Version | Notes |
 |---|---|---|
@@ -103,21 +105,20 @@ done
 | kubectl | v1.35.4 | |
 | helm | v3.20.2 | |
 
-> **`git` must already be installed** before running `configure`. It is preinstalled on most Ubuntu and RHEL images. The installer uses it to clone external repos on first run.
+> **`git` and `curl` (or `wget`) must already be installed.** Both are preinstalled on most Ubuntu and RHEL images. `configure` downloads the tools with `curl` or `wget`, and `init` uses `git` to clone the external repositories.
 
 ---
 
 ## Credentials
 
 - **Hugging Face token** — required only for gated models (Llama, Mistral, Gemma, etc.). Get one at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) (free account). Export as `HF_TOKEN=hf_...` before deploying those models.
-- **Keycloak admin password** — auto-generated if not set. Override by exporting `KEYCLOAK_ADMIN_PASSWORD` before install.
-- **Grafana admin password** — auto-generated if not set. Override by exporting `GRAFANA_ADMIN_PASSWORD` before install.
+- **Keycloak and Grafana admin passwords** — generated on the first install and kept in Kubernetes Secrets. To choose them yourself, set `keycloak_admin_password` and `observability_grafana_admin_password` in `env/<name>/global_config.yaml` before the first install. See [Admin passwords](../configuration/configuration.md#admin-passwords) for how to read them.
 
 ---
 
 ## What `configure` does not do
 
-- Install `git` — must already be present
+- Install `git`, `curl` or `wget` — they must already be present
 - Configure proxy settings — edit `env/<name>/global_config.yaml` yourself
 - Set up SSH keys — you must distribute them to target nodes for multi-node installs
 
@@ -128,6 +129,6 @@ done
 | If you want to… | Go to |
 |---|---|
 | Start the actual install now that prerequisites are met | [Getting Started](quickstart.md) |
-| Understand what you're installing and why, before running anything | [Meet Toolkit Manager](../meet/meet.md) |
-| Plan hardware for a multi-node or bring-your-own-cluster setup | [Multi-Node & BYO Cluster](../deploy/topologies.md) |
-| Set proxy, TLS, or other options `configure` doesn't handle | [Configuration Reference](../customize/configuration.md) |
+| Understand what you're installing and why, before running anything | [Meet Toolkit Manager](../overview/meet.md) |
+| Plan hardware for a multi-node or bring-your-own-cluster setup | [Multi-Node & BYO Cluster](../deployment/multi-node.md) |
+| Set proxy, TLS, or other options `configure` doesn't handle | [Configuration Reference](../configuration/configuration.md) |

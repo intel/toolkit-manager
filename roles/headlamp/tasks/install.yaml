@@ -51,7 +51,7 @@
           preferred_username, groups = claim groups, both prefixed '{{ headlamp_oidc_prefix }}'):
           apply {{ log_dir }}/headlamp-authentication-config.yaml with kube-apiserver
           --authentication-config (or the provider's OIDC setting on managed clusters), then set
-          headlamp_byo_apiserver_trusted: true. See docs/deploy/headlamp.md.
+          headlamp_byo_apiserver_trusted: true. See docs/configuration/headlamp.md.
         quiet: true
 
 # ── Cluster this installer built, apiserver mode: its API server must have been
@@ -89,7 +89,7 @@
           --authentication-config (cluster built before this release), so it would reject every Headlamp
           sign-in. Quickest: set headlamp_auth_mode: gateway (one shared read-only account). For per-person
           access, rebuild the cluster with this installer; re-running install kubernetes does not add the flag.
-          See docs/deploy/headlamp.md.
+          See docs/configuration/headlamp.md.
         quiet: true
 
 - name: "headlamp | Namespace"

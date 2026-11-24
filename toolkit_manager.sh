@@ -44,7 +44,7 @@ REPOS_GLOB="${REPOS_DIR}/repos.*.yaml"
 EXT_DIR="${SCRIPT_DIR}/ext"
 VENV="${SCRIPT_DIR}/.venv"
 ENV_ROOT="${SCRIPT_DIR}/env"
-# Per-env provisioning record, written by init. See docs/adding_solutions.md.
+# Per-env provisioning record, written by init. See docs/reference/adding-solutions.md.
 readonly SOLUTIONS_BASE=".solutions.yaml"
 # Bumped whenever a recorded field changes name or meaning, so an older record is
 # refused with the re-init to run instead of being misread as empty.
@@ -116,7 +116,7 @@ banner() {
 
 _advanced_op_banner() {
     warn "ADVANCED OPERATION: PROCEED ONLY IF YOU KNOW WHAT YOU'RE DOING. ${ACTION} changes the membership
-  of a live cluster: review the --dry-run output and docs/customize/node_scaling.md first."
+  of a live cluster: review the --dry-run output and docs/deployment/node-scaling.md first."
 }
 _quiet() {
     if (( _LOG_LEVEL >= 1 )); then
@@ -181,7 +181,7 @@ usage() {
     remove-node            remove the worker node(s) deleted from env/<env>/nodes.yaml
                            (rack-scale: rack-profile.yaml) (Kubespray remove-node.yml),
                            after a placement check no flag skips. See
-                           docs/customize/node_scaling.md.
+                           docs/deployment/node-scaling.md.
 
   Targets:
     <layer>                single layer (Ansible routes it to its components)
@@ -1392,7 +1392,7 @@ $(sed 's/^/  /' <<< "$reasons")"
     gone_cp=$(_in_both "$gone" "$(_inventory_group kube_control_plane)")
     [[ -z "$gone_cp" ]] \
         || err "${ACTION} only adds and removes worker nodes: ${gone_cp//$'\n'/, } is a control-plane node.
-  See docs/customize/node_scaling.md."
+  See docs/deployment/node-scaling.md."
     gone_infra=$(_in_both "$gone" "$(_inventory_group etcd; _inventory_group ceph_storage_nodes)")
     [[ -z "$gone_infra" ]] \
         || err "${ACTION} only adds and removes worker nodes: ${gone_infra//$'\n'/, } is an etcd or storage node. Put it back in rack-profile.yaml."
@@ -1800,7 +1800,7 @@ do_remove_node() {
     local removed_cp; removed_cp=$(_in_both "$(_inventory_group kube_control_plane)" "$removed")
     [[ -z "$removed_cp" ]] \
         || err "remove-node only removes worker nodes: ${removed_cp//$'\n'/, } is a control-plane node.
-  See docs/customize/node_scaling.md."
+  See docs/deployment/node-scaling.md."
 
     # remove-node.yml reaches each node through the current inventory: one an
     # install has already dropped from it would match no host, and the removal
@@ -2202,7 +2202,7 @@ main() {
         [[ "$IS_BYO" == "false" ]] \
             || err "${ACTION} is not supported for a BYO cluster (existing_kubernetes is set in global_config.yaml)."
         # Only the kubernetes component is ever run, so ERAG's node-specific
-        # placement would not be re-applied (docs/customize/node_scaling.md).
+        # placement would not be re-applied (docs/deployment/node-scaling.md).
         local _erag_ns; _erag_ns=$(_erag_namespaces_present)
         [[ -z "$_erag_ns" ]] \
             || err "${ACTION} is not supported on a cluster with ERAG deployed (found namespace(s): ${_erag_ns//$'\n'/, }).

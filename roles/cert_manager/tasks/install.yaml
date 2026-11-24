@@ -23,7 +23,7 @@
         fail_msg: |-
           cert-manager is not running in namespace {{ certmanager_namespace }}. Install the cert-manager
           Operator for Red Hat OpenShift (package openshift-cert-manager-operator) from
-          OperatorHub before running the installer (docs/deploy/openshift.md, step 2).
+          OperatorHub before running the installer (docs/deployment/openshift.md, step 2).
         success_msg: "cert-manager provided by the cluster (OLM) — skipping Helm install."
 
 - name: "cert_manager | Install via Helm"

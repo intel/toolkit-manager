@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
-# Canonical dispatcher (docs/reference/adding_solutions.md), the same in every
+# Canonical dispatcher (docs/reference/adding-solutions.md), the same in every
 # role with platform values but for the name.
 #   vars/<cluster_distribution>.yaml   values that differ by platform;
 #                                      the tasks are the same on both

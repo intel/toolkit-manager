@@ -30,7 +30,7 @@
         fail_msg: |-
           No NodeFeatureDiscovery instance found. Install the Node Feature Discovery
           operator (package nfd, namespace openshift-nfd) from OperatorHub and create a
-          NodeFeatureDiscovery (docs/deploy/openshift.md, step 8), or set nfd_enabled: false
+          NodeFeatureDiscovery (docs/deployment/openshift.md, step 8), or set nfd_enabled: false
           if no model needs AMX node affinity (require_amx).
         success_msg: >-
           NFD provided by the cluster (OLM, {{ _nfd_olm_instances.resources | map(attribute='metadata.namespace') | join(', ') }})

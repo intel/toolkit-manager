@@ -111,7 +111,7 @@ def _ceph_checks(devices):
              "%d disk(s) ready: %s" % (len(devices), ", ".join(sorted(devices))),
              "Rook skips a disk that is mounted, partitioned or carries a signature, which leaves 0 OSDs: "
              "check the device names in rack-profile.yaml / rook_ceph_devices, and wipe a former OSD disk "
-             "(docs/quickstart/prerequisites.md, Reusing a disk that held an OSD). Teardown keeps OSD data "
+             "(docs/getting-started/prerequisites.md, Reusing a disk that held an OSD). Teardown keeps OSD data "
              "unless rook_ceph_teardown_wipe_devices is true")]
 
 
