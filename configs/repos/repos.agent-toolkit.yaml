@@ -7,9 +7,9 @@
 
 repos:
   - layer: "inference"
-    url: "https://github.com/intel/enterprise-inference"
+    url: "https://github.com/intel/inference-toolkit"
     dest: "enterprise.ai-inference"
-    rev: "main"
+    rev: "8389f47f94403fd682dcd90e02ed5cc25e6eef18" # v1.2.0-rc.1
     deployment_subdir: ""
     config_dir: ""
     default_flavour: ""
