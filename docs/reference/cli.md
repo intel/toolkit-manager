@@ -408,7 +408,7 @@ Every `toolkit_manager.sh` run (except `configure`, `init` and `show`) writes a 
 |---|---|
 | `env/<name>/logs/<action>-<target>-<YYYYMMDD-HHMMSS>.log` | One run, for example `install-inference-20261120-091522.log`. `status`, `add-node` and `remove-node` use `cluster` as the target |
 | `env/<name>/logs/backup-<layer>-<YYYYMMDD-HHMMSS>.log` | One `run_backup.sh` run |
-| `env/<name>/logs/ai-solutions-ca.crt` | Self-signed CA certificate (import it into your browser; see [TLS](../configuration/configuration.md#tls)) |
+| `env/<name>/logs/toolkit-manager-ca.crt` | Self-signed CA certificate (import it into your browser; see [TLS](../configuration/configuration.md#tls)) |
 | `env/<name>/reports/<layer>-upgrade-report-<UTC>.yaml` | One per layer of each install that upgrades or downgrades it |
 
 When a run fails, the last lines on screen name its log. For more Ansible detail, append `-- -vvv`

@@ -197,7 +197,7 @@ The gateway terminates all external HTTPS traffic. There is no plain-HTTP mode.
 
 | `gateway_tls_mode` | What happens |
 |---|---|
-| `selfsigned` (default) | cert-manager creates a private root CA and signs a certificate for `<base_domain_name>` and `*.<base_domain_name>` with it. After install the CA is saved to `env/<name>/logs/ai-solutions-ca.crt`. Import it once (below) to stop browser warnings |
+| `selfsigned` (default) | cert-manager creates a private root CA and signs a certificate for `<base_domain_name>` and `*.<base_domain_name>` with it. After install the CA is saved to `env/<name>/logs/toolkit-manager-ca.crt`. Import it once (below) to stop browser warnings |
 | `custom` | You supply the certificate and key |
 
 **Use your own certificate:**
@@ -215,8 +215,8 @@ gateway_tls_key_file:  "/path/to/key.pem"
 |---|---|
 | Firefox | Settings → Privacy & Security → Certificates → View Certificates → Authorities → Import |
 | Chrome / Edge | Settings → Privacy → Security → Manage certificates → Authorities → Import |
-| Linux, system-wide | `sudo cp env/<name>/logs/ai-solutions-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates` |
-| macOS | `sudo security add-trusted-cert -d -k /Library/Keychains/System.keychain env/<name>/logs/ai-solutions-ca.crt` |
+| Linux, system-wide | `sudo cp env/<name>/logs/toolkit-manager-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates` |
+| macOS | `sudo security add-trusted-cert -d -k /Library/Keychains/System.keychain env/<name>/logs/toolkit-manager-ca.crt` |
 
 ---
 

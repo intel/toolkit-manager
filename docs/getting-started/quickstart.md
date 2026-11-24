@@ -173,15 +173,15 @@ For self-signed TLS (the default), import the CA certificate to remove browser w
 
 ```bash
 # The installer writes the CA certificate here during install
-cat env/local/logs/ai-solutions-ca.crt
+cat env/local/logs/toolkit-manager-ca.crt
 ```
 
 | Browser / OS | Import path |
 |---|---|
 | Firefox | Settings → Privacy & Security → Certificates → View Certificates → Authorities → Import |
 | Chrome / Edge | Settings → Privacy → Security → Manage certificates → Authorities → Import |
-| Linux system-wide | `sudo cp env/local/logs/ai-solutions-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates` |
-| macOS | `sudo security add-trusted-cert -d -k /Library/Keychains/System.keychain env/local/logs/ai-solutions-ca.crt` |
+| Linux system-wide | `sudo cp env/local/logs/toolkit-manager-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates` |
+| macOS | `sudo security add-trusted-cert -d -k /Library/Keychains/System.keychain env/local/logs/toolkit-manager-ca.crt` |
 
 ---
 

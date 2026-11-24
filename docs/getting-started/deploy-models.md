@@ -146,7 +146,7 @@ GATEWAY_IP=$(kubectl get svc -n envoy-gateway-system \
   -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
 
 DOMAIN=$(yq '.base_domain_name' env/local/global_config.yaml)
-CA=$(pwd)/env/local/logs/ai-solutions-ca.crt
+CA=$(pwd)/env/local/logs/toolkit-manager-ca.crt
 ```
 
 The domain (default `inteltoolkits.ai`) is usually not in your DNS, so the commands use `--resolve <host>:443:<gateway IP>` to send the request to the gateway while keeping the right host name.
@@ -216,7 +216,7 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-Run it with `SSL_CERT_FILE=env/local/logs/ai-solutions-ca.crt` so Python trusts the self-signed certificate, and make the host name resolve to the gateway IP (DNS or `/etc/hosts`).
+Run it with `SSL_CERT_FILE=env/local/logs/toolkit-manager-ca.crt` so Python trusts the self-signed certificate, and make the host name resolve to the gateway IP (DNS or `/etc/hosts`).
 
 For LangChain, LlamaIndex, CrewAI, Cursor, n8n, and others → see [Integration Guide](../reference/integration.md).
 
