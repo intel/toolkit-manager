@@ -72,7 +72,7 @@ Cluster-side logs are in Loki, browsable from Grafana.
 | `platform-admin` cannot sign in to the Keycloak admin console | Expected: the console uses the `master` realm `admin` account. See [Keycloak admin console](../configuration/configuration.md#keycloak-admin-console). |
 | `403` at Headlamp or the LiteLLM UI after signing in | The user is in neither `platform-admins` nor `platform-viewers`. See [Who gets in](../configuration/headlamp.md#who-gets-in). |
 | Grafana has no **Sign in with Keycloak** button | `observability_grafana_sso` is `false`, or Keycloak is off. Sign in as the local `admin`: [Observability](../configuration/observability.md#sign-in). |
-| No Headlamp at all | It is opt-in: set `headlamp_enabled: true` in `env/<env>/global_config.yaml` and run `install platform` again. |
+| No Headlamp at all | It is skipped on OpenShift, when `headlamp_enabled: false`, and on a BYO cluster in `apiserver` mode until the API server trusts the realm (the install prints a warning): see [Bring your own Kubernetes](../configuration/headlamp.md#bring-your-own-kubernetes-byo). |
 
 ## Models and requests
 

@@ -161,10 +161,10 @@ GATEWAY_IP=$(kubectl get svc -n envoy-gateway-system \
 DOMAIN=$(yq '.base_domain_name' env/local/global_config.yaml)
 
 # Prints the line to add to /etc/hosts on each client machine
-echo "${GATEWAY_IP}  ${DOMAIN} inference.${DOMAIN} keycloak.${DOMAIN} grafana.${DOMAIN}"
+echo "${GATEWAY_IP}  ${DOMAIN} inference.${DOMAIN} keycloak.${DOMAIN} grafana.${DOMAIN} headlamp.${DOMAIN}"
 ```
 
-Add `litellm.${DOMAIN}` and `langfuse.${DOMAIN}` when LiteLLM is on (`auth_type: litellm_vkey`), and `headlamp.${DOMAIN}` with `headlamp_enabled: true`. `./toolkit_manager.sh status` prints the service URLs. With `routing_mode: path` the services sit under the one name `${DOMAIN}` (Langfuse and the vLLM Semantic Router dashboard keep their own hostnames).
+Add `litellm.${DOMAIN}` and `langfuse.${DOMAIN}` when LiteLLM is on (`auth_type: litellm_vkey`), and drop `headlamp.${DOMAIN}` with `headlamp_enabled: false`. `./toolkit_manager.sh status` prints the service URLs. With `routing_mode: path` the services sit under the one name `${DOMAIN}` (Langfuse and the vLLM Semantic Router dashboard keep their own hostnames).
 
 > [!IMPORTANT]
 > Every subdomain must be listed explicitly. Wildcards do not work in `/etc/hosts`, so a missing entry looks like a connection failure in the browser rather than an error from the cluster.

@@ -65,6 +65,11 @@
 - name: "Preflight - Platform"
   ansible.builtin.include_tasks: preflight_platform.yaml
 
+- name: "Preflight - Headlamp: resolve whether it installs"
+  ansible.builtin.include_role:
+    name: headlamp
+    tasks_from: resolve.yaml
+
 # ── OpenShift: settings the platform decides ─────────────────────────────────
 # One global_config.yaml serves both platforms. global_config.yaml is passed as
 # extra vars, which set_fact cannot override, so the components that the cluster

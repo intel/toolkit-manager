@@ -30,7 +30,7 @@ The stack is built in **layers**, each on top of the one before. You pick a **ta
 | # | Layer | In short | What it installs | Install target | Learn more |
 | --- | --- | --- | --- | --- | --- |
 | 1 | **Infrastructure** | The cluster your machines become | Kubernetes (built with Kubespray) and storage (local-path, NFS, Ceph, NetApp ONTAP, or your own CSI driver) | `infrastructure` | [Quick Start: Layer 1](#layer-1-infrastructure) |
-| 2 | **Platform** | Shared services every layer uses: the front door, sign-in, encryption, monitoring, databases | Envoy Gateway, Keycloak, cert-manager, Istio ambient mesh, MetalLB, PostgreSQL, SeaweedFS, observability (Grafana, Prometheus, Loki, Tempo), Node Feature Discovery, NRI CPU balloons, metrics-server, the Intel GPU device plugin; opt-in the Kubernetes cluster dashboard (Headlamp), KEDA, Velero | `platform` | [Quick Start: Layer 2](#layer-2-platform) |
+| 2 | **Platform** | Shared services every layer uses: the front door, sign-in, encryption, monitoring, databases | Envoy Gateway, Keycloak, cert-manager, Istio ambient mesh, MetalLB, PostgreSQL, SeaweedFS, observability (Grafana, Prometheus, Loki, Tempo), Node Feature Discovery, NRI CPU balloons, metrics-server, the Intel GPU device plugin, the Kubernetes cluster dashboard (Headlamp); opt-in KEDA, Velero | `platform` | [Quick Start: Layer 2](#layer-2-platform) |
 | 3 | **Intel® Inference Toolkit** | Serves models behind one OpenAI-compatible API | Envoy AI Gateway, KServe, vLLM / OpenVINO™ Model Server, optional LiteLLM and Langfuse | `inference` | [inference-toolkit](https://github.com/intel/inference-toolkit) |
 | 4 | **Intel® Chatbot Toolkit** *(optional, on top of 3)* | Chat with your own documents (RAG) | Vector database, document ingestion, RAG pipeline, MCP gateway, chat history, web UI | `erag` | [chatbot-toolkit](https://github.com/intel/chatbot-toolkit) |
 | 4 | **Intel® Agent Toolkit** *(optional, on top of 3)* | Run AI agents safely | Agent sandboxes (optionally Kata microVMs), memory stores (Redis Stack, pgvector), LiteLLM virtual keys, guardrails, a hybrid model router; optional KubeRay | `agent-toolkit` | [agent-toolkit](https://github.com/intel/agent-toolkit) |
@@ -73,7 +73,7 @@ cd toolkit-manager
 base_domain_name: "inteltoolkits.ai"   # all URLs: grafana.<domain>, keycloak.<domain>, ...
 storage_backend: local-path            # local-path (single node) | nfs | ceph | netapp-trident | custom
 observability_enabled: true            # Grafana, Prometheus, Loki, Tempo
-headlamp_enabled: false                # true: Kubernetes cluster dashboard (one sign-in, links every UI)
+headlamp_enabled: true                 # Kubernetes cluster dashboard (one sign-in, links every UI)
 # http_proxy: "http://your-proxy:8080" # behind a proxy: uncomment http_proxy, https_proxy and no_proxy
 # auth_type: "jwt"                     # API sign-in: jwt | litellm_vkey
 ```
@@ -110,7 +110,7 @@ kubectl get storageclass                             # local-path
 
 - **Front door:** Envoy Gateway, HTTPS for every service under your domain (IP from MetalLB, certificates from cert-manager)
 - **Sign-in:** Keycloak, for every web UI and for API tokens
-- **Kubernetes cluster dashboard** (Headlamp, opt-in: `headlamp_enabled: true`): one sign-in, with a link to every service UI
+- **Kubernetes cluster dashboard** (Headlamp): one sign-in, with a link to every service UI
 - **Monitoring:** Grafana over Prometheus metrics, Loki logs and Tempo traces
 - **Data services:** PostgreSQL and SeaweedFS object storage (S3)
 - **Encrypted traffic** between services: Istio ambient mesh
@@ -124,7 +124,7 @@ kubectl get storageclass                             # local-path
 kubectl -n keycloak get secret platform-bootstrap-admin -o jsonpath='{.data.value}' | base64 -d; echo
 ```
 
-**In the browser:** sign in as `platform-admin` at Grafana, `https://grafana.inteltoolkits.ai` (**Sign in with Keycloak**). With `headlamp_enabled: true` the same account opens the Kubernetes cluster dashboard, `https://headlamp.inteltoolkits.ai`, which links every service UI → [Kubernetes cluster dashboard](docs/configuration/headlamp.md). The Keycloak admin console, where you add users, has its own `admin` login → [Keycloak admin console](docs/configuration/configuration.md#keycloak-admin-console). Browser access (`/etc/hosts`, certificate) → [Access the services](docs/getting-started/quickstart.md#access-the-services). More: [Observability](docs/configuration/observability.md), [Network Architecture](docs/reference/networking.md).
+**In the browser:** sign in as `platform-admin` at the Kubernetes cluster dashboard, `https://headlamp.inteltoolkits.ai`, which links every service UI → [Kubernetes cluster dashboard](docs/configuration/headlamp.md). Grafana takes the same account (**Sign in with Keycloak**). The Keycloak admin console, where you add users, has its own `admin` login → [Keycloak admin console](docs/configuration/configuration.md#keycloak-admin-console). Browser access (`/etc/hosts`, certificate) → [Access the services](docs/getting-started/quickstart.md#access-the-services). More: [Observability](docs/configuration/observability.md), [Network Architecture](docs/reference/networking.md).
 
 ### Layer 3: Intel® Inference Toolkit
 
@@ -181,7 +181,7 @@ A JSON reply with `choices` means the model is serving; any OpenAI client works.
 
 More: [Deploy a Model](docs/getting-started/deploy-models.md) (gated models, the Python SDK), [Integration Guide](docs/reference/integration.md), [Troubleshooting](docs/faq-and-troubleshooting/troubleshooting.md).
 
-**In the browser:** with Headlamp on, the Kubernetes cluster dashboard gains a **Models** page to deploy and remove models, plus LiteLLM and Langfuse when LiteLLM is on → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
+**In the browser:** the Kubernetes cluster dashboard gains a **Models** page to deploy and remove models, plus LiteLLM and Langfuse when LiteLLM is on → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
 
 ### Layer 4: Intel® Agent Toolkit or Intel® Chatbot Toolkit
 
@@ -213,7 +213,7 @@ curl -s --noproxy '*' --cacert env/local/logs/ai-solutions-ca.crt --resolve "lit
 
 Keep the admin key to yourself; give each application or agent its own virtual key. More: [Getting Started with the Intel® Agent Toolkit](docs/getting-started/agent-toolkit.md) (every component and its switch), [virtual keys](docs/getting-started/deploy-models.md#access-the-model).
 
-**In the browser:** the LiteLLM admin UI (virtual keys, spend) at `https://litellm-ui.inteltoolkits.ai/ui/` and Langfuse (agent traces) at `https://langfuse.inteltoolkits.ai`; with Headlamp on, the Kubernetes cluster dashboard links both → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
+**In the browser:** the LiteLLM admin UI (virtual keys, spend) at `https://litellm-ui.inteltoolkits.ai/ui/` and Langfuse (agent traces) at `https://langfuse.inteltoolkits.ai`; the Kubernetes cluster dashboard links both → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
 
 #### Intel® Chatbot Toolkit
 

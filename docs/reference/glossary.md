@@ -30,7 +30,7 @@ Terms used across this documentation, in alphabetical order.
 
 **Flavour.** A preset that `init <layer> --flavour <name>` seeds a layer's config from. Only layers that ship presets accept it, such as the RAG pipelines.
 
-**Headlamp.** An optional Kubernetes web UI with Keycloak sign-in, switched on with `headlamp_enabled: true`. See [Headlamp and Platform Sign-in](../configuration/headlamp.md).
+**Headlamp.** The Kubernetes web UI with Keycloak sign-in, on by default (`headlamp_enabled`). See [Headlamp and Platform Sign-in](../configuration/headlamp.md).
 
 **Idempotent.** Running the same install twice produces the same result rather than duplicating or breaking anything. Every role is written this way, which is why a failed run can simply be re-run.
 

@@ -4,14 +4,16 @@
 
 Headlamp is the cluster web UI and the platform's landing page. People sign in
 with their Keycloak account (realm `platform`), the same sign-in as Grafana,
-Langfuse and the LiteLLM admin UI. This page covers turning it on, who gets in,
-and the extra step on a cluster you bring yourself (BYO).
+Langfuse and the LiteLLM admin UI. This page covers turning it on or off, who
+gets in, and the extra step on a cluster you bring yourself (BYO).
 
-## Turn it on
+## Turn it on or off
 
-Headlamp is off by default, and is not installed on OpenShift.
+Headlamp is on by default. It is skipped on OpenShift, and on a BYO cluster until you set
+`headlamp_auth_mode: gateway` or finish [Bring your own Kubernetes](#bring-your-own-kubernetes-byo).
+To add it to a platform installed without it:
 
-1. In `env/<name>/global_config.yaml`, set:
+1. In `env/<name>/global_config.yaml`, set (`false` skips it):
 
    ```yaml
    headlamp_enabled: true
@@ -103,13 +105,14 @@ kubectl -n team-a create rolebinding headlamp-team-a \
 
 With `existing_kubernetes` set, the installer does not change the API server. In
 `apiserver` mode the API server must trust the `platform` realm, or sign-in
-works but every Kubernetes call in Headlamp returns 401. So the Headlamp install
-stops early, before creating anything, until you choose one:
+works but every Kubernetes call in Headlamp returns 401. So the install skips
+Headlamp with a warning, before creating anything, and carries on with the rest
+of the platform, until you choose one:
 
 **Option A: configure the API server (per-person access and audit).**
 
-1. Install Headlamp. It stops with the issuer to trust and writes a ready-made
-   configuration to `env/<name>/logs/headlamp-authentication-config.yaml`.
+1. Install the platform (or Headlamp). The warning names the issuer to trust, and a ready-made
+   configuration is written to `env/<name>/logs/headlamp-authentication-config.yaml`.
 2. Copy that file to every control-plane node (for example to
    `/etc/kubernetes/authn/authentication-config.yaml`, mode `0600`) and start
    kube-apiserver with `--authentication-config=<that path>`. Mount the
@@ -121,14 +124,15 @@ stops early, before creating anything, until you choose one:
    control-plane nodes must resolve the Keycloak host (`keycloak.<base>`, or
    `<base>` in path mode) to the gateway. The file already carries the gateway
    CA when the certificate is not publicly trusted.
-5. Set `headlamp_byo_apiserver_trusted: true` in `global_config.yaml` and
-   install Headlamp again.
+5. Set `headlamp_byo_apiserver_trusted: true` in `global_config.yaml` and run
+   `./toolkit_manager.sh install platform --env <name>` again. In path mode that
+   also turns on the bare-domain redirect to Headlamp, which `install headlamp` alone does not.
 6. Check: `./toolkit_manager.sh validate platform --env <name>` confirms the
    API server accepts a realm token.
 
 On a managed cluster (EKS, AKS, GKE and others), use the provider's OIDC
 identity-provider setting with the same values: issuer from the installer's
-stop message, client ID `headlamp`, username claim `preferred_username`, groups claim
+warning, client ID `headlamp`, username claim `preferred_username`, groups claim
 `groups`, and prefix `oidc:` for both.
 
 **Option B: no API server change.** Set `headlamp_auth_mode: gateway`. Only

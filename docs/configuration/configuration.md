@@ -75,6 +75,7 @@ Edit the file when one of these is true:
 | `storage_backend` | `local-path` | Where persistent data lives — see [Storage](#storage) |
 | `gateway_tls_mode` | `selfsigned` | Generate a certificate, or bring your own — see [TLS](#tls) |
 | `observability_enabled` | `true` | Deploy the monitoring stack: Grafana, Prometheus, Loki, Tempo |
+| `headlamp_enabled` | `true` | The Kubernetes cluster dashboard (Headlamp) — see [Headlamp](headlamp.md) |
 | `velero_enabled` | `false` | Deploy the backup mechanism (Velero). Needs `storage_backend: nfs` or `ceph`; `run_backup.sh` backs up and restores a layer with it (see [Upgrade a Layer](../deployment/upgrade.md#backup-and-restore)) |
 
 Everything else is safe to leave alone until you have a reason to change it.
@@ -131,10 +132,10 @@ lines are optional settings (remove the `# ` to use one). It has eight sections:
 | 1. Kubernetes | cluster name, kube-proxy mode, `existing_kubernetes` (your own cluster) |
 | 2. Networking and proxy | service and pod CIDRs, `metallb_ip_range`, `http_proxy` / `https_proxy` / `no_proxy` |
 | 3. Domain and access | `base_domain_name`, `routing_mode`, `gateway_landing_path`, TLS (`gateway_tls_mode`, custom certificate files), `gateway_request_timeout` |
-| 4. Components | `istio_enabled`, `observability_enabled` (and Prometheus retention and size), `metrics_server_enabled`, `headlamp_enabled`, `keda_enabled`, `velero_enabled`, `kata_containers_enabled`, `kata_runtime` |
+| 4. Components | `istio_enabled`, `observability_enabled` (and Prometheus retention and size), `metrics_server_enabled`, `headlamp_enabled` (on), `keda_enabled`, `velero_enabled`, `kata_containers_enabled`, `kata_runtime` |
 | 5. Storage | `storage_backend` and its `custom` settings, `object_store_backend`, `seaweedfs_volume_storage_size` |
 | 6. Sign-in | `auth_type` (API auth: `jwt` by default, `litellm_vkey` with the Agent Toolkit; set here only to force it for every layer), platform-admin MFA, `headlamp_byo_apiserver_trusted` |
-| 7. Advanced | `node_topology_enabled`, `enforce_pss`, CPU policy, `kubernetes_accelerator`, `rack_scale_enabled`, `envoy_gateway_upgrade` |
+| 7. Advanced | `node_topology_enabled`, `enforce_pss`, CPU policy, `kubernetes_accelerator`, `rack_scale_enabled`, `envoy_gateway_upgrade` (on: Envoy Gateway 1.9.3) |
 | 8. Hardware and platform specific | Ceph devices, NetApp ONTAP, OpenShift checks |
 
 Keycloak and the gateway always install; section 4 switches the rest on or off. LiteLLM and
@@ -165,7 +166,7 @@ is left as it is (or commented out).
 | `observability_enabled` | Whether the full monitoring stack (Prometheus/Grafana/Loki/Tempo) is deployed. Default `true` |
 | `observability_prometheus_retention`, `observability_prometheus_storage_size` | How long Prometheus keeps metrics (default `30d`) and its disk size (default `50Gi`) |
 | `metrics_server_enabled` | Node and pod CPU/memory figures (`kubectl top`, Headlamp). Default `true`; skipped if the cluster already has one |
-| `headlamp_enabled` | Headlamp, the Kubernetes web UI, with Keycloak sign-in. Default `false` — see [Headlamp](headlamp.md) |
+| `headlamp_enabled` | Headlamp, the Kubernetes web UI, with Keycloak sign-in. Default `true`. Skipped on OpenShift, and on a BYO cluster in `apiserver` mode until `headlamp_byo_apiserver_trusted: true`. In path mode the bare domain redirects to it — see [Headlamp](headlamp.md) |
 | `keda_enabled` | KEDA event-driven autoscaling (on OpenShift: the Custom Metrics Autoscaler). Default `false` |
 | `velero_enabled` | Whether the backup mechanism (Velero) is deployed. Default `false`; needs snapshot-capable storage (`nfs` or `ceph`) |
 | `kata_containers_enabled`, `kata_runtime` | Kata Containers microVM runtime for the Agent Toolkit sandbox. Default `false`; runtime `kata-fc` (Firecracker, default), `kata-qemu` or `both` — see [Kata Containers](#kata-containers) |
@@ -181,7 +182,7 @@ is left as it is (or commented out).
 | `kubernetes_cpu_policy` | CPU pinning strategy for inference workloads. Default `nri-balloons` — see [CPU policy](#cpu-policy) |
 | `kubernetes_accelerator` | Compute target for inference workloads. Default `cpu` (Intel® Xeon®: tune the kubelet's CPU/NUMA settings); CPU pinning is turned off for any other value |
 | `rack_scale_enabled` | Rack-scale fabric; needs `env/<name>/rack-profile.yaml`. Default `false` — see [Rack-scale deployment](../deployment/rack-scale.md) |
-| `envoy_gateway_upgrade` | `true`: install Envoy Gateway 1.9.3 instead of 1.7.5 (and upgrade an older one in place). Default `false`; never downgrades |
+| `envoy_gateway_upgrade` | `true` (default): install Envoy Gateway 1.9.3 instead of 1.7.5 (and upgrade an older one in place); the inference layer then installs KServe 0.21. `false`: 1.7.5. Never downgrades |
 | `rook_ceph_devices`, `rook_ceph_teardown_wipe_devices` | `storage_backend: ceph` only — see [Storage](#storage) |
 | `ontap_*`, `gateway_s3_subdomain` | `storage_backend: netapp-trident` only — see [NetApp ONTAP and Trident](../deployment/netapp-ontap.md) |
 | `cluster_distribution`, `openshift_prereq_*` | OpenShift only — see [Deploy on OpenShift](../deployment/openshift.md) |

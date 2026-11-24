@@ -168,8 +168,8 @@ spec:
 
 **How services attach to the gateway.** Each service publishes its own host. How it does so depends on the Envoy Gateway version:
 
-- **Envoy Gateway 1.9 or newer** (`envoy_gateway_upgrade: true` installs 1.9.3): each service adds a **ListenerSet** in its own namespace, with a listener and certificate for its hostname. The Gateway accepts ListenerSets only from namespaces labelled `gateway.enterprise-ai/allow-listenersets: "true"`. An admission policy accepts a hostname only if it is listed in that namespace's `gateway.enterprise-ai/hostnames` annotation.
-- **Envoy Gateway 1.7.5** (the default) has no ListenerSets. Services attach their routes to the shared `*.<domain>` listener, and the same hostname grants decide which namespace may serve which host.
+- **Envoy Gateway 1.9 or newer** (the default: `envoy_gateway_upgrade: true` installs 1.9.3): each service adds a **ListenerSet** in its own namespace, with a listener and certificate for its hostname. The Gateway accepts ListenerSets only from namespaces labelled `gateway.enterprise-ai/allow-listenersets: "true"`. An admission policy accepts a hostname only if it is listed in that namespace's `gateway.enterprise-ai/hostnames` annotation.
+- **Envoy Gateway 1.7.5** (`envoy_gateway_upgrade: false`) has no ListenerSets. Services attach their routes to the shared `*.<domain>` listener, and the same hostname grants decide which namespace may serve which host.
 - **Path mode**: every service lives on the apex host. Only namespaces labelled `gateway.enterprise-ai/allow-apex-routes: "true"` may attach there, and only under the paths granted to them in the `gateway-path-grants` ConfigMap.
 
 Grants live on namespaces or in the gateway namespace, so only cluster operators can hand out hostnames and paths.

@@ -8,7 +8,7 @@ Toolkit Manager is a modular, extensible deployment framework for a self-hosted 
 
 This repository provides:
 - **Infrastructure layer** — Kubernetes (via Kubespray), storage (local-path, NFS, Ceph, NetApp ONTAP via Trident, or your own CSI driver), and on rack-scale clusters the fabric roles
-- **Platform layer** — Node Feature Discovery, NRI CPU balloons, the Intel GPU device plugin (Intel GPU nodes only), cert-manager, Istio (ambient), MetalLB, metrics-server, the gateway (Envoy Gateway), PostgreSQL, Keycloak, object store (SeaweedFS), observability; opt-in Headlamp, KEDA and Velero
+- **Platform layer** — Node Feature Discovery, NRI CPU balloons, the Intel GPU device plugin (Intel GPU nodes only), cert-manager, Istio (ambient), MetalLB, metrics-server, the gateway (Envoy Gateway), PostgreSQL, Keycloak, object store (SeaweedFS), observability, Headlamp; opt-in KEDA and Velero
 - **Multi-environment support** — Isolated configs under `env/<name>/`
 - **Cross-repo orchestration** — `init <layer>` clones the solution repos a layer needs into `ext/`, and their roles plug in by name
 
@@ -35,7 +35,7 @@ infrastructure  →  platform  →  inference  →  erag / agent-toolkit (opt-in
 | Layer | Components (in [configs/components.yaml](../../configs/components.yaml) unless noted) | Installed by |
 |---|---|---|
 | `infrastructure` | `kubernetes`, `storage`; `kata_containers` (`kata_containers_enabled`); rack-scale only (`rack_scale_enabled`): `fabric_inventory`, `fabric_netplan`, `fabric_sysctl`, `fabric_bgp`, `fabric_validate` | `install` of any layer |
-| `platform` | `node_feature_discovery`, `nri_cpu_balloons`, `intel_gpu_plugin`, `cert_manager`, `istio`, `metallb`, `metrics_server`, `gateway` (alias `envoy_gateway`), `postgresql`, `keycloak`, `object_store`, `seaweedfs`, `observability`; opt-in: `headlamp`, `keda`, `velero`; rack-scale: `nvidia_gpu_operator`, `gpu_observability` | `install` of `platform` or any layer above |
+| `platform` | `node_feature_discovery`, `nri_cpu_balloons`, `intel_gpu_plugin`, `cert_manager`, `istio`, `metallb`, `metrics_server`, `gateway` (alias `envoy_gateway`), `postgresql`, `keycloak`, `object_store`, `seaweedfs`, `observability`, `headlamp`; opt-in: `keda`, `velero`; rack-scale: `nvidia_gpu_operator`, `gpu_observability` | `install` of `platform` or any layer above |
 | `inference` | from inference-toolkit's `components.yaml`: `keycloak_config`, `envoy_ai_gateway`, `kserve`, `litellm`, `langfuse`, `llm_services`, `vllm_sr` (opt-in) | `install inference`, or a layer above it |
 | `erag` | from enterprise-rag's `components.yaml` (the `app_*` roles) | `install erag`, after `init erag` |
 | `agent-toolkit` | from enterprise-agent-toolkit's `components.yaml` | `install agent-toolkit`, after `init agent-toolkit` |
@@ -424,7 +424,7 @@ All roles follow the same pattern: `defaults/main.yaml` for config, `tasks/main.
 | `gateway`, `envoy_gateway` | The platform's front door (Gateway API): TLS, hostnames, the deny-by-default Keycloak JWT SecurityPolicy. `envoy_gateway` installs the Envoy Gateway controller it runs on. |
 | `postgresql` | CNPG operator + the PostgreSQL cluster for Keycloak, LiteLLM, Langfuse. |
 | `keycloak` | Keycloak operator + instance and the platform realm for sign-in. On by default (`keycloak_enabled`). |
-| `headlamp` | Kubernetes web UI with Keycloak sign-in (opt-in, `headlamp_enabled`) ([Headlamp](../configuration/headlamp.md)). |
+| `headlamp` | Kubernetes web UI with Keycloak sign-in (on by default, `headlamp_enabled`) ([Headlamp](../configuration/headlamp.md)). |
 | `object_store` | The object store interface; selects the backend (`object_store_backend`: `seaweedfs` or `external`). |
 | `seaweedfs` | S3-compatible object storage for Loki, Tempo, Langfuse blob storage. |
 | `observability` | Prometheus + Grafana + Loki + Tempo + OpenTelemetry Collector stack ([Observability](../configuration/observability.md)). |

@@ -121,7 +121,7 @@ gateway_portal_configmap: "platform-portal"
 # when on, is the platform landing page; signing out at the gateway ends here.
 # An app that publishes '/' (e.g. a RAG UI) takes it over, and gives it back
 # when it unpublishes.
-gateway_landing_path: "{{ (headlamp_path | default('/headlamp')) ~ '/' if headlamp_enabled | default(false) | bool else '' }}"
+gateway_landing_path: "{{ (headlamp_path | default('/headlamp')) ~ '/' if headlamp_installs | default(false) | bool else '' }}"
 
 # Keycloak routing for the SecurityPolicy JWT provider (canonical owner: keycloak
 # role). Issuer and in-cluster JWKS URL follow where Keycloak serves.

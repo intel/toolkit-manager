@@ -1,0 +1,12 @@
+# Copyright (C) 2024-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+# Runs once, in preflight: sets headlamp_installs for this role's BYO skip and for
+# gateway_landing_path. BYO in apiserver mode needs API server trust first.
+- name: "headlamp | resolve | Whether Headlamp installs"
+  ansible.builtin.set_fact:
+    headlamp_installs: >-
+      {{ (components | selectattr('name', 'eq', 'headlamp') | map(attribute='enabled') | first) | bool
+         and (existing_kubernetes | default('', true) | length == 0
+              or headlamp_byo_apiserver_trusted | bool
+              or not __headlamp_apiserver_mode | bool) }}
