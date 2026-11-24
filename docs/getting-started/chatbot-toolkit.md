@@ -49,7 +49,7 @@ DOMAIN=$(yq '.base_domain_name' env/local/global_config.yaml)
 echo "$GATEWAY_IP  $DOMAIN keycloak.$DOMAIN s3.$DOMAIN seaweedfs.$DOMAIN grafana.$DOMAIN"
 ```
 
-Open `https://<base_domain_name>` in a browser (import `env/local/logs/ai-solutions-ca.crt` to drop the certificate warning; see [Access the services](quickstart.md#access-the-services)). Get the admin password:
+Open `https://<base_domain_name>` in a browser (import `env/local/logs/toolkit-manager-ca.crt` to drop the certificate warning; see [Access the services](quickstart.md#access-the-services)). Get the admin password:
 
 ```bash
 kubectl get secret -n keycloak erag-credentials \

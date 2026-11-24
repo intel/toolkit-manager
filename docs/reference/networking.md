@@ -118,7 +118,7 @@ It implements the Kubernetes **Gateway API** and:
 - routes by hostname (subdomain mode) or by path (path mode) to the service behind it;
 - applies a request timeout of `gateway_request_timeout` (default `600s`), long enough for slow model answers.
 
-In selfsigned mode the CA certificate is saved as `env/<env>/logs/ai-solutions-ca.crt`. Give it to clients (`curl --cacert ...`) instead of turning certificate checks off.
+In selfsigned mode the CA certificate is saved as `env/<env>/logs/toolkit-manager-ca.crt`. Give it to clients (`curl --cacert ...`) instead of turning certificate checks off.
 
 ### How Envoy Gateway Gets Its IP
 
@@ -458,7 +458,7 @@ To check that it works:
 
 
 ```bash
-curl --cacert env/<env>/logs/ai-solutions-ca.crt https://inference.inteltoolkits.ai/v1/models
+curl --cacert env/<env>/logs/toolkit-manager-ca.crt https://inference.inteltoolkits.ai/v1/models
 # 401 means the gateway answered and asks for a token: networking is working
 ```
 
@@ -501,7 +501,7 @@ arping -c 3 10.1.1.1
 
 ### Test connectivity
 ```bash
-curl --cacert env/<env>/logs/ai-solutions-ca.crt \
+curl --cacert env/<env>/logs/toolkit-manager-ca.crt \
   --resolve inference.inteltoolkits.ai:443:10.1.1.1 \
   https://inference.inteltoolkits.ai/v1/models
 # 401 = gateway reached, token needed. 404 = no route for that host
@@ -518,7 +518,7 @@ kubectl describe httproute inference-external -n envoy-gateway-system
 kubectl logs -n envoy-gateway-system -l gateway.envoyproxy.io/owning-gateway-name=eg-gateway -f
 # Then, in another terminal, send a request with a token
 # (see Accessing Models for how to get $TOKEN)
-curl --cacert env/<env>/logs/ai-solutions-ca.crt -H "Authorization: Bearer $TOKEN" \
+curl --cacert env/<env>/logs/toolkit-manager-ca.crt -H "Authorization: Bearer $TOKEN" \
   https://inference.inteltoolkits.ai/v1/models
 ```
 

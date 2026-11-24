@@ -170,11 +170,11 @@ Add `litellm.${DOMAIN}` and `langfuse.${DOMAIN}` when LiteLLM is on (`auth_type:
 > Every subdomain must be listed explicitly. Wildcards do not work in `/etc/hosts`, so a missing entry looks like a connection failure in the browser rather than an error from the cluster.
 
 For self-signed TLS (the default), trust the CA certificate once on each machine that opens the
-web UIs. The install writes it to `env/local/logs/ai-solutions-ca.crt` on the deploy node; copy
+web UIs. The install writes it to `env/local/logs/toolkit-manager-ca.crt` on the deploy node; copy
 it to your machine, then import it:
 
 ```bash
-scp <user>@<deploy-node>:<toolkit-manager-folder>/env/local/logs/ai-solutions-ca.crt .
+scp <user>@<deploy-node>:<toolkit-manager-folder>/env/local/logs/toolkit-manager-ca.crt .
 ```
 
 Steps for Windows, macOS, Linux and Firefox: [Trust the self-signed CA](../configuration/configuration.md#trust-the-self-signed-ca-in-your-browser).

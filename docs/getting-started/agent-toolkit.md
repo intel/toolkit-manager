@@ -48,7 +48,7 @@ DOMAIN=$(yq '.base_domain_name' env/local/global_config.yaml)
 echo "$GATEWAY_IP  litellm.$DOMAIN keycloak.$DOMAIN langfuse.$DOMAIN"   # line for /etc/hosts on client machines
 
 MK=$(kubectl get secret litellm-master-key -n litellm -o jsonpath='{.data.master_key}' | base64 -d)
-curl -s --cacert env/local/logs/ai-solutions-ca.crt \
+curl -s --cacert env/local/logs/toolkit-manager-ca.crt \
   --resolve "litellm.$DOMAIN:443:$GATEWAY_IP" \
   https://litellm.$DOMAIN/v1/models -H "Authorization: Bearer $MK"
 ```

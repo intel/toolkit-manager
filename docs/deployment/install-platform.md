@@ -621,13 +621,13 @@ The domain (default `inteltoolkits.ai`) is usually not in your DNS. That is why 
 **TLS certificate:** When using self-signed TLS (the default), the installer exports a CA certificate to:
 
 ```
-env/<name>/logs/ai-solutions-ca.crt
+env/<name>/logs/toolkit-manager-ca.crt
 ```
 
 Copy it to each machine that opens the web UIs and trust it there ([Trust the self-signed CA](../configuration/configuration.md#trust-the-self-signed-ca-in-your-browser)), so Keycloak, Grafana and Langfuse open without certificate warnings. The `curl` commands below pass it with `--cacert`; for Python/SDK clients, set `SSL_CERT_FILE` to it:
 
 ```bash
-CA=$(pwd)/env/<env>/logs/ai-solutions-ca.crt
+CA=$(pwd)/env/<env>/logs/toolkit-manager-ca.crt
 ```
 
 ### 2. Deploy a Model
@@ -868,7 +868,7 @@ curl -s --cacert "$CA" --noproxy '*' \
 
 ### 5. Access the Model — Python (OpenAI Client)
 
-Run these with `SSL_CERT_FILE=env/<env>/logs/ai-solutions-ca.crt` so Python trusts the self-signed certificate. Your machine must also resolve the host name to the gateway IP (DNS or `/etc/hosts`); Python has no `--resolve`.
+Run these with `SSL_CERT_FILE=env/<env>/logs/toolkit-manager-ca.crt` so Python trusts the self-signed certificate. Your machine must also resolve the host name to the gateway IP (DNS or `/etc/hosts`); Python has no `--resolve`.
 
 #### With `auth_type: jwt` (default)
 
