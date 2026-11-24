@@ -13,7 +13,7 @@ This repository provides:
 - **Cross-repo orchestration** — `init <layer>` clones the solution repos a layer needs into `ext/`, and their roles plug in by name
 
 Solution repositories contribute the layers above platform:
-- **Inference layer** (inference-toolkit) — KServe, model serving (`llm_services` + `model-manager`), Envoy AI Gateway or agentgateway, LiteLLM (proxy + virtual keys), Langfuse (LLM observability), Keycloak realm setup, opt-in vLLM Semantic Router
+- **Inference layer** (inference-toolkit) — KServe, model serving (`llm_services` + `model-manager`), Envoy AI Gateway, LiteLLM (proxy + virtual keys), Langfuse (LLM observability), Keycloak realm setup, opt-in vLLM Semantic Router
 - **Application layers** (opt-in) — Intel® Chatbot Toolkit (`erag`: RAG pipelines, UI, vector databases) and Intel® Agent Toolkit (`agent-toolkit`)
 
 **Auth modes:** Keycloak is deployed by default (`keycloak_enabled: true`) and people sign in to every web UI through it. `auth_type` in `env/<name>/config.inference.yaml` selects the credential API clients send:
@@ -36,7 +36,7 @@ infrastructure  →  platform  →  inference  →  erag / agent-toolkit (opt-in
 |---|---|---|
 | `infrastructure` | `kubernetes`, `storage`; `kata_containers` (`kata_containers_enabled`); rack-scale only (`rack_scale_enabled`): `fabric_inventory`, `fabric_netplan`, `fabric_sysctl`, `fabric_bgp`, `fabric_validate` | `install` of any layer |
 | `platform` | `node_feature_discovery`, `nri_cpu_balloons`, `intel_gpu_plugin`, `cert_manager`, `istio`, `metallb`, `metrics_server`, `gateway` (alias `envoy_gateway`), `postgresql`, `keycloak`, `object_store`, `seaweedfs`, `observability`; opt-in: `headlamp`, `keda`, `velero`; rack-scale: `nvidia_gpu_operator`, `gpu_observability` | `install` of `platform` or any layer above |
-| `inference` | from inference-toolkit's `components.yaml`: `keycloak_config`, `envoy_ai_gateway` or `agentgateway` (`ai_gateway_provider`), `kserve`, `litellm`, `langfuse`, `llm_services`, `vllm_sr` (opt-in) | `install inference`, or a layer above it |
+| `inference` | from inference-toolkit's `components.yaml`: `keycloak_config`, `envoy_ai_gateway`, `kserve`, `litellm`, `langfuse`, `llm_services`, `vllm_sr` (opt-in) | `install inference`, or a layer above it |
 | `erag` | from enterprise-rag's `components.yaml` (the `app_*` roles) | `install erag`, after `init erag` |
 | `agent-toolkit` | from enterprise-agent-toolkit's `components.yaml` | `install agent-toolkit`, after `init agent-toolkit` |
 
@@ -159,7 +159,7 @@ inference-toolkit/
 │   ├── model-manager                           # Model CLI: deploy, undeploy, list, cpu-collisions-check
 │   ├── models.yaml                             # Model catalog, seeded to env/<name>/models.yaml
 │   └── core/, runtimes/, templates/, chat-templates/, scripts/
-└── roles/                                      # agentgateway, envoy_ai_gateway, keycloak_config, kserve,
+└── roles/                                      # envoy_ai_gateway, keycloak_config, kserve,
                                                 # langfuse, litellm, llm_services, vllm_sr
 ```
 

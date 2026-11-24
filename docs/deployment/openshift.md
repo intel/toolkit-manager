@@ -197,7 +197,7 @@ oc get csv -A | grep -E 'loki|cluster-logging|tempo|opentelemetry|grafana'   # a
 
 ## Platform detection
 
-Preflight detects the platform before it resolves the components to install. Components that OpenShift provides itself or does not support are switched off in `configs/components.yaml` on OpenShift, whatever `global_config.yaml` says: `istio`, `metallb`, `metrics_server`, `headlamp`, `velero`, and on rack-scale `nvidia_gpu_operator` and `gpu_observability`. The inference layer does the same for its own AI gateways (`envoy_ai_gateway`, `agentgateway`). The installer never stamps Pod Security labels on OpenShift, whatever `enforce_pss` says: the platform syncs them from the SCCs, and the keycloak namespace is the admin's. One default in `configs/defaults/global_config.yaml` is for Kubernetes. Set it in `env/<env>/global_config.yaml` of an OpenShift env:
+Preflight detects the platform before it resolves the components to install. Components that OpenShift provides itself or does not support are switched off in `configs/components.yaml` on OpenShift, whatever `global_config.yaml` says: `istio`, `metallb`, `metrics_server`, `headlamp`, `velero`, and on rack-scale `nvidia_gpu_operator` and `gpu_observability`. The inference layer does the same for its AI gateway (`envoy_ai_gateway`). The installer never stamps Pod Security labels on OpenShift, whatever `enforce_pss` says: the platform syncs them from the SCCs, and the keycloak namespace is the admin's. One default in `configs/defaults/global_config.yaml` is for Kubernetes. Set it in `env/<env>/global_config.yaml` of an OpenShift env:
 
 ```yaml
 istio_enabled: false   # true makes roles label their namespaces for ambient mode, which enrolls them in Service Mesh 3

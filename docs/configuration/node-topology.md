@@ -14,7 +14,7 @@ Why you would care: model servers want whole machines. If Keycloak, PostgreSQL, 
 When `node_topology_enabled: true` (the default) on a multi-node cluster:
 
 - **Every node gets a label.** Control-plane nodes get `workload-class=platform`; worker nodes get `workload-class=inference`.
-- **Platform components prefer `workload-class=platform` nodes** (Keycloak, PostgreSQL, cert-manager, MetalLB, Istio, KEDA, metrics-server, Headlamp, the observability stack, the Envoy Gateway controller, and from the inference layer the KServe controller, LiteLLM, Langfuse, the Envoy AI Gateway and agentgateway controllers).
+- **Platform components prefer `workload-class=platform` nodes** (Keycloak, PostgreSQL, cert-manager, MetalLB, Istio, KEDA, metrics-server, Headlamp, the observability stack, the Envoy Gateway controller, and from the inference layer the KServe controller, LiteLLM, Langfuse and the Envoy AI Gateway controller).
 - **The preference is soft.** If no preferred node can take the pod, the scheduler places it elsewhere. Nothing fails because of it.
 - **No taints are added** by this feature. A *taint* is a hard "keep out" mark on a node; see [why soft affinity](#why-does-toolkit-manager-use-soft-affinity-instead-of-taints).
 
@@ -88,7 +88,7 @@ nodeAffinity:
             values: [platform]
 ```
 
-**Components that use it**, in this repository: cert-manager, Envoy Gateway (controller), Headlamp, Istio, KEDA, Keycloak, MetalLB, metrics-server, the observability stack, PostgreSQL. In the inference repository: agentgateway, Envoy AI Gateway, KServe, Langfuse, LiteLLM.
+**Components that use it**, in this repository: cert-manager, Envoy Gateway (controller), Headlamp, Istio, KEDA, Keycloak, MetalLB, metrics-server, the observability stack, PostgreSQL. In the inference repository: Envoy AI Gateway, KServe, Langfuse, LiteLLM.
 
 > [!IMPORTANT]
 > On a multi-node cluster built with workers, Kubernetes puts a `NoSchedule` taint on the control-plane node, and these components do not tolerate it. They then run on the workers, and the preference only matters on clusters whose control plane accepts pods (one listed under `nodes_workers` too, or with the taint removed).

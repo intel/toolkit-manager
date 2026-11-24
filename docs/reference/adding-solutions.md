@@ -508,9 +508,8 @@ Reuse what the platform runs instead of rebuilding it. The points that bite:
   own listeners. The gateway is **deny-by-default**: a route without its own policy needs a
   Keycloak JWT, so a UI with its own login gets `401` until you exempt its route with
   `route_auth_exempt.yaml`. Example: `roles/langfuse` in inference-toolkit.
-- **Call models in-cluster** at `http://ai-gateway.envoy-gateway-system.svc.cluster.local/v1`
-  (with `ai_gateway_provider: agentgateway`: `ai-gateway.llm-inference.svc.cluster.local`). It is
-  the same OpenAI-compatible API as `inference.<domain>`, with the model named in the request
+- **Call models in-cluster** at `http://ai-gateway.envoy-gateway-system.svc.cluster.local/v1`.
+  It is the same OpenAI-compatible API as `inference.<domain>`, with the model named in the request
   body, but needs no token. The paths are in the inference-toolkit repo's
   `docs/deploy/accessing_models.md`.
 - **Deploy a model you need** with `{{ playbook_dir }}/../model-manager deploy <model> --label

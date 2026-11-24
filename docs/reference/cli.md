@@ -165,7 +165,7 @@ refuses a blocking verdict. See [Upgrade a Layer](../deployment/upgrade.md).
 |---|---|
 | `infrastructure` | `kubernetes`, `storage`; plus `kata_containers` (`kata_containers_enabled`) and the `fabric_*` rack-scale networking components (`rack_scale_enabled`) when switched on |
 | `platform` | `cert_manager`, `istio`, `metallb`, `gateway` (also accepted as `envoy_gateway`), `postgresql`, `keycloak`, `object_store`, `seaweedfs`, `observability`, `metrics_server`, `node_feature_discovery`, `nri_cpu_balloons`, `intel_gpu_plugin` (Intel GPU nodes only); plus `headlamp`, `keda` and `velero` when switched on, and `nvidia_gpu_operator` / `gpu_observability` on rack-scale |
-| `inference` | `keycloak_config`, `envoy_ai_gateway`, `kserve`, `llm_services`; plus `litellm` and `langfuse` (with `auth_type: litellm_vkey` or `litellm_enabled: true`), `agentgateway` and `vllm_sr` when switched on. Comes from the inference repository |
+| `inference` | `keycloak_config`, `envoy_ai_gateway`, `kserve`, `llm_services`; plus `litellm` and `langfuse` (with `auth_type: litellm_vkey` or `litellm_enabled: true`), and `vllm_sr` when switched on. Comes from the inference repository |
 | `erag` | The Intel® Chatbot Toolkit components (vector databases, document ingestion, chat UI, …). Comes from its repository; opt-in |
 | `agent-toolkit` | The Intel® Agent Toolkit components (agent sandboxes, memory stores, …). Comes from its repository; opt-in |
 | `<component>` | Any single component name, for example `kserve`, `observability` or `metallb` |

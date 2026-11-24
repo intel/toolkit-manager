@@ -16,7 +16,7 @@ The platform brings together:
 - Model serving through vLLM and OpenVINO™ Model Server
 - OpenAI-compatible endpoints (drop-in for any OpenAI SDK client)
 - TLS, authentication, and access control (Keycloak sign-in and tokens, or LiteLLM virtual keys)
-- AI-aware inference routing via Envoy AI Gateway (or agentgateway)
+- AI-aware inference routing via Envoy AI Gateway
 - Persistent model storage (local-path, NFS, Ceph, NetApp ONTAP, or your own CSI driver)
 - NUMA-aware CPU optimization via NRI CPU Balloons
 - Retrieval-augmented generation (RAG) services (Intel® Chatbot Toolkit — opt-in) and agent services (Intel® Agent Toolkit — opt-in)

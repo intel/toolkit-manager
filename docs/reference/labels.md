@@ -68,8 +68,7 @@ The NRI CPU balloons and Kata Containers components install into `kube-system`, 
 
 | Namespace | PSA enforce | PSA audit | PSA warn | Istio | Role | Created when |
 |---|---|---|---|---|---|---|
-| `envoy-ai-gateway-system` | `privileged` | `privileged` | `privileged` | `ambient` | `envoy_ai_gateway` | `ai_gateway_provider: envoy` (default) |
-| `agentgateway-system` | `privileged` | `privileged` | `privileged` | `ambient` | `agentgateway` | `ai_gateway_provider: agentgateway` |
+| `envoy-ai-gateway-system` | `privileged` | `privileged` | `privileged` | `ambient` | `envoy_ai_gateway` | `kserve_enabled: true`, not on OpenShift |
 | `kserve` | `baseline` | `restricted` | `restricted` | `ambient` | `kserve` | `kserve_enabled: true` |
 | `lws-system` | `baseline` | `restricted` | `restricted` | `ambient` | `kserve` | LeaderWorkerSet is not installed yet |
 | `llm-inference` | `restricted` | `restricted` | `restricted` | `ambient` | `llm_services` | `kserve_enabled: true` |
@@ -119,7 +118,7 @@ These namespaces only exist once `install erag` has run; `install inference` doe
 
 | Profile | Used for |
 |---|---|
-| `privileged` | Pods that need host access or extra Linux capabilities: the mesh data plane (istio-cni, ztunnel), MetalLB's speaker (raw ARP sockets on the host network), Node Feature Discovery and node-exporter (read host hardware), storage drivers (csi-driver-nfs and Rook Ceph: host network, `hostPath` volumes, bidirectional mount propagation), the Envoy AI Gateway and agentgateway controllers. |
+| `privileged` | Pods that need host access or extra Linux capabilities: the mesh data plane (istio-cni, ztunnel), MetalLB's speaker (raw ARP sockets on the host network), Node Feature Discovery and node-exporter (read host hardware), storage drivers (csi-driver-nfs and Rook Ceph: host network, `hostPath` volumes, bidirectional mount propagation), the Envoy AI Gateway controller. |
 | `baseline` | Upstream operators and controllers whose charts do not declare a full restricted security context: the Keycloak operator, the KServe and LeaderWorkerSet controllers, Velero, and the vLLM Semantic Router dashboard. `baseline` still blocks privilege escalation and host access. |
 | `restricted` | Workloads that declare a full security context (non-root, all capabilities dropped, a seccomp profile): cert-manager, the PostgreSQL operator and database, Envoy Gateway (its proxies listen on unprivileged ports), metrics-server, Headlamp, KEDA, the model namespaces, LiteLLM and Langfuse. |
 
