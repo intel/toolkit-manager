@@ -30,7 +30,7 @@ The stack is built in **layers**, each on top of the one before. You pick a **ta
 | # | Layer | In short | What it installs | Install target | Learn more |
 | --- | --- | --- | --- | --- | --- |
 | 1 | **Infrastructure** | The cluster your machines become | Kubernetes (built with Kubespray) and storage (local-path, NFS, Ceph, NetApp ONTAP, or your own CSI driver) | `infrastructure` | [Quick Start: Layer 1](#layer-1-infrastructure) |
-| 2 | **Platform** | Shared services every layer uses | Gateway, sign-in, certificates, service mesh, databases, object storage, monitoring, cluster dashboard | `platform` | [Quick Start: Layer 2](#layer-2-platform) |
+| 2 | **Platform** | Shared services every layer uses | Envoy Gateway, Keycloak, cert-manager, Istio ambient mesh, MetalLB, PostgreSQL, SeaweedFS, Grafana with Prometheus, Loki and Tempo, Headlamp | `platform` | [Quick Start: Layer 2](#layer-2-platform) |
 | 3 | **Intel® Inference Toolkit** | Serves models behind one OpenAI-compatible API | Envoy AI Gateway, KServe, vLLM / OpenVINO™ Model Server, optional LiteLLM and Langfuse | `inference` | [inference-toolkit](https://github.com/intel/inference-toolkit) |
 | 4 | **Intel® Chatbot Toolkit** *(optional, on top of 3)* | Chat with your own documents (RAG) | Vector database, document ingestion, RAG pipeline, MCP gateway, chat history, web UI | `erag` | [chatbot-toolkit](https://github.com/intel/chatbot-toolkit) |
 | 4 | **Intel® Agent Toolkit** *(optional, on top of 3)* | Run AI agents safely | Agent sandboxes (optionally Kata microVMs), memory stores (Redis Stack, pgvector), LiteLLM virtual keys, guardrails, a hybrid model router; optional KubeRay | `agent-toolkit` | [agent-toolkit](https://github.com/intel/agent-toolkit) |
@@ -60,7 +60,7 @@ cd toolkit-manager
 ./toolkit_manager.sh init platform  # creates env/local/ with your settings
 ```
 
-The defaults work as they are. Your settings are in `env/local/`. Behind a proxy, or to change the domain or storage, edit `env/local/global_config.yaml` before you install → [Configuration Reference](docs/configuration/configuration.md#changing-values).
+The defaults work as they are. Your settings are in `env/local/`. Edit `env/local/global_config.yaml` before you install if you are behind a proxy, want another domain or storage, or want API clients to sign in with LiteLLM virtual keys instead of Keycloak tokens (`auth_type: litellm_vkey`). The install reads these settings, so to change one later, edit it and run the install again → [Configuration Reference](docs/configuration/configuration.md#changing-values).
 
 ### Layer 1: Infrastructure
 
@@ -117,7 +117,7 @@ curl -s --noproxy '*' --cacert env/local/logs/toolkit-manager-ca.crt \
   "${GATEWAY_URL}/v1/chat/completions"
 ```
 
-A JSON reply with `choices` means the model is serving; any OpenAI client works. Using LiteLLM virtual keys (`auth_type: litellm_vkey`) instead? → [With `auth_type: litellm_vkey`](docs/getting-started/deploy-models.md#with-auth_type-litellm_vkey).
+A JSON reply with `choices` means the model is serving; any OpenAI client works. Want LiteLLM virtual keys instead of Keycloak tokens? Set `auth_type: litellm_vkey` in `env/local/global_config.yaml` before `install inference`: it decides whether the install deploys LiteLLM → [With `auth_type: litellm_vkey`](docs/getting-started/deploy-models.md#with-auth_type-litellm_vkey).
 
 <details>
 <summary><b>Something went wrong?</b></summary>
@@ -151,7 +151,7 @@ More: [Deploy a Model](docs/getting-started/deploy-models.md) (gated models, the
 ./toolkit_manager.sh install agent-toolkit
 ```
 
-API sign-in becomes LiteLLM virtual keys.
+API sign-in switches to LiteLLM virtual keys, so each agent gets its own key: `init agent-toolkit` sets `auth_type: litellm_vkey` in `env/local/config.agent-toolkit.yaml`.
 
 **Check it:** list the models through LiteLLM with its admin key:
 
@@ -166,7 +166,7 @@ curl -s --noproxy '*' --cacert env/local/logs/toolkit-manager-ca.crt --resolve "
   -H "Authorization: Bearer $MK" "https://litellm.$DOMAIN/v1/models"   # lists qwen2-5-coder-14b and hybrid-router
 ```
 
-Keep the admin key to yourself; give each application or agent its own virtual key. More: [Getting Started with the Intel® Agent Toolkit](docs/getting-started/agent-toolkit.md) (every component and its switch), [virtual keys](docs/getting-started/deploy-models.md#access-the-model).
+Keep the admin key to yourself; give each application or agent its own virtual key. More: [Getting Started with the Intel® Agent Toolkit](docs/getting-started/agent-toolkit.md) (every component and its switch, including OpenShell, KubeRay and Kata microVMs), [virtual keys](docs/getting-started/deploy-models.md#access-the-model).
 
 **In the browser:** the LiteLLM admin UI (virtual keys, spend) at `https://litellm-ui.inteltoolkits.ai/ui/` and Langfuse (agent traces) at `https://langfuse.inteltoolkits.ai`; the Kubernetes cluster dashboard links both → [Kubernetes cluster dashboard](docs/configuration/headlamp.md).
 
