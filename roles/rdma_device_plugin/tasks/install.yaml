@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # A no-op unless a node lists rdma_nics in rack-profile.yaml. The DaemonSet follows
-# fabric_rdma's rdma-nics label, so add-node needs no step here. One config for the
-# whole rack: the plugin selects NICs by name.
+# fabric_rdma's rdma-nics label, so add-node needs no step here unless the added
+# node brings NIC names or networks the config lacks (docs: run install again).
+# One config for the whole rack: the plugin selects NICs by name.
 
 - name: "rdma_device_plugin | Install"
   environment:

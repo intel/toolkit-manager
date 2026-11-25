@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # The DaemonSet runs on every labelled node, and each advertises the RDMA resources
-# of its NICs. Install waits; validate checks once.
+# of its NICs. Install waits; validate checks twice (with retries 0 ansible-core
+# never evaluates until).
 
 - name: "rdma_device_plugin | Wait for the DaemonSet to roll out"
   kubernetes.core.k8s_info:
@@ -13,7 +14,7 @@
     namespace: "{{ rdma_device_plugin_namespace }}"
   register: _rdma_dp_ds
   until: _rdma_dp_ds.resources | default([]) | rdma_daemonset_ready(_rdma_dp_labelled | length)
-  retries: "{{ rdma_device_plugin_ready_retries if component_action == 'install' else 0 }}"
+  retries: "{{ rdma_device_plugin_ready_retries if component_action == 'install' else 1 }}"
   delay: 10
 
 - name: "rdma_device_plugin | Read the RDMA resources each node advertises"
