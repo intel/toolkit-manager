@@ -168,7 +168,7 @@ site:
 network:
   topology: star             # star | clos | l2 | none
   calico_mode: vxlan         # vxlan (star/l2/none) | bgp (clos or l2 node-mesh)
-  pod_cidr: 10.244.0.0/16
+  pod_cidr: 10.233.64.0/18
   service_cidr: 10.233.0.0/18
   mtu: 9000                  # jumbo frames — must match switch and NIC config (none: 1500 by default)
   fabric_prefix: 30          # /30 for star point-to-point, /16 for clos
@@ -176,7 +176,9 @@ network:
   control_plane_on_fabric: true  # bind kubelet + etcd to fabric IP (recommended)
 ```
 
-Defaults when a key is left out: `topology: clos`, `calico_mode: vxlan`, `pod_cidr: 10.244.0.0/16`, `service_cidr: 10.96.0.0/12`, `mtu: 9000` (`1500` with `none`), `vxlan_overhead: 50`, `fabric_prefix: 16`, `netplan_renderer: networkd`, `control_plane_on_fabric: false`. Set `topology` and `calico_mode` explicitly: left out, they give `clos` with `vxlan`, while a Clos fabric runs `bgp`.
+Defaults when a key is left out: `topology: clos`, `calico_mode: vxlan`, `pod_cidr: 10.233.64.0/18`, `service_cidr: 10.233.0.0/18`, `mtu: 9000` (`1500` with `none`), `vxlan_overhead: 50`, `fabric_prefix: 16`, `netplan_renderer: networkd`, `control_plane_on_fabric: false`. Set `topology` and `calico_mode` explicitly: left out, they give `clos` with `vxlan`, while a Clos fabric runs `bgp`.
+
+`pod_cidr` and `service_cidr` set the cluster's pod and Service ranges. On rack-scale they replace `kubernetes_cluster_cidr` and `kubernetes_service_cidr`: leave those out of `global_config.yaml`, where a different value stops the install. The ranges are fixed when Kubernetes is installed: on an installed cluster, `install` stops if the profile names other ranges, and changing them needs a reinstall. Behind a proxy, list them in `no_proxy`.
 
 ### SSH Access
 
@@ -398,7 +400,7 @@ With `calico_mode: bgp` on L2, Calico uses **node-to-node mesh** (all nodes peer
        10.201.1.1/16          10.201.1.2/16          10.201.1.3/16
 
   routes:   none — 10.201.0.0/16 is on-link on every node
-  pod CIDR: 10.244.x.0/24 via 10.201.1.x (learned from the Calico node mesh)
+  pods:     10.233.64.0/18 in /26 blocks, each via its node's 10.201.1.x (learned from the Calico node mesh)
 ```
 
 > [!Note]
@@ -459,8 +461,8 @@ network:
   topology: none
   calico_mode: vxlan       # forced — bgp rejected by parser
   # mtu: 1500             # the management network's MTU; 1500 by default
-  pod_cidr: 10.244.0.0/16
-  service_cidr: 10.96.0.0/12
+  pod_cidr: 10.233.64.0/18
+  service_cidr: 10.233.0.0/18
 
 # Nodes — mgmt_ip only, NO fabric_nics:
 master1:

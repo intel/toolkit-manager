@@ -151,8 +151,8 @@ is left as it is (or commented out).
 | `kubernetes_cluster_name` | The cluster's internal DNS suffix. Default `cluster.local` |
 | `kubernetes_kube_proxy_mode` | How Kubernetes routes service traffic: `nftables` (default), `iptables` or `ipvs` |
 | `existing_kubernetes` | Path to the kubeconfig of a cluster you already run; the installer then skips building one. Unset by default. `KUBECONFIG` is not supported: the installer uses this path, or `env/<name>/kubeconfig.yaml` for a managed cluster — see [BYO cluster](#byo-cluster) |
-| `kubernetes_service_cidr` | Address range for Kubernetes services. Default `10.233.0.0/18` |
-| `kubernetes_cluster_cidr` | Address range for pods. Default `10.233.64.0/18` |
+| `kubernetes_service_cidr` | Address range for Kubernetes services. Default `10.233.0.0/18`. On rack-scale, set `network.service_cidr` in `rack-profile.yaml` instead |
+| `kubernetes_cluster_cidr` | Address range for pods. Default `10.233.64.0/18`. On rack-scale, set `network.pod_cidr` in `rack-profile.yaml` instead |
 | `metallb_ip_range` | Range of IPs (`a-b`) MetalLB hands out to load balancers. Leave unset to have one detected |
 | `http_proxy`, `https_proxy`, `no_proxy` | Corporate proxy. Unset by default — see [Proxy](#proxy) |
 | `base_domain_name` | All service URLs derive from this (e.g. `grafana.<domain>`, `litellm.<domain>`). Default `inteltoolkits.ai` |

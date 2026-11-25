@@ -338,7 +338,7 @@ A typical multi-node stack that Toolkit Manager installs looks like this at the 
 
 - The MetalLB IP is the control-plane node's own IP here (see [IP Allocation Strategy](#ip-allocation-strategy)).
 - The Envoy proxy runs on the control-plane node. Platform pods prefer it and model pods prefer the workers ([Node Topology](../configuration/node-topology.md)).
-- The pod and Service ranges are the defaults, `kubernetes_cluster_cidr` and `kubernetes_service_cidr`. Change them in `global_config.yaml` if they overlap your network.
+- The pod and Service ranges are the defaults, `kubernetes_cluster_cidr` and `kubernetes_service_cidr`. Change them in `global_config.yaml` if they overlap your network; on rack-scale, in `network.pod_cidr` and `network.service_cidr` of `rack-profile.yaml` instead.
 
 ### Traffic Flow Detail
 

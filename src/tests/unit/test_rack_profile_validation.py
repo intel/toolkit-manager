@@ -6,7 +6,7 @@ import copy
 import pytest
 import yaml
 
-from plugin_loader import EXAMPLE_PROFILE as EXAMPLE, load_plugin
+from plugin_loader import EXAMPLE_PROFILE as EXAMPLE, ROOT, load_plugin
 
 _mod = load_plugin("rack_profile_parser")
 
@@ -189,3 +189,26 @@ def test_calico_mode_must_be_vxlan_or_bgp():
     profile = none_topology("192.0.2.0/24")
     profile["network"]["calico_mode"] = "VXLAN"
     assert "network.calico_mode must be 'vxlan' or 'bgp', got 'VXLAN'" in validate(profile)["errors"]
+
+
+def test_the_pod_and_service_ranges_default_to_the_kubernetes_role_defaults():
+    defaults = yaml.safe_load((ROOT / "roles" / "kubernetes" / "defaults" / "main.yaml").read_text())
+    summary = _mod.rack_profile_parse(clos())["summary"]
+    assert (summary["pod_cidr"], summary["service_cidr"]) == (
+        defaults["kubernetes_cluster_cidr"], defaults["kubernetes_service_cidr"])
+
+
+def test_the_profile_sets_the_pod_and_service_ranges():
+    profile = clos()
+    profile["network"].update(pod_cidr="10.240.0.0/16", service_cidr="10.241.0.0/18")
+    summary = _mod.rack_profile_parse(profile)["summary"]
+    assert (summary["pod_cidr"], summary["service_cidr"]) == ("10.240.0.0/16", "10.241.0.0/18")
+
+
+@pytest.mark.parametrize("mgmt_ip, label", [("10.233.1.10", "network.service_cidr 10.233.0.0/18"),
+                                            ("10.233.65.10", "network.pod_cidr 10.233.64.0/18")])
+def test_the_default_ranges_are_the_ones_checked(mgmt_ip, label):
+    profile = none_topology("192.0.2.0/24")
+    profile["racks"]["rack-01"]["nodes"]["w1"]["mgmt_ip"] = mgmt_ip
+    assert (f"{label} contains mgmt_ip {mgmt_ip} of node 'w1' — cluster traffic would collide with "
+            f"the management network") in validate(profile)["errors"]

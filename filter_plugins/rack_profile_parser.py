@@ -497,8 +497,8 @@ def _parse_and_validate(profile):
     leafs = network.get("leafs", []) or []
     bgp_block = network.get("bgp", {}) or {}
     cluster_asn = bgp_block.get("cluster_asn", 65100)
-    pod_cidr = network.get("pod_cidr", "10.244.0.0/16")
-    service_cidr = network.get("service_cidr", "10.96.0.0/12")
+    pod_cidr = network.get("pod_cidr", "10.233.64.0/18")
+    service_cidr = network.get("service_cidr", "10.233.0.0/18")
     vxlan_overhead = network.get("vxlan_overhead", 50)
     overhead_ok = _whole(vxlan_overhead, 0)
     if not overhead_ok:
@@ -1483,6 +1483,8 @@ def _build_summary(ctx):
         "calico_mode": ctx["calico_mode"],
         "fabric_mtu": ctx["fabric_mtu"],
         "fabric_cidrs": _fabric_cidrs(ctx),
+        "pod_cidr": ctx["pod_cidr"],
+        "service_cidr": ctx["service_cidr"],
         "node_count": len(all_nodes),
         "gpu_vendor": gpu_vendor,
         "gpu_model": gpu_model,
