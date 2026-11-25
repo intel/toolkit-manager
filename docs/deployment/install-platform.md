@@ -84,7 +84,7 @@ Set `intel_gpu_plugin_enabled: false` to turn it off.
 git clone https://github.com/intel/toolkit-manager.git
 cd toolkit-manager
 
-# Prepare your machine, once (installs Python 3.11+, yq, kubectl, helm and the .venv; asks first)
+# Prepare your machine, once (installs Python 3.11+, yq, jq, kubectl, helm and the .venv; asks first)
 ./toolkit_manager.sh configure
 
 # Create an environment named "local" for the inference layer (add --env <name> for another name)

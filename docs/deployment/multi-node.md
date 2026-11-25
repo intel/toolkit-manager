@@ -34,7 +34,7 @@ You then describe the machines in one of two ways: [Option A](#option-a--configu
 ### Step 1 — Create the environment
 
 ```bash
-./toolkit_manager.sh configure                 # once per machine: installs Python, yq, kubectl and helm (uses sudo)
+./toolkit_manager.sh configure                 # once per machine: installs Python, yq, jq, kubectl and helm (uses sudo)
 ./toolkit_manager.sh init inference --env prod # creates env/prod/ and clones the inference repo into ext/
 ```
 
