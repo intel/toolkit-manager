@@ -748,9 +748,12 @@ On a shared NIC use `hostNetwork: true` and `rdma/hca: 1` instead of the annotat
   other pods' included. Fine for a single-tenant rack.
 - The RDMA network namespace mode must be `shared`, the kernel default: the plugin
   refuses `exclusive`.
-- `fabric_rdma` owns Multus on the cluster: do not enable Kubespray's
-  (`kube_network_plugin_multus`). Its teardown removes the NetworkAttachmentDefinition
-  CRD and the nodes' Multus files; running pods keep their `net1` until deleted.
+- `fabric_rdma` owns Multus on the cluster: with `pod_range`, install stops if
+  another Multus runs (Kubespray's `kube_network_plugin_multus`, a network operator).
+  Its teardown removes the NetworkAttachmentDefinition CRD and the nodes' Multus
+  files, unless another install's Multus runs or the API does not answer (the
+  Kubernetes reset removes the node files); running pods keep their `net1` until
+  deleted.
 
 ---
 

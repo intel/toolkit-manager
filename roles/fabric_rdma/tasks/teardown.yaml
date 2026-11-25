@@ -31,6 +31,27 @@
   register: _rdma_api
   failed_when: false
 
+# Multus that another install runs (pod networks never installed here) owns the
+# shared CRD and node files: leave them. Without an answer from the API, leave
+# them too: after the Kubernetes reset, which removes /etc/cni and /opt/cni,
+# there is nothing left to remove.
+- name: "fabric_rdma | teardown | Multus from another install"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    label_selectors:
+      - app=multus
+    kubeconfig: "{{ kubernetes_kubeconfig }}"
+  register: _rdma_multus_existing
+  when: _rdma_api.resources is defined
+
+- name: "fabric_rdma | teardown | Whether the pod networks' Multus is ours to remove"
+  ansible.builtin.set_fact:
+    _rdma_multus_ours: >-
+      {{ _rdma_multus_existing.resources is defined
+         and (_rdma_multus_existing.resources
+              | rejectattr('metadata.namespace', 'equalto', rack_scale_rdma_namespace) | list | length) == 0 }}
+
 # First, so that no Multus pod writes its files on the nodes again.
 - name: "fabric_rdma | teardown | Multus, whereabouts and the NetworkAttachmentDefinitions"
   kubernetes.core.k8s:
@@ -52,6 +73,7 @@
   loop: "{{ _rdma_all_nodes | product(rack_scale_rdma_cni_host_files) | list }}"
   loop_control:
     label: "{{ item.0 }}: {{ item.1 }}"
+  when: _rdma_multus_ours
 
 - name: "fabric_rdma | teardown | Their cluster-wide objects (CRDs, ClusterRoles)"
   kubernetes.core.k8s:
@@ -63,7 +85,7 @@
   loop: "{{ rack_scale_rdma_pod_docs | rejectattr('metadata.namespace', 'defined') | rejectattr('kind', 'equalto', 'Namespace') | list }}"
   loop_control:
     label: "{{ item.kind }}/{{ item.metadata.name }}"
-  when: _fabric_scope_nodes is not defined and _rdma_api.resources is defined
+  when: _fabric_scope_nodes is not defined and _rdma_api.resources is defined and _rdma_multus_ours
 
 - name: "fabric_rdma | teardown | Remove the rdma-nics label"
   ansible.builtin.command:

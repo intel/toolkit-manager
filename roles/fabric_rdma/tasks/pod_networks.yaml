@@ -11,6 +11,31 @@
 # NetworkAttachmentDefinition rdma-net<i> per network. Shared NICs get none:
 # their pods use hostNetwork.
 
+# fabric_rdma owns the cluster's Multus, like rdma_device_plugin its plugin: another
+# one (Kubespray's kube_network_plugin_multus, a network operator) shares its CRD
+# and node files, which this install would replace.
+# app=multus: upstream's, Kubespray's (kube-multus-ds-<arch>) and ours.
+- name: "fabric_rdma | pods | Multus from another install"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    label_selectors:
+      - app=multus
+    kubeconfig: "{{ kubernetes_kubeconfig }}"
+  register: _rdma_multus_existing
+
+- name: "fabric_rdma | pods | Stop on Multus from another install"
+  ansible.builtin.fail:
+    msg: >-
+      Multus already runs in {{ _rdma_multus_elsewhere | map(attribute='metadata.namespace') | unique | join(', ') }}.
+      The RDMA pod networks bring their own Multus, which would replace that one's objects and node files.
+      Remove the other Multus (for Kubespray's, kube_network_plugin_multus), or remove network.rdma.pod_range
+      and use hostNetwork RDMA pods.
+  vars:
+    _rdma_multus_elsewhere: >-
+      {{ _rdma_multus_existing.resources | rejectattr('metadata.namespace', 'equalto', rack_scale_rdma_namespace) | list }}
+  when: _rdma_multus_elsewhere | length > 0
+
 - name: "fabric_rdma | pods | CNI configs of the nodes in this run"
   ansible.builtin.set_fact:
     _rdma_cni_files: >-
