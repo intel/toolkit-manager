@@ -18,7 +18,7 @@ repos:
   - layer: "agent-toolkit"
     url: "https://github.com/intel/enterprise-agent-toolkit"
     dest: "enterprise.agent-toolkit"
-    rev: "agentic-toolkit-migration"
+    rev: "v2.0.1-rc.1"
     deployment_subdir: ""
     config_dir: ""
     default_flavour: ""
