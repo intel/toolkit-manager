@@ -96,7 +96,7 @@ kubectl -n keycloak get secret platform-bootstrap-admin -o jsonpath='{.data.valu
 
 ### Layer 3: Intel® Inference Toolkit
 
-**What you get:** production model serving, not just an endpoint. Every model sits behind one secured, OpenAI-compatible API, `https://inference.inteltoolkits.ai/v1`, over HTTPS, and every request must sign in, with a Keycloak token or a LiteLLM virtual key that carries its own model list, budget and rate limit. The gateway sends each request to the model it names, and each engine gets a Grafana dashboard. Models run on vLLM or OpenVINO™ Model Server on Intel® Xeon® CPUs or Intel® Arc™ GPUs. `model-manager` deploys and removes models in one command.
+**What you get:** production model serving on Intel® hardware. Every model sits behind one OpenAI-compatible API, `https://inference.inteltoolkits.ai/v1`, over HTTPS, and every request must sign in. The gateway sends each request to the model it names, and each engine gets a Grafana dashboard. Models run on vLLM or OpenVINO™ Model Server on Intel® Xeon® processors or Intel® Arc™ GPUs. `model-manager` deploys and removes models in one command.
 
 ```bash
 ./toolkit_manager.sh init inference      # downloads the Inference Toolkit into ext/
@@ -234,4 +234,6 @@ Licensed under the [Apache License, Version 2.0](LICENSE).
 
 ---
 
-*Intel® and Intel® Arc™ are registered trademarks of Intel Corporation or its subsidiaries.*
+*Intel, the Intel logo and Xeon are trademarks of Intel Corporation or its subsidiaries.*
+
+*Intel, the Intel logo, and Arc are trademarks of Intel Corporation or its subsidiaries.*
