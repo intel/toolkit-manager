@@ -620,6 +620,10 @@ installer never configures switches: give your network team this table.
   kernel, without PFC.
 - To change `network.rdma` or a node's `rdma_nics`, tear down `fabric_rdma`, then
   install it again.
+- One `network.rdma.subnet`: give a node at most one dedicated NIC with `rdma_ip`.
+  Several NICs of a node on one subnet (one per GPU) need per-rail subnets, which
+  are not supported yet: the kernel sends to the subnet through one of the NICs,
+  and RDMA-CM picks the NIC by route.
 - Teardown removes the RDMA netplan file and its addresses but leaves the NIC up
   at its MTU; reboot, or `ip link set <nic> down`.
 - The first PFC and DSCP settings on an Intel E810 reset its link for about 10 s.
@@ -629,12 +633,13 @@ installer never configures switches: give your network team this table.
   (dmesg: "Couldn't create ib_mad QP1"; validate: "ib_write_bw measured
   nothing"), and keeps the DSCP map after teardown until a reboot. Intel's
   ice/irdma driver package works.
-- The RDMA user library (rdma-core) must work with the kernel's RDMA driver.
-  Ubuntu 24.04's HWE kernel 7.0 with a Broadcom NIC (bnxt_re) does not work with
-  24.04's own rdma-core 50: install and validate fail with "could not create an
-  RDMA queue pair". Install a newer rdma-core on the nodes (rdma-core 65 works).
-  When a node runs an rdma-core that no OS package installed, the install warns:
-  RDMA app images for those nodes need a matching rdma-core too.
+- The RDMA user library (rdma-core) must work with the kernel's RDMA driver. A
+  Broadcom Thor 2 NIC (bnxt_re) on kernel 6.12 or later, such as Ubuntu 24.04's
+  HWE kernel 7.0, needs rdma-core 53 or later (65 is tested). Ubuntu 24.04 ships
+  50, and install and validate then fail with "could not create an RDMA queue
+  pair": install a newer rdma-core on the nodes. When a node runs an rdma-core
+  that no OS package installed, the install warns: RDMA app images for those
+  nodes need a matching rdma-core too.
 
 **Nodes:** `add-node` sets up RDMA on the added node(s) only and checks their
 RDMA NICs; with one added node there is no second node to measure against.
