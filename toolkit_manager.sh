@@ -408,19 +408,23 @@ _detect_os() {
     esac
 }
 
+# sudo resets the environment, so DEBIAN_FRONTEND is set on its side; exported for the
+# `bash -c` chains below.
+_apt_get() { sudo env DEBIAN_FRONTEND=noninteractive apt-get "$@"; }
+export -f _apt_get
+
 _configure_debian() {
     . /etc/os-release
-    export DEBIAN_FRONTEND=noninteractive
     infon "Updating package index"
-    _quiet sudo apt-get update -qq
+    _quiet _apt_get update -qq
     case "${VERSION_ID:-}" in
         22.04)
             infon "Installing Python 3.11 via deadsnakes (Ubuntu 22.04)"
-            _quiet bash -c 'sudo apt-get install -y -qq software-properties-common && sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt-get update -qq && sudo apt-get install -y -qq python3.11 python3.11-venv python3.11-dev'
+            _quiet bash -c '_apt_get install -y -qq software-properties-common && sudo add-apt-repository -y ppa:deadsnakes/ppa && _apt_get update -qq && _apt_get install -y -qq python3.11 python3.11-venv python3.11-dev'
             ;;
         24.04)
             infon "Installing Python 3 (Ubuntu 24.04)"
-            _quiet sudo apt-get install -y -qq python3 python3-venv python3-dev
+            _quiet _apt_get install -y -qq python3 python3-venv python3-dev
             ;;
         *) err "Unsupported Ubuntu version: ${VERSION_ID:-?} (supported: 22.04, 24.04)" ;;
     esac
@@ -437,7 +441,7 @@ _configure_locale() {
     infon "Configuring UTF-8 locale"
     case "$(_detect_os)" in
         debian)
-            _quiet bash -c 'sudo apt-get install -y -qq locales && sudo locale-gen en_US.UTF-8 && sudo update-locale LANG=en_US.UTF-8' \
+            _quiet bash -c '_apt_get install -y -qq locales && sudo locale-gen en_US.UTF-8 && sudo update-locale LANG=en_US.UTF-8' \
                 || { warn "Could not provision en_US.UTF-8 — continuing with ${LANG}."; return 0; }
             ;;
         rhel)
