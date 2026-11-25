@@ -18,6 +18,7 @@ import re
 LOSS = re.compile(r"out_of_sequence|seq_err", re.I)
 ECN = re.compile(r"ecn", re.I)
 NOT_PFC_FRAMES = re.compile(r"duration|transition|xon", re.I)
+QP_FAILED = re.compile(r"create .*QP", re.I)
 
 
 def _pcie_gbps(pcie):
@@ -121,16 +122,24 @@ def _nic_problems(host, nic, want, got, mgmt_ip, settings):
 
 def rdma_readback_evaluate(readbacks, expected, settings):
     """{"errors": [...], "warnings": [...], "record": {host: {nic: {...}}}}."""
-    errors, warnings, record = [], [], {}
+    errors, warnings, record, unpackaged = [], [], {}, {}
     for host in sorted(expected):
         got = readbacks.get(host) or {}
+        core = got.get("rdma_core") or {}
+        if core.get("version") and core.get("packaged") is False:
+            unpackaged.setdefault(core["version"], []).append(host)
         for want in expected[host].get("nics") or []:
             e, w, r = _nic_problems(host, want["nic"], want, (got.get("nics") or {}).get(want["nic"]),
                                     expected[host].get("mgmt_ip"), settings)
             errors += e
             warnings += w
             if r is not None:
-                record.setdefault(host, {})[want["nic"]] = r
+                record.setdefault(host, {})[want["nic"]] = dict(r, rdma_core=core.get("version"))
+    # The site replaced the OS's rdma-core, as kernels whose RDMA driver needs a newer one require.
+    for version, hosts in sorted(unpackaged.items()):
+        warnings.append("%s: RDMA runs on rdma-core %s, which no OS package installed. RDMA app images for these "
+                        "nodes need an rdma-core that works with their kernel, like this one: an image with the "
+                        "OS's own rdma-core may fail with \"Couldn't create QP\"" % (", ".join(hosts), version))
     return {"errors": errors, "warnings": warnings, "record": record}
 
 
@@ -204,6 +213,7 @@ def rdma_bw_pairs(record, hosts):
                 "client": client, "client_nic": cnic, "client_dev": crec["dev"], "client_cpus": crec.get("cpus"),
                 "server": server, "server_nic": snic, "server_dev": srec["dev"], "server_cpus": srec.get("cpus"),
                 "server_ip": srec["ipv4"], "ceiling_gbps": min(ceilings) if ceilings else None,
+                "client_rdma_core": crec.get("rdma_core"),
             })
     return pairs
 
@@ -259,7 +269,13 @@ def rdma_bw_report(runs, deltas, low):
     for r in runs or []:
         what = "%s %s -> %s %s (%s)" % (r["client"], r["client_nic"], r["server"], r["server_nic"], r["server_ip"])
         if r.get("gbps") is None:
-            errors.append("%s: ib_write_bw measured nothing: %s" % (what, " ".join(r.get("output") or []) or "no output"))
+            output = " ".join(r.get("output") or []) or "no output"
+            if QP_FAILED.search(output):
+                output = output.rstrip(".") + (
+                    ". %s could not create an RDMA queue pair: its rdma-core%s probably does not work with its "
+                    "kernel's RDMA driver; install a newer rdma-core on it"
+                    % (r["client"], " (%s)" % r["client_rdma_core"] if r.get("client_rdma_core") else ""))
+            errors.append("%s: ib_write_bw measured nothing: %s" % (what, output))
             continue
         ceiling = r.get("ceiling_gbps")
         lines.append("%s: %.1f Gb/s%s" % (what, r["gbps"], " of up to %s" % ceiling if ceiling else ""))

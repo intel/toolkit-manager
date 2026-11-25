@@ -629,6 +629,12 @@ installer never configures switches: give your network team this table.
   (dmesg: "Couldn't create ib_mad QP1"; validate: "ib_write_bw measured
   nothing"), and keeps the DSCP map after teardown until a reboot. Intel's
   ice/irdma driver package works.
+- The RDMA user library (rdma-core) must work with the kernel's RDMA driver.
+  Ubuntu 24.04's HWE kernel 7.0 with a Broadcom NIC (bnxt_re) does not work with
+  24.04's own rdma-core 50: install and validate fail with "could not create an
+  RDMA queue pair". Install a newer rdma-core on the nodes (rdma-core 65 works).
+  When a node runs an rdma-core that no OS package installed, the install warns:
+  RDMA app images for those nodes need a matching rdma-core too.
 
 **Nodes:** `add-node` sets up RDMA on the added node(s) only and checks their
 RDMA NICs; with one added node there is no second node to measure against.

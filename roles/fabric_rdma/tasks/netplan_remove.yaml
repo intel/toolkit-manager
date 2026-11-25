@@ -5,9 +5,10 @@
 # =============================================================================
 # fabric_rdma — Remove the RDMA netplan file: _rdma_netplan_remove_hosts
 # =============================================================================
-# netplan apply leaves an address in place once its definition is gone, so the
-# addresses the file set are read first and deleted after. Other addresses on
-# the NIC stay. Nothing happens on a node without the file.
+# netplan apply may leave an address in place once its definition is gone (on
+# Ubuntu 24.04 it removes it), so, as in fabric_netplan's teardown, the addresses
+# the file set are read first and deleted after if still there. Other addresses
+# on the NIC stay. Nothing happens on a node without the file.
 
 - name: "fabric_rdma | netplan | Read {{ rack_scale_rdma_netplan_dest }}"
   ansible.builtin.slurp:

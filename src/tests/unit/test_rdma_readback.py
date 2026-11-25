@@ -392,3 +392,41 @@ def test_qos_follows_a_renamed_rdma_device(monkeypatch, tmp_path):
     cfg = {"dscp": 26, "priority": 3, "dev": "irdma0", "port": 1, "pfc": False, "dscp_map": False, "tos": True}
     assert qos.apply("ens6f0", cfg) == []
     assert (tmp_path / "rdma_cm" / "rocep42s0f0" / "ports" / "1" / "default_roce_tos").read_text() == "104"
+
+
+@pytest.mark.parametrize("lib, owned, found", [
+    ("libibverbs.so.1.14.50.0", True, {"version": 50, "packaged": True}),
+    ("libibverbs.so.1.18.65.0", False, {"version": 65, "packaged": False}),
+])
+def test_probe_reads_the_rdma_core_release(monkeypatch, tmp_path, lib, owned, found):
+    (tmp_path / lib).write_text("")
+    (tmp_path / "libibverbs.so.1").symlink_to(lib)
+    out = {"ldconfig": (0, "\tlibibverbs.so.1 (libc6,x86-64) => %s/libibverbs.so.1" % tmp_path),
+           "dpkg": (0 if owned else 1, "")}
+    monkeypatch.setattr(probe, "run", lambda args: out[args[0]])
+    assert probe.rdma_core() == dict(found, lib=str(tmp_path / lib))
+    monkeypatch.setattr(probe, "run", lambda args: (None, ""))
+    assert probe.rdma_core() is None
+
+
+def test_rdma_core_no_os_package_installed_warns_once_per_release():
+    core = {"a": {"version": 65, "packaged": False}, "b": {"version": 65, "packaged": False},
+            "c": {"version": 50, "packaged": True}}
+    out = _mod.rdma_readback_evaluate(
+        {h: {"nics": {"ens6np0": nic(ip="198.51.100.%d" % i)}, "rdma_core": core[h]} for i, h in enumerate(core, 1)},
+        {h: {"nics": [want("ens6np0")]} for h in core}, SETTINGS)
+    assert out["warnings"] == [
+        "a, b: RDMA runs on rdma-core 65, which no OS package installed. RDMA app images for these nodes need an "
+        "rdma-core that works with their kernel, like this one: an image with the OS's own rdma-core may fail "
+        "with \"Couldn't create QP\""]
+    assert [out["record"][h]["ens6np0"]["rdma_core"] for h in core] == [65, 65, 50]
+
+
+def test_bw_report_explains_a_queue_pair_that_could_not_be_created():
+    run = {"client": "a", "client_nic": "x", "server": "b", "server_nic": "x", "server_ip": "198.51.100.2",
+           "gbps": None, "client_rdma_core": 50,
+           "output": ["Couldn't create rdma old QP - Bad address", "Unable to create QP.", "Failed to create QP."]}
+    assert _mod.rdma_bw_report([run], {}, 0.5)["errors"] == [
+        "a x -> b x (198.51.100.2): ib_write_bw measured nothing: Couldn't create rdma old QP - Bad address "
+        "Unable to create QP. Failed to create QP. a could not create an RDMA queue pair: its rdma-core (50) "
+        "probably does not work with its kernel's RDMA driver; install a newer rdma-core on it"]

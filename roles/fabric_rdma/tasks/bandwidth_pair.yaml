@@ -46,11 +46,14 @@
   failed_when: false
   changed_when: false
 
+# perftest's first error lines name the cause; its last ones only say it gave up.
 - name: "fabric_rdma | Bandwidth | Record {{ _pair.client }} -> {{ _pair.server }}"
+  vars:
+    _lines: "{{ ((_rdma_client.stdout | default('')) ~ '\n' ~ (_rdma_client.stderr | default(''))).strip().splitlines() }}"
   ansible.builtin.set_fact:
     _rdma_bw: >-
       {{ _rdma_bw + [_pair | combine({
            'gbps': _rdma_client.stdout | default('') | rdma_bw_gbps,
-           'output': (((_rdma_client.stdout | default('')) ~ '\n' ~ (_rdma_client.stderr | default(''))).strip().splitlines()[-3:]
-                      or [_rdma_client.msg | default('no output')])
+           'output': ((_lines | reject('search', '^libibverbs: Warning') | select('search', '(?i)couldn.t|unable|failed|error') | list)[:3]
+                      or _lines[-3:] or [_rdma_client.msg | default('no output')])
                      + (['timed out'] if _rdma_client.rc | default(0) == 124 else [])})] }}

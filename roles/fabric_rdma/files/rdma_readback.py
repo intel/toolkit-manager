@@ -5,7 +5,7 @@
 
 Per NIC: link, addresses, PCIe link and NUMA node, its RDMA device and RoCE v2 GIDs, the
 host's PFC, DSCP and ARP settings, ECN where the driver shows it, and the PFC, ECN and
-retransmit counters. Standard library only, Python 3.6+.
+retransmit counters. Per host: the rdma-core release it runs. Standard library only, Python 3.6+.
 """
 
 import ipaddress
@@ -150,6 +150,19 @@ def fw_lldp_agent(nic):
     return m.group(1) if m else None
 
 
+def rdma_core():
+    """The rdma-core release of the libibverbs the host loads, and whether an OS package installed it."""
+    _, cache = run(["ldconfig", "-p"])
+    m = re.search(r"libibverbs\.so\.1 \([^)]*\) => (\S+)", cache)
+    if not m:
+        return None
+    lib = os.path.realpath(m.group(1))
+    version = re.match(r"libibverbs\.so\.1\.\d+\.(\d+)\.", os.path.basename(lib))
+    rc, _ = run(["dpkg", "-S", lib])
+    return {"version": int(version.group(1)) if version else None, "lib": lib,
+            "packaged": None if rc is None else rc == 0}
+
+
 def nic_record(nic, priority):
     net = "/sys/class/net/" + nic
     if not os.path.isdir(net):
@@ -191,6 +204,7 @@ def main():
     print(json.dumps({
         "ib_write_bw": bool(shutil.which("ib_write_bw")),
         "installer_qos": installer_qos,
+        "rdma_core": rdma_core(),
         "nics": {nic: nic_record(nic, spec.get("priority", 3)) for nic in spec.get("nics", [])},
     }, sort_keys=True))
 
