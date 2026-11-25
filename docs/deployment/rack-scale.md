@@ -717,6 +717,13 @@ On a shared NIC use `hostNetwork: true` and `rdma/hca: 1` instead of the annotat
 - **Pod Security:** a pod on `net1` needs no capability and can run as non-root
   (`/dev/infiniband/uverbs*` and `rdma_cm` are world-accessible; containerd gives
   containers unlimited locked memory).
+- **Image:** its rdma-core must work with the node's kernel RDMA driver, as the
+  node's own does: on a Broadcom Thor 2 NIC with kernel 6.12 or later, rdma-core
+  53 or later (see RDMA limits). An image with Ubuntu 24.04's rdma-core 50 fails
+  there with "Couldn't create QP – Bad address"; rdma-core 65 is tested. The
+  install warns when a node runs an rdma-core that no OS package installed. Its
+  pod check below uses the node's own tools, so it does not test your image: run
+  `ib_write_bw` from the image between two pods once.
 - **Validation:** install and `validate fabric_rdma` start two busybox pods per pod
   network on its first two nodes and run `ib_write_bw` between their `net1` addresses,
   inside the pods' network namespaces, and print the results (the record holds the
