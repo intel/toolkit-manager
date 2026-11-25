@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 ---
 # The host-network apiserver calls these workloads over plaintext: only their
-# port is PERMISSIVE, and only the apiserver's node and CNI tunnel addresses may
-# reach it. Node addresses are a snapshot; re-running the caller refreshes them.
+# port is PERMISSIVE, and only the addresses the apiserver sends from may reach it
+# (filter_plugins/apiserver_source_ips.py). They are a snapshot; re-running the
+# caller refreshes them.
 #   istio_apiserver_exception_namespace   namespace of the workloads
 #   istio_apiserver_exception_workloads   [{name, selector, port, extra_rules (optional, appended)}]
 
@@ -11,6 +12,17 @@
   kubernetes.core.k8s_info:
     kind: Node
   register: _istio_ax_nodes
+
+# A BYO cluster's nodes are not in the inventory: there only the Node objects'
+# addresses are used.
+- name: "istio | apiserver exception | Read the control-plane node addresses"
+  ansible.builtin.command: ip -j addr show
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['kube_control_plane'] | default(['localhost'], true) }}"
+  register: _istio_ax_addrs
+  changed_when: false
+  check_mode: false
+  when: existing_kubernetes | default('', true) | length == 0
 
 - name: "istio | apiserver exception | Allow apiserver plaintext (port-level mTLS)"
   ansible.builtin.include_tasks: out_of_mesh_exception.yaml
@@ -41,7 +53,9 @@
     _apiserver_rule:
       from:
         - source:
-            ipBlocks: "{{ _istio_ax_nodes.resources | apiserver_source_ips }}"
+            ipBlocks: >-
+              {{ _istio_ax_nodes.resources | apiserver_source_ips(_istio_ax_addrs.results
+                 | selectattr('stdout', 'defined') | map(attribute='stdout') | map('from_json') | list) }}
       to:
         - operation:
             ports: ["{{ item.port | string }}"]
