@@ -32,7 +32,7 @@ SETTINGS = {"dscp": 26, "priority": 3, "pfc": True, "ecn": True}
 def nic(dev="rocep75s0", driver="bnxt_en", ip="198.51.100.44", gen=16.0, width=16, rate=400, **over):
     record = {
         "exists": True, "driver": driver, "admin_up": True, "carrier": True, "mtu": 9000, "speed_mbps": rate * 1000,
-        "addrs": ["%s/24" % ip] if ip else [], "numa_node": 0, "cpulist": "0-35,72-107",
+        "addrs": ["%s/24" % ip] if ip else [], "uppers": [], "numa_node": 0, "cpulist": "0-35,72-107",
         "pcie": {"speed_gts": gen, "width": width},
         "arp": {"ignore": 1, "announce": 2},
         "rdma": [{"dev": dev, "port": 1, "state": "ACTIVE",
@@ -430,3 +430,23 @@ def test_bw_report_explains_a_queue_pair_that_could_not_be_created():
         "a x -> b x (198.51.100.2): ib_write_bw measured nothing: Couldn't create rdma old QP - Bad address "
         "Unable to create QP. Failed to create QP. a could not create an RDMA queue pair: its rdma-core (50) "
         "probably does not work with its kernel's RDMA driver; install a newer rdma-core on it"]
+
+
+def test_an_rdma_ip_nic_that_something_else_configures_is_refused():
+    wanted = {"n1": [{"nic": "eno1", "rdma_ip": "192.168.40.20", "prefix": 24, "mtu": 9000, "shared": False},
+                     {"nic": "ens6np0", "mtu": 9000, "shared": False}]}
+
+    def conflicts(**over):
+        return _mod.rdma_netplan_conflicts({"n1": {"nics": {"eno1": nic(ip=None, **over), "ens6np0": nic()}}},
+                                           wanted)
+
+    why = ", so something else configures it (the management NIC?, or an install with another " \
+          "network.rdma.subnet), and rdma_ip would replace that. Give rdma_ip to a NIC nothing else " \
+          "configures, or remove rdma_ip and configure the NIC yourself"
+    assert conflicts(addrs=["10.23.0.15/24"]) == ["n1 eno1 carries 10.23.0.15/24" + why]
+    assert conflicts(uppers=["bond0"]) == ["n1 eno1 is part of bond0" + why]
+    assert conflicts(addrs=["10.23.0.15/24"], uppers=["eno1.100"]) == [
+        "n1 eno1 carries 10.23.0.15/24 and is part of eno1.100" + why]
+    assert conflicts() == []
+    assert conflicts(addrs=["192.168.40.19/24", "169.254.7.1/16"]) == []  # an earlier install's; link-local
+    assert _mod.rdma_netplan_conflicts({"n1": {"nics": {"eno1": {"exists": False}}}}, wanted) == []

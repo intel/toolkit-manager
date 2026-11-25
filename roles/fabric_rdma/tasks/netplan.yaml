@@ -15,6 +15,21 @@
       {% set out = [] %}{% for h in _rdma_hosts %}{% if hostvars[h].node_rdma_nics
         | selectattr('rdma_ip', 'defined') | list %}{% set _ = out.append(h) %}{% endif %}{% endfor %}{{ out }}
 
+# Before 99-rdma.yaml is written: a NIC that something else configures (the
+# management NIC, typically) would lose its address to it.
+- name: "fabric_rdma | netplan | Read the RDMA NICs"
+  ansible.builtin.include_tasks: probe.yaml
+  when: _rdma_netplan_hosts | length > 0
+
+- name: "fabric_rdma | netplan | Refuse an rdma_ip NIC that something else configures"
+  vars:
+    _conflicts: >-
+      {{ _rdma_readback | rdma_netplan_conflicts(dict(_rdma_netplan_hosts
+         | zip(_rdma_netplan_hosts | map('extract', hostvars, 'node_rdma_nics')))) }}
+  ansible.builtin.fail:
+    msg: "{{ _conflicts | join('; ') }}. No netplan was written."
+  when: _rdma_netplan_hosts | length > 0 and _conflicts | length > 0
+
 - name: "fabric_rdma | netplan | Write {{ rack_scale_rdma_netplan_dest }}"
   vars:
     _ethernets: >-

@@ -581,6 +581,9 @@ node lists `rdma_nics`):
   and loads the NICs' RDMA drivers (`bnxt_re`, `irdma`, `mlx5_ib`), also at boot.
 - Writes netplan for dedicated NICs with `rdma_ip` (`/etc/netplan/99-rdma.yaml`).
   `rdma_ip` means the installer configures the NIC: no other netplan file may.
+  Before writing it, install refuses an `rdma_ip` NIC that carries an address
+  outside `network.rdma.subnet` (the management NIC, say) or that a bond, bridge
+  or VLAN is built on: the file would take that configuration away.
 - Applies the RoCE settings on the hosts that have none (below).
 - Reads back every RDMA NIC and measures it node to node (Validation).
 - Labels the RDMA nodes `rdma-nics=<count>`; RDMA workloads select on it.

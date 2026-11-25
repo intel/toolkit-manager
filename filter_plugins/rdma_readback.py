@@ -143,6 +143,36 @@ def rdma_readback_evaluate(readbacks, expected, settings):
     return {"errors": errors, "warnings": warnings, "record": record}
 
 
+def rdma_netplan_conflicts(readbacks, nics_by_host):
+    """Errors for the dedicated NICs with rdma_ip that something else configures.
+
+    99-rdma.yaml gives such a NIC only its rdma_ip, so a NIC that carries an IPv4
+    address outside network.rdma.subnet (which holds no mgmt_ip), or that a bond,
+    bridge or VLAN is built on, would lose that: the management NIC, typically. The
+    live state is read, as the management NIC always has its address. Addresses in
+    the subnet are an earlier install's; link-local ones are nobody's. A NIC that
+    does not exist is the read-back's to report.
+    """
+    errors = []
+    for host in sorted(nics_by_host):
+        got_nics = (readbacks.get(host) or {}).get("nics") or {}
+        for want in nics_by_host[host] or []:
+            got = got_nics.get(want["nic"]) or {}
+            if "rdma_ip" not in want or not got.get("exists"):
+                continue
+            rdma_net = ipaddress.ip_interface("%s/%s" % (want["rdma_ip"], want["prefix"])).network
+            others = [a for a in got.get("addrs") or []
+                      if ipaddress.ip_interface(a).ip not in rdma_net and not ipaddress.ip_interface(a).is_link_local]
+            what = (["carries %s" % ", ".join(others)] if others else []) + \
+                   (["is part of %s" % ", ".join(got["uppers"])] if got.get("uppers") else [])
+            if what:
+                errors.append("%s %s %s, so something else configures it (the management NIC?, or an install "
+                              "with another network.rdma.subnet), and rdma_ip would replace that. Give rdma_ip to "
+                              "a NIC nothing else configures, or remove rdma_ip and configure the NIC yourself"
+                              % (host, want["nic"], " and ".join(what)))
+    return errors
+
+
 def rdma_qos_plan(readbacks, expected, settings):
     """{"plan": {host: {nic: cfg}}, "kept": [...]}: the RoCE settings rack-rdma-qos takes on.
 
@@ -301,4 +331,5 @@ class FilterModule:
             "rdma_counter_deltas": rdma_counter_deltas,
             "rdma_bw_report": rdma_bw_report,
             "rdma_qos_plan": rdma_qos_plan,
+            "rdma_netplan_conflicts": rdma_netplan_conflicts,
         }

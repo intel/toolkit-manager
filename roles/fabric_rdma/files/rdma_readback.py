@@ -5,7 +5,7 @@
 
 Per NIC: link, addresses, PCIe link and NUMA node, its RDMA device and RoCE v2 GIDs, the
 host's PFC, DSCP and ARP settings, ECN where the driver shows it, and the PFC, ECN and
-retransmit counters. Per host: the rdma-core release it runs. Standard library only, Python 3.6+.
+retransmit counters, and the bonds, bridges or VLANs built on it. Per host: the rdma-core release it runs. Standard library only, Python 3.6+.
 """
 
 import ipaddress
@@ -180,6 +180,7 @@ def nic_record(nic, priority):
         "mtu": number(read(os.path.join(net, "mtu"))),
         "speed_mbps": max(number(read(os.path.join(net, "speed"))) or 0, 0) or None,
         "addrs": re.findall(r"inet (\S+)", addr),
+        "uppers": sorted(name[len("upper_"):] for name in os.listdir(net) if name.startswith("upper_")),
         "numa_node": numa if numa is not None and numa >= 0 else None,
         "cpulist": read("/sys/devices/system/node/node%d/cpulist" % numa) if numa is not None and numa >= 0 else None,
         "pcie": pcie(dev),
