@@ -581,6 +581,37 @@
 # 4. Mesh
 # =============================================================================
 
+# The admin's namespace: the mesh label only, no PSS. ztunnel captures the running
+# pods in place.
+- name: "observability | olm | Enroll user-workload monitoring in the mesh"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ _observability_uwm_namespace }}"
+        labels:
+          istio.io/dataplane-mode: "ambient"
+  when: istio_enabled | default(false) | bool
+
+# Its callers stay outside the mesh: Thanos Querier reads the Prometheus and Thanos
+# Ruler stores, the platform Prometheus scrapes them. The ports are OpenShift's, so
+# the whole namespace accepts plain TCP; its own calls out use mTLS.
+- name: "observability | olm | Let out-of-mesh callers reach user-workload monitoring"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: security.istio.io/v1
+      kind: PeerAuthentication
+      metadata:
+        name: out-of-mesh-callers
+        namespace: "{{ _observability_uwm_namespace }}"
+      spec:
+        mtls:
+          mode: PERMISSIVE
+  when: istio_enabled | default(false) | bool
+
 - name: "observability | olm | Open the ports out-of-mesh callers use"
   ansible.builtin.include_role:
     name: istio
