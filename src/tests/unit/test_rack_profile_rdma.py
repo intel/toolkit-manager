@@ -132,6 +132,17 @@ def test_duplicate_rdma_ip_and_duplicate_nic():
     assert errors(profile) == ["node 'w1' rdma_nics lists 'ens6np0' twice"]
 
 
+def test_a_node_gets_at_most_one_dedicated_nic_with_rdma_ip():
+    profile = none_rack(subnet="192.168.40.0/24")
+    node(profile, "w1")["rdma_nics"] = [{"nic": "ens6np0", "rdma_ip": "192.168.40.11"},
+                                        {"nic": "ens28np0", "rdma_ip": "192.168.40.12"}]
+    assert errors(profile) == [
+        "node 'w1' has rdma_ip on ens6np0, ens28np0: network.rdma has one subnet, so a node gets at most one "
+        "dedicated RDMA NIC with rdma_ip (per-rail subnets are not supported yet)"]
+    node(profile, "w1")["rdma_nics"][0] = {"nic": "ens6np0"}  # the site configures it
+    assert errors(profile) == []
+
+
 def test_subnet_must_stay_off_the_fabric_cluster_and_management_networks():
     profile = clos_rack()
     profile["network"]["rdma"] = {"subnet": "10.10.0.0/16"}

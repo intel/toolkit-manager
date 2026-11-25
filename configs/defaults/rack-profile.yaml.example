@@ -153,7 +153,9 @@ storage:
 # ─────────────────────────────────────────────────────────────────────────────
 # A dedicated RDMA NIC is the default. A NIC that is also in fabric_nics is
 # shared: RDMA runs on its fabric_ip and network.mtu, for CPU, storage and
-# KV-cache traffic. Give GPU backend NICs (one per GPU) a dedicated network.
+# KV-cache traffic. network.rdma has one subnet, so give a node at most one
+# dedicated NIC with rdma_ip: several NICs of a node on one subnet (one per GPU)
+# need per-rail subnets, which are not supported yet.
 #
 # network:
 #   rdma:                    # every key is optional; the defaults are shown

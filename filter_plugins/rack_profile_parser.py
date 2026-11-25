@@ -510,6 +510,11 @@ def _rdma_faults(all_nodes, rdma, fabric_mtu, fabric_prefix, pod_cidr, service_c
                               f"{subnet} — not assignable")
             else:
                 rn["prefix"] = subnet.prefixlen
+        with_ip = [rn["nic"] for rn in node.get("rdma_nics", []) if rn.get("rdma_ip") and not rn["shared"]]
+        if len(with_ip) > 1:
+            errors.append(f"node '{name}' has rdma_ip on {', '.join(with_ip)}: network.rdma has one "
+                          f"subnet, so a node gets at most one dedicated RDMA NIC with rdma_ip "
+                          f"(per-rail subnets are not supported yet)")
 
     if subnet is not None:
         for sup in _fabric_supernets(all_nodes, fabric_prefix):
