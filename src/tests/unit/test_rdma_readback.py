@@ -33,13 +33,13 @@ def nic(dev="rocep75s0", driver="bnxt_en", ip="198.51.100.44", gen=16.0, width=1
     record = {
         "exists": True, "driver": driver, "admin_up": True, "carrier": True, "mtu": 9000, "speed_mbps": rate * 1000,
         "addrs": ["%s/24" % ip] if ip else [], "numa_node": 0, "cpulist": "0-35,72-107",
-        "pcie": {"speed_gts": gen, "width": width, "max_speed_gts": 32.0, "max_width": 16},
+        "pcie": {"speed_gts": gen, "width": width},
         "arp": {"ignore": 1, "announce": 2},
-        "rdma": [{"dev": dev, "port": 1, "fw": "238.1.168.0", "state": "ACTIVE", "phys_state": "LinkUp",
+        "rdma": [{"dev": dev, "port": 1, "state": "ACTIVE",
                   "link_layer": "Ethernet", "rate_gbps": rate, "roce_tos": 104,
                   "gids": [{"index": 1, "type": "RoCE v2", "ipv4": None},
                            {"index": 3, "type": "RoCE v2", "ipv4": ip}]}],
-        "pfc": [3], "dscp_prio": {"26": 3}, "dcbx": "host ieee", "fw_lldp_agent": None, "ecn": None,
+        "pfc": [3], "dscp_prio": {"26": 3}, "fw_lldp_agent": None, "ecn": None,
         "counters": {"rx_pfc_ena_frames_pri3": 0, "tx_pfc_ena_frames_pri3": 0},
         "rdma_counters": {dev + ".np_ecn_marked_roce_packets": 0, dev + ".out_of_sequence": 0},
     }
@@ -404,7 +404,7 @@ def test_probe_reads_the_rdma_core_release(monkeypatch, tmp_path, lib, owned, fo
     out = {"ldconfig": (0, "\tlibibverbs.so.1 (libc6,x86-64) => %s/libibverbs.so.1" % tmp_path),
            "dpkg": (0 if owned else 1, "")}
     monkeypatch.setattr(probe, "run", lambda args: out[args[0]])
-    assert probe.rdma_core() == dict(found, lib=str(tmp_path / lib))
+    assert probe.rdma_core() == found
     monkeypatch.setattr(probe, "run", lambda args: (None, ""))
     assert probe.rdma_core() is None
 

@@ -159,8 +159,7 @@ def rdma_core():
     lib = os.path.realpath(m.group(1))
     version = re.match(r"libibverbs\.so\.1\.\d+\.(\d+)\.", os.path.basename(lib))
     rc, _ = run(["dpkg", "-S", lib])
-    return {"version": int(version.group(1)) if version else None, "lib": lib,
-            "packaged": None if rc is None else rc == 0}
+    return {"version": int(version.group(1)) if version else None, "packaged": None if rc is None else rc == 0}
 
 
 def nic_record(nic, priority):

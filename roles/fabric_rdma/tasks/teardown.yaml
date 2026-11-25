@@ -17,7 +17,17 @@
       {{ _fabric_scope_nodes | default((groups['kube_control_plane'] | default([]))
          | union(groups['kube_node'] | default([]))
          | union(groups.get('ceph_storage_nodes', []))
+         | union(groups.get('rdma_nodes', []))
          | reject('equalto', 'localhost') | unique) }}
+
+# A re-run after the Kubernetes reset finds no API: the label went with the cluster.
+- name: "fabric_rdma | teardown | Kubernetes API"
+  kubernetes.core.k8s_info:
+    kind: Namespace
+    name: kube-system
+    kubeconfig: "{{ kubernetes_kubeconfig }}"
+  register: _rdma_api
+  failed_when: false
 
 - name: "fabric_rdma | teardown | Remove the rdma-nics label"
   ansible.builtin.command:
@@ -32,6 +42,7 @@
   changed_when: "'unlabeled' in _rdma_unlabel.stdout"
   # remove-node: the node has left the cluster
   failed_when: _rdma_unlabel.rc != 0 and 'NotFound' not in _rdma_unlabel.stderr
+  when: _rdma_api.resources is defined
 
 - name: "fabric_rdma | teardown | RoCE settings"
   ansible.builtin.include_tasks: qos_remove.yaml

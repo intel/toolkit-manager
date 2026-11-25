@@ -29,7 +29,8 @@
     msg: >-
       {{ _rdma_eval.record.values() | map('length') | sum }} RDMA NICs
       on {{ _rdma_eval.record | length }} nodes; record in {{ rack_scale_rdma_record_path }}.
-      {{ _rdma_bw_report.lines | join(' | ') }}
+      {{ _rdma_bw_report.lines | join(' | ') if not _rdma_eval.errors
+         else 'Bandwidth not measured: the RDMA NICs have errors.' }}
 
 - name: "fabric_rdma | Report | Warnings"
   ansible.builtin.debug:
