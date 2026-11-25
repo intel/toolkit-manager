@@ -59,7 +59,7 @@ openshift_prerequisites:
     layers: [platform]
     package: servicemeshoperator3
     channel: stable
-    version: "3.4.3"
+    version: "3.5.0"
     apis: [sailoperator.io/v1]
     instances:
       - {api_version: sailoperator.io/v1, kind: Istio, name: default, conditions: {Ready: "True"}}
@@ -108,7 +108,7 @@ openshift_prerequisites:
     when: "{{ postgresql_enabled | default(true) | bool }}"
     package: cloudnative-pg
     channel: stable-v1
-    version: "1.30.1"
+    version: "1.30.2"
     apis: [postgresql.cnpg.io/v1]
 
   - name: keycloak
@@ -119,7 +119,7 @@ openshift_prerequisites:
     when: "{{ keycloak_enabled | default(true) | bool }}"
     package: rhbk-operator
     channel: stable-v26.6
-    version: "26.6.7-opr.1"
+    version: "26.6.9-opr.2"
     # The operator watches only its own namespace: the one the installer creates the instance in.
     namespace: "{{ keycloak_namespace | default('keycloak') }}"
     apis: [k8s.keycloak.org/v2beta1]
@@ -206,7 +206,7 @@ openshift_prerequisites:
     when: "{{ observability_enabled | default(true) | bool }}"
     package: loki-operator
     channel: stable-6.6
-    version: "6.6.1"
+    version: "6.6.2"
     apis: [loki.grafana.com/v1]
 
   - name: logging
@@ -216,7 +216,7 @@ openshift_prerequisites:
     when: "{{ observability_enabled | default(true) | bool }}"
     package: cluster-logging
     channel: stable-6.6
-    version: "6.6.1"
+    version: "6.6.2"
     apis: [observability.openshift.io/v1]
 
   - name: tempo
@@ -226,7 +226,7 @@ openshift_prerequisites:
     when: "{{ observability_enabled | default(true) | bool }}"
     package: tempo-product
     channel: stable
-    version: "0.22.0-3"
+    version: "0.22.0-5"
     apis: [tempo.grafana.com/v1alpha1]
 
   - name: opentelemetry
@@ -246,5 +246,5 @@ openshift_prerequisites:
     when: "{{ observability_enabled | default(true) | bool }}"
     package: grafana-operator
     channel: v5
-    version: "5.25.0"
+    version: "5.26.0"
     apis: [grafana.integreatly.org/v1beta1]
