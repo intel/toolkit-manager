@@ -56,3 +56,22 @@ def test_duplicates_removed_and_missing_fields_tolerated():
     nodes = [node(["10.0.0.1"]), node(["10.0.0.1"]), {"metadata": {}}, {"status": {"addresses": None}}]
     assert apiserver_source_ips(nodes) == ["10.0.0.1"]
     assert apiserver_source_ips(None) == []
+
+
+def link(name, *addrs):
+    return {"ifname": name, "addr_info": [
+        {"family": "inet6" if ":" in a else "inet", "local": a, "prefixlen": 24, "scope": s} for a, s in addrs]}
+
+
+def test_control_plane_addresses_follow_and_only_global_ones_count():
+    # The node's first global address (a 400G NIC) is not its node IP.
+    nodes = [node(["10.0.0.9"], {"projectcalico.org/IPv4VXLANTunnelAddr": "10.233.1.128"})]
+    host = [
+        link("lo", ("127.0.0.1", "host"), ("::1", "host")),
+        link("ens1f0np0", ("192.168.1.32", "global"), ("fe80::1", "link")),
+        link("eno1", ("10.0.0.9", "global")),
+        link("vxlan.calico", ("10.233.1.128", "global")),
+        link("calidcccf7445e7", ("fe80::ecee:eeff:feee:eeee", "link")),
+    ]
+    assert apiserver_source_ips(nodes, [host]) == ["10.0.0.9", "10.233.1.128", "192.168.1.32"]
+    assert apiserver_source_ips(nodes, []) == ["10.0.0.9", "10.233.1.128"]
