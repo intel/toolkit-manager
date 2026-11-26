@@ -555,11 +555,7 @@ class GuardedApi(FakeApi):
         return super().call_api(path, method, *args, **kwargs)
 
 
-def _deletes(api):
-    return [path.rsplit("/", 1)[1] for method, path in api.calls if method == "DELETE"]
-
-
-def test_webhook_refused_delete_retried_after_the_webhooks(tmp_path):
+def test_webhooks_deleted_before_the_custom_resources_they_guard(tmp_path):
     api, p = GuardedApi(), params(tmp_path, component="kserve")
     api.add("LLMInferenceServiceConfig", "decode", "kserve", labels=MINE)
     api.add("ValidatingWebhookConfiguration", "kserve-webhook", labels=MINE)
@@ -568,26 +564,5 @@ def test_webhook_refused_delete_retried_after_the_webhooks(tmp_path):
     result = own.delete(api, p, Module())
 
     assert result["left"] == []
-    assert _deletes(api) == ["decode", "kserve-webhook", "decode", "kserve-controller"]
-    assert not any(o["metadata"]["name"] == "decode" for o in api.objects)
-
-
-def test_webhook_refused_delete_fails_when_the_webhook_is_not_the_components(tmp_path):
-    api, p = GuardedApi(), params(tmp_path, component="kserve")
-    api.add("LLMInferenceServiceConfig", "decode", "kserve", labels=MINE)
-    api.add("ValidatingWebhookConfiguration", "kserve-webhook")  # another component's
-
-    with pytest.raises(ApiException) as e:
-        own.delete(api, p, Module())
-
-    assert e.value.status == 403
-
-
-def test_rbac_forbidden_is_not_retried(tmp_path):
-    api, p = FakeApi(), params(tmp_path, component="kserve")
-    api.add("LLMInferenceServiceConfig", "decode", "kserve", labels=MINE)
-    api.add("ValidatingWebhookConfiguration", "kserve-webhook", labels=MINE)
-    api.fail["/apis/serving.kserve.io/v1/namespaces/kserve/llminferenceserviceconfigs/decode"] = 403
-
-    with pytest.raises(ApiException):
-        own.delete(api, p, Module())
+    deletes = [path.rsplit("/", 1)[1] for method, path in api.calls if method == "DELETE"]
+    assert deletes == ["kserve-webhook", "decode", "kserve-controller"]

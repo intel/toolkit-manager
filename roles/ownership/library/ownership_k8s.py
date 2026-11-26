@@ -52,10 +52,6 @@ the keys that still hold the value set. Only `restore_resources` are followed
 (Namespaces and Nodes by default), only objects a record names, and only objects
 whose labels the state file holds.
 
-A custom resource an admission webhook refuses to delete (an operator guarding its
-own presets) is deleted again right after the webhooks phase, when the component's
-webhooks are gone.
-
 Teardown also deletes the Secret cert-manager issues for a labelled Certificate,
 which has no owner reference. It leaves PersistentVolumeClaims, those of a
 StatefulSet's volumeClaimTemplates included, to their chart and the StatefulSet's
@@ -113,7 +109,7 @@ options:
 META_LIST = "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1,application/json"
 
 # Groups served by Kubernetes itself. Everything else is a custom resource, deleted
-# first, while the operator that holds its finalizers still runs.
+# right after the webhooks, while the operator that holds its finalizers still runs.
 BUILTIN_GROUPS = {
     "", "apps", "batch", "autoscaling", "policy", "networking.k8s.io", "rbac.authorization.k8s.io",
     "storage.k8s.io", "scheduling.k8s.io", "coordination.k8s.io", "discovery.k8s.io", "node.k8s.io",
@@ -121,9 +117,11 @@ BUILTIN_GROUPS = {
     "certificates.k8s.io", "flowcontrol.apiserver.k8s.io", "resource.k8s.io",
 }
 
-# Delete phases, in order. Webhooks and APIServices go before the workloads behind
-# them, so the API never calls a backend that is already gone.
-PHASES = ("custom", "webhooks", "namespaced", "namespaces", "cluster", "crds")
+# Delete phases, in order. Admission webhooks go first: an operator's webhook may refuse
+# to delete its own objects (KServe's well-known LLMInferenceServiceConfigs). APIServices
+# go after the custom resources they may serve. Both go before the workloads behind them,
+# so the API never calls a backend that is already gone.
+PHASES = ("webhooks", "custom", "apiservices", "namespaced", "namespaces", "cluster", "crds")
 
 
 def _get(api, path, query=None, headers=None):
@@ -207,8 +205,10 @@ def _all_objects(api, resources, selector=None):
 def _phase(res):
     if res["resource"] == "customresourcedefinitions":
         return "crds"
-    if res["resource"] in ("validatingwebhookconfigurations", "mutatingwebhookconfigurations", "apiservices"):
+    if res["resource"] in ("validatingwebhookconfigurations", "mutatingwebhookconfigurations"):
         return "webhooks"
+    if res["resource"] == "apiservices":
+        return "apiservices"
     if res["group"] not in BUILTIN_GROUPS:
         return "custom"
     if res["resource"] == "namespaces":
@@ -619,12 +619,6 @@ def _created_by(api, resources, objects, p):
     return found
 
 
-def _webhook_refused(e):
-    """A 403 an admission webhook returned, not RBAC's."""
-    body = e.body.decode(errors="replace") if isinstance(e.body, bytes) else e.body or ""
-    return e.status == 403 and "admission webhook" in body
-
-
 def delete(api, p, module):
     resources = _discover(api, set(p["skip_resources"]))
     objects, restored = {}, []
@@ -638,15 +632,8 @@ def delete(api, p, module):
     # Not waited for in their own phase: deleting the namespace removes them, along with
     # what holds them that no component owns (a model-manager model mounting the model store).
     owned_ns = {meta["name"] for res, meta in objects.values() if _phase(res) == "namespaces"}
-    # An operator's webhook may refuse to delete its own objects (KServe's well-known
-    # LLMInferenceServiceConfigs). When the component's webhooks go too, those objects are
-    # deleted right after them, while the controller that clears their finalizers still runs.
-    defer = any(_phase(res) == "webhooks" for res, _ in objects.values())
-    deferred = []
-
-    def remove(targets, retry):
-        """DELETE each target; return those an admission webhook refused, when `retry`."""
-        refused = []
+    for phase in PHASES:
+        targets = sorted((t for t in objects.values() if _phase(t[0]) == phase), key=lambda t: _ref(*t))
         for res, meta in targets:
             if module.check_mode:
                 deleted.append(_ref(res, meta))
@@ -657,39 +644,17 @@ def delete(api, p, module):
                              _preload_content=False)
                 deleted.append(_ref(res, meta))
             except ApiException as e:
-                if retry and _webhook_refused(e):
-                    refused.append((res, meta))
-                elif e.status != 404:
+                if e.status != 404:
                     raise
-        return refused
-
-    def wait(targets, deadline):
-        """The targets still there at the deadline."""
+        if phase == "namespaced":
+            targets = [t for t in targets if t[1].get("namespace") not in owned_ns]
+        deadline = time.time() + p["timeout"]
         while targets and not module.check_mode:  # the next phase may need this one gone
             targets = [t for t in targets if _exists(api, *t)]
             if not targets or time.time() > deadline:
                 break
             time.sleep(5)
-        return targets
-
-    for phase in PHASES:
-        targets = sorted((t for t in objects.values() if _phase(t[0]) == phase), key=lambda t: _ref(*t))
-        refused = remove(targets, defer and phase == "custom")
-        deferred += refused
-        targets = [t for t in targets if t not in refused]
-        if phase == "namespaced":
-            targets = [t for t in targets if t[1].get("namespace") not in owned_ns]
-        left = wait(targets, time.time() + p["timeout"])
-        if phase == "webhooks" and deferred and not left:
-            # The API server may still call a webhook for a moment after it is deleted.
-            refused, deadline = deferred, time.time() + p["timeout"]
-            while refused:
-                refused = remove(refused, True)
-                if not refused or time.time() > deadline:
-                    break
-                time.sleep(5)
-            left = refused + wait([t for t in deferred if t not in refused], deadline)
-        left = [_ref(*t) for t in left]
+        left = [_ref(*t) for t in targets]
         if left:  # stop: a later phase may hold the controller that clears the finalizers
             return {"changed": bool(deleted or restored), "deleted": deleted, "restored": restored,
                     "left": left, "phase": phase}
