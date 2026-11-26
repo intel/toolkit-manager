@@ -1,5 +1,24 @@
 pipeline {
-    agent { label 'docker' }
+    agent {
+        kubernetes {
+            inheritFrom 'proxy'
+            defaultContainer 'agent'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+    - name: agent
+      image: ger-is-registry.caas.intel.com/nwcsp/jenkins-agent-docker:3.6
+      command: ['cat']
+      tty: true
+    - name: renovate
+      image: renovate/renovate:44.257.9
+      command: ['cat']
+      tty: true
+'''
+        }
+    }
 
     options {
         disableConcurrentBuilds()
@@ -19,15 +38,13 @@ pipeline {
         )
         booleanParam(
             name: 'CREATE_PRS',
-            defaultValue: true,
+            defaultValue: false,
             description: 'Create or update pull requests after successful discovery; disable for discovery-only runs'
         )
     }
 
     environment {
-        RENOVATE_IMAGE = 'renovate/renovate:44.257.9'
         RENOVATE_PLATFORM = 'github'
-        RENOVATE_CONFIG_FILE = '/config/renovate-config.json'
         LOG_FORMAT = 'json'
         LOG_LEVEL = 'info'
         HTTPS_PROXY = 'http://proxy-dmz.intel.com:912'
@@ -42,21 +59,20 @@ pipeline {
                         error('REPOSITORIES must be a comma-separated list of GitHub owner/repository names without spaces.')
                     }
                 }
-                withCredentials([string(credentialsId: 'renovate-github-token', variable: 'RENOVATE_TOKEN')]) {
-                    withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}", 'RENOVATE_DRY_RUN=full']) {
-                        sh '''#!/usr/bin/env bash
-                            set -euo pipefail
-                            set +x
-                            rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl
-                            docker run --rm \
-                              -v "$WORKSPACE/ci/renovate-config.json:/config/renovate-config.json:ro" \
-                              -e RENOVATE_TOKEN -e RENOVATE_REPOSITORIES -e RENOVATE_PLATFORM \
-                              -e RENOVATE_CONFIG_FILE -e RENOVATE_DRY_RUN -e LOG_FORMAT -e LOG_LEVEL \
-                              -e HTTP_PROXY -e http_proxy -e HTTPS_PROXY -e https_proxy -e NO_PROXY -e no_proxy \
-                              "$RENOVATE_IMAGE" | tee stable-discovery.jsonl
-                            bash ci/check-renovate-report.sh stable-discovery.jsonl
-                        '''
+                sh 'rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl'
+                container('renovate') {
+                    withCredentials([string(credentialsId: 'renovate-github-token', variable: 'RENOVATE_TOKEN')]) {
+                        withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}", "RENOVATE_CONFIG_FILE=${env.WORKSPACE}/ci/renovate-config.json", 'RENOVATE_DRY_RUN=full']) {
+                            sh '''#!/usr/bin/env bash
+                                set -euo pipefail
+                                set +x
+                                renovate | tee stable-discovery.jsonl
+                            '''
+                        }
                     }
+                }
+                withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}"]) {
+                    sh 'bash ci/check-renovate-report.sh stable-discovery.jsonl'
                 }
             }
         }
@@ -64,21 +80,20 @@ pipeline {
         stage('Create change and pull requests') {
             when { expression { params.CREATE_PRS } }
             steps {
-                withCredentials([string(credentialsId: 'renovate-github-token', variable: 'RENOVATE_TOKEN')]) {
-                    withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}"]) {
-                        sh '''#!/usr/bin/env bash
-                            set -euo pipefail
-                            set +x
-                            export RENOVATE_FORK_TOKEN="$RENOVATE_TOKEN"
-                            docker run --rm \
-                              -v "$WORKSPACE/ci/renovate-config.json:/config/renovate-config.json:ro" \
-                              -e RENOVATE_TOKEN -e RENOVATE_FORK_TOKEN -e RENOVATE_REPOSITORIES -e RENOVATE_PLATFORM \
-                              -e RENOVATE_CONFIG_FILE -e LOG_FORMAT -e LOG_LEVEL \
-                              -e HTTP_PROXY -e http_proxy -e HTTPS_PROXY -e https_proxy -e NO_PROXY -e no_proxy \
-                              "$RENOVATE_IMAGE" | tee stable-pull-requests.jsonl
-                            bash ci/check-renovate-report.sh stable-pull-requests.jsonl
-                        '''
+                container('renovate') {
+                    withCredentials([string(credentialsId: 'renovate-github-token', variable: 'RENOVATE_TOKEN')]) {
+                        withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}", "RENOVATE_CONFIG_FILE=${env.WORKSPACE}/ci/renovate-config.json"]) {
+                            sh '''#!/usr/bin/env bash
+                                set -euo pipefail
+                                set +x
+                                export RENOVATE_FORK_TOKEN="$RENOVATE_TOKEN"
+                                renovate | tee stable-pull-requests.jsonl
+                            '''
+                        }
                     }
+                }
+                withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}"]) {
+                    sh 'bash ci/check-renovate-report.sh stable-pull-requests.jsonl'
                 }
             }
         }

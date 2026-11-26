@@ -3,9 +3,9 @@
 The pipeline in `Jenkinsfile.stable-versions` uses self-hosted Renovate to
 discover dependency updates and open pull requests in their owning GitHub
 repositories. It does not install or validate updates and does not access a
-Kubernetes cluster. It runs weekly at 02:00 UTC on Monday, within Renovate's
-weekly update window, and creates pull requests after successful discovery by
-default. Set `CREATE_PRS=false` for a discovery-only run.
+deployment cluster. It runs weekly during the 02:00 UTC hour on Monday, within
+Renovate's weekly update window. By default it runs discovery only; set
+`CREATE_PRS=true` after reviewing the discovery results.
 
 ## What it covers
 
@@ -43,10 +43,12 @@ environments.
 1. Commit `Jenkinsfile.stable-versions` and `ci/renovate-config.json` to a
    trusted repository branch. Review this configuration before granting it
    credentials.
-2. Provide a trusted Jenkins agent labeled `docker`, with Bash, Docker, `jq`, access
-   to `renovate/renovate:44.257.9`, GitHub, and the relevant package registries.
-   The job launches a container through the agent's Docker daemon; it does not
-   mount the daemon socket into that container. HTTPS requests use
+2. Provide a trusted Jenkins Kubernetes cloud with the `proxy` pod template.
+   The job uses the existing agent container for checkout and report checks,
+   and a `renovate/renovate:44.257.9` container for Renovate. It requires a
+   shared, writable workspace, Bash and `jq` in the agent container, permission
+   to pull both images, and access to GitHub and relevant package registries.
+   No Docker daemon is required. HTTPS requests use
    `http://proxy-dmz.intel.com:912` (set in both `HTTPS_PROXY` and `https_proxy`);
    ensure this proxy is reachable and approved for GitHub access. Configure
    `HTTP_PROXY`, `http_proxy`, `NO_PROXY`, and `no_proxy` on the agent as required.
@@ -72,8 +74,7 @@ environments.
    Check the
    `stable-discovery.jsonl` artifact and reconcile its
    extracted dependencies with the intended component inventory.
-6. After reviewing coverage, run with `CREATE_PRS=true` or allow the next
-   scheduled build to create proposals. Renovate opens or
+6. After reviewing coverage, run with `CREATE_PRS=true`. Renovate opens or
    updates pull requests against the parent repositories using Renovate's
    experimental fork mode. It can create missing forks and update a fork's default branch;
    use dedicated bot-owned forks rather than forks containing personal work.
@@ -81,9 +82,10 @@ environments.
    pull requests. The configured repository default branch is the base; arrange
    a repository-specific base branch policy if another branch is needed.
 7. Jenkins applies the in-file weekly trigger after the pipeline has run from
-   the configured SCM branch. Scheduled builds use the parameter defaults, so
-   they create PRs after successful discovery. Confirm the job is authorized to
-   run this trusted branch and that Jenkins honors the explicit UTC schedule.
+   the configured SCM branch. Scheduled builds use parameter defaults and run
+   discovery only until the PR-creation default is deliberately changed after
+   approval. Confirm the job is authorized to run this trusted branch and that
+   Jenkins honors the explicit UTC schedule.
 
 Both stages fail if Renovate logs warnings or errors, or if its report does not
 show extracted dependencies for every requested repository. Investigate the
