@@ -16,6 +16,13 @@ spec:
       image: renovate/renovate:44.257.9
       command: ['cat']
       tty: true
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      env:
+        - name: HOME
+          value: /tmp/renovate
 '''
         }
     }
@@ -68,6 +75,14 @@ spec:
                     rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl
                 '''
                 container('renovate') {
+                    sh '''#!/usr/bin/env bash
+                        set -euo pipefail
+                        echo "Renovate container identity:"
+                        id
+                        test -w "$WORKSPACE"
+                        test -w "${WORKSPACE}@tmp"
+                        echo "Renovate can write to the shared workspace and temporary directory."
+                    '''
                     withCredentials([string(credentialsId: 'renovate-github-token', variable: 'RENOVATE_TOKEN')]) {
                         withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}", "RENOVATE_CONFIG_FILE=${env.WORKSPACE}/ci/renovate-config.json", 'RENOVATE_DRY_RUN=full']) {
                             sh '''#!/usr/bin/env bash

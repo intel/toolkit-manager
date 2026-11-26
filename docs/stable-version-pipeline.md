@@ -48,6 +48,8 @@ environments.
    and a `renovate/renovate:44.257.9` container for Renovate. It requires a
    shared, writable workspace, Bash and `jq` in the agent container, permission
    to pull both images, and access to GitHub and relevant package registries.
+   The Renovate container uses UID and GID 1000 to match the observed Jenkins
+   workspace owner; verify or adjust these IDs if the agent setup changes.
    No Docker daemon is required. HTTPS requests use
    `http://proxy-dmz.intel.com:912` (set in both `HTTPS_PROXY` and `https_proxy`);
    ensure this proxy is reachable and approved for GitHub access. Configure
