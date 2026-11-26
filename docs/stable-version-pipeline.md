@@ -92,6 +92,11 @@ environments.
    Check the
    `stable-discovery.jsonl` artifact and reconcile its
    extracted dependencies with the intended component inventory.
+   To identify the PR credential account and check its conventional
+   `account/agent-toolkit` fork without changing GitHub, run with
+   `VERIFY_PR_CREDENTIAL=true` and `CREATE_PRS=false`. A missing conventional
+   fork does not rule out a renamed or organization-owned fork. This read-only
+   check does not verify permission to create pull requests.
 6. After reviewing coverage, run with `CREATE_PRS=true`. Renovate opens or
    updates pull requests against the parent repositories using Renovate's
    experimental fork mode. It can create missing forks and update a fork's default branch;

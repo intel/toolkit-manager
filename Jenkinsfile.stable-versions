@@ -48,6 +48,11 @@ spec:
             defaultValue: false,
             description: 'Create or update pull requests after successful discovery; disable for discovery-only runs'
         )
+        booleanParam(
+            name: 'VERIFY_PR_CREDENTIAL',
+            defaultValue: false,
+            description: 'Read-only check of the PR credential account and its Agent Toolkit fork'
+        )
     }
 
     environment {
@@ -62,6 +67,9 @@ spec:
         stage('Identify stable versions') {
             steps {
                 script {
+                    if (params.VERIFY_PR_CREDENTIAL && params.CREATE_PRS) {
+                        error('VERIFY_PR_CREDENTIAL requires CREATE_PRS=false.')
+                    }
                     if (!(params.REPOSITORIES ==~ /[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(,[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)*/)) {
                         error('REPOSITORIES must be a comma-separated list of GitHub owner/repository names without spaces.')
                     }
@@ -101,6 +109,19 @@ spec:
                 }
                 withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}"]) {
                     sh 'bash ci/check-renovate-report.sh stable-discovery.jsonl'
+                }
+            }
+        }
+
+        stage('Verify PR credential') {
+            when { expression { params.VERIFY_PR_CREDENTIAL } }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'validation-agent-github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'RENOVATE_TOKEN')]) {
+                    sh '''#!/usr/bin/env bash
+                        set -euo pipefail
+                        set +x
+                        bash ci/check-pr-credential.sh
+                    '''
                 }
             }
         }
