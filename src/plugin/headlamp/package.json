@@ -48,7 +48,8 @@
       "rimraf": {
         "glob": "14.0.4"
       }
-    }
+    },
+    "i18next": "26.3.4"
   },
   "devDependencies": {
     "@kinvolk/headlamp-plugin": "0.14.0"
