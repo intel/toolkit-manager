@@ -4,6 +4,7 @@
   "onboarding": false,
   "requireConfig": "optional",
   "exitCodeForErrors": true,
+  "gitAuthor": "Nishi Shah <292722984+nishi252003@users.noreply.github.com>",
   "reportType": "logging",
   "allowScripts": false,
   "allowPlugins": false,
@@ -23,6 +24,16 @@
     {
       "matchPackageNames": ["kubernetes-sigs/agent-sandbox"],
       "groupName": "agent sandbox version"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["langfuse/langfuse", "langfuse/langfuse-worker"],
+      "groupName": "langfuse images"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["rayproject/ray"],
+      "enabled": false
     },
     {
       "matchPackageNames": ["base", "istiod", "cni", "ztunnel"],

@@ -23,6 +23,10 @@ in the target repository's `renovate.json`. That file must be present on the
 scanned default branch for the self-hosted run to apply those rules. Until
 [PR #41](https://github.com/intel/agent-toolkit/pull/41) is merged, do not treat
 the Jenkins discovery as covering those custom version fields.
+The self-hosted configuration groups Langfuse web and worker image updates and
+disables Ray image updates until the image and chart application versions can
+be updated consistently. Verify these safeguards in the discovery report before
+enabling PR creation; they do not prove compatibility.
 
 Renovate ignores versions it recognizes as unstable or prerelease. A proposed
 version is an upstream candidate, not an Intel-certified compatibility claim.
@@ -64,7 +68,12 @@ environments.
    authorized to create or use forks, push branches to those forks, and open
    pull requests against the parent repositories. Repository and organization
    policies can restrict these operations; use organization-approved
-   credentials and confirm permissions before enabling PR creation.
+   credentials and confirm permissions before enabling PR creation. GitHub
+   vulnerability-alert access is also required for the currently enabled alert
+   integration. Have a repository administrator grant the approved bot the
+   necessary access; do not suppress a missing-access warning.
+   The configured Git author is the approved Nishi Shah GitHub no-reply
+   identity; update it if the organization assigns a dedicated bot identity.
 4. Create a Pipeline job using **Pipeline script from SCM** and select
    `Jenkinsfile.stable-versions` as the script path. Restrict who can configure
    or run the job and access its artifacts. Never expose the credential to
@@ -90,8 +99,9 @@ environments.
    Jenkins honors the explicit UTC schedule.
 
 Both stages fail if Renovate logs warnings or errors, or if its report does not
-show extracted dependencies for every requested repository. Investigate the
-archived log instead of treating an incomplete scan as a successful run.
+show extracted dependencies for every requested repository. The report check
+also fails if it finds a proposed Ray image update for Agent Toolkit. Investigate
+the archived log instead of treating an incomplete scan as a successful run.
 
 The PR stage performs its own lookup; releases or base branches can change
 between the two stages, so a PR may differ from the discovery report. Renovate

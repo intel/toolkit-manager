@@ -12,8 +12,10 @@ if ! jq -e -s --arg repositories "$RENOVATE_REPOSITORIES" '
   all(.[]; (.level // 0) < 40) and
   ($result != null) and
   all($expected[]; . as $repo |
-    ($actual | has($repo)) and (($actual[$repo].packageFiles // {}) | length > 0))
+    ($actual | has($repo)) and (($actual[$repo].packageFiles // {}) | length > 0)) and
+  ([($actual["intel/agent-toolkit"].branches // [])[] |
+    .upgrades[]? | select(.packageName == "rayproject/ray")] | length == 0)
 ' "$report_file" >/dev/null; then
-  echo "Renovate reported a warning/error or did not extract dependencies for every requested repository. Inspect $report_file." >&2
+  echo "Renovate reported a warning/error, incomplete extraction, or an unsafe Ray update. Inspect $report_file." >&2
   exit 1
 fi
