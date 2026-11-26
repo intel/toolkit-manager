@@ -22,9 +22,9 @@ COMPONENT = f"{PREFIX}/component"
 
 
 class ApiException(Exception):
-    def __init__(self, status, reason=""):
+    def __init__(self, status, reason="", body=None):
         super().__init__(status)
-        self.status, self.reason, self.body = status, reason, None
+        self.status, self.reason, self.body = status, reason, body
 
 
 @pytest.fixture(autouse=True)
@@ -45,6 +45,8 @@ RESOURCES = [
     ("apiextensions.k8s.io", "v1", "customresourcedefinitions", "CustomResourceDefinition", False),
     ("cert-manager.io", "v1", "certificates", "Certificate", True),
     ("serving.knative.dev", "v1", "services", "Service", True),
+    ("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations", "ValidatingWebhookConfiguration", False),
+    ("serving.kserve.io", "v1", "llminferenceserviceconfigs", "LLMInferenceServiceConfig", True),
 ]
 
 
@@ -535,3 +537,57 @@ def test_labels_added_to_an_existing_namespace_are_restored(tmp_path):
     assert api.exists(ns)
     assert api.labels(ns) == {"team": "a"}
     assert result["restored"] == ["Namespace customer: istio.io/dataplane-mode"]
+
+
+MINE = {f"{PREFIX}/env": "local", COMPONENT: "kserve"}
+DENIED = json.dumps({"message": 'admission webhook "llminferenceserviceconfig.kserve-webhook-server.v1alpha2.validator"'
+                                ' denied the request: well-known config kserve/decode cannot be deleted'})
+
+
+class GuardedApi(FakeApi):
+    """KServe's webhook: refuses to delete the well-known configs while it is there."""
+
+    def call_api(self, path, method, *args, **kwargs):
+        guarded = path.endswith("/llminferenceserviceconfigs/decode")
+        if method == "DELETE" and guarded and any(o["res"][3] == "ValidatingWebhookConfiguration" for o in self.objects):
+            self.calls.append((method, path))
+            raise ApiException(403, body=DENIED)
+        return super().call_api(path, method, *args, **kwargs)
+
+
+def _deletes(api):
+    return [path.rsplit("/", 1)[1] for method, path in api.calls if method == "DELETE"]
+
+
+def test_webhook_refused_delete_retried_after_the_webhooks(tmp_path):
+    api, p = GuardedApi(), params(tmp_path, component="kserve")
+    api.add("LLMInferenceServiceConfig", "decode", "kserve", labels=MINE)
+    api.add("ValidatingWebhookConfiguration", "kserve-webhook", labels=MINE)
+    api.add("Deployment", "kserve-controller", "kserve", labels=MINE)
+
+    result = own.delete(api, p, Module())
+
+    assert result["left"] == []
+    assert _deletes(api) == ["decode", "kserve-webhook", "decode", "kserve-controller"]
+    assert not any(o["metadata"]["name"] == "decode" for o in api.objects)
+
+
+def test_webhook_refused_delete_fails_when_the_webhook_is_not_the_components(tmp_path):
+    api, p = GuardedApi(), params(tmp_path, component="kserve")
+    api.add("LLMInferenceServiceConfig", "decode", "kserve", labels=MINE)
+    api.add("ValidatingWebhookConfiguration", "kserve-webhook")  # another component's
+
+    with pytest.raises(ApiException) as e:
+        own.delete(api, p, Module())
+
+    assert e.value.status == 403
+
+
+def test_rbac_forbidden_is_not_retried(tmp_path):
+    api, p = FakeApi(), params(tmp_path, component="kserve")
+    api.add("LLMInferenceServiceConfig", "decode", "kserve", labels=MINE)
+    api.add("ValidatingWebhookConfiguration", "kserve-webhook", labels=MINE)
+    api.fail["/apis/serving.kserve.io/v1/namespaces/kserve/llminferenceserviceconfigs/decode"] = 403
+
+    with pytest.raises(ApiException):
+        own.delete(api, p, Module())
