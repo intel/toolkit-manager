@@ -83,7 +83,7 @@ spec:
                         test -w "${WORKSPACE}@tmp"
                         echo "Renovate can write to the shared workspace and temporary directory."
                     '''
-                    withCredentials([usernamePassword(credentialsId: 'validation-agent-github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'RENOVATE_TOKEN')]) {
+                    withCredentials([string(credentialsId: 'gh-sys-aibot', variable: 'RENOVATE_TOKEN')]) {
                         withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}", "RENOVATE_CONFIG_FILE=${env.WORKSPACE}/ci/renovate-config.json", 'RENOVATE_DRY_RUN=full']) {
                             sh '''#!/usr/bin/env bash
                                 set -euo pipefail
