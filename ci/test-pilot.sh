@@ -10,7 +10,7 @@ bash ci/make-pilot-config.sh ci/renovate-config.json "$config"
 jq -e '
   .force.enabledManagers == ["custom.regex"] and
   .force.automerge == false and .force.vulnerabilityAlerts.enabled == false and
-  .force.dependencyDashboard == false and
+  .force.dependencyDashboard.enabled == false and
   .force.packageRules[0].matchPackageNames == ["!kubernetes-sigs/agent-sandbox"] and
   .force.packageRules[0].enabled == false and
   .force.packageRules[1].allowedVersions == "=1.0.12"

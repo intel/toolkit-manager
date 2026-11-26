@@ -10,5 +10,5 @@ jq '
     {"matchPackageNames": ["kubernetes-sigs/agent-sandbox"], "groupName": "agent sandbox version",
      "allowedVersions": "=1.0.12"}
   ] |
-  .force.dependencyDashboard = false
+  .force.dependencyDashboard = {"enabled": false}
 ' "$input" >"$output"
