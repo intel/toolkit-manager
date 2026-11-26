@@ -92,6 +92,13 @@ environments.
    Check the
    `stable-discovery.jsonl` artifact and reconcile its
    extracted dependencies with the intended component inventory.
+   To test the approved Agent Sandbox patch in dry-run mode only, set
+   `PILOT_DRY_RUN=true`, leave `CREATE_PRS=false`, and use
+   `REPOSITORIES=intel/agent-toolkit`. The pilot requires exactly one proposal
+   changing both version references from v1.0.10 to v1.0.12. If upstream
+   changes, the check intentionally fails and requires review. This run does
+   not create a PR; its config and result must be reviewed before a separately
+   controlled PR-creation implementation.
    To check the PR credential account and its existing
    `nishi252003/enterprise-agent-toolkit` fork without changing GitHub, run
    with `VERIFY_PR_CREDENTIAL=true` and `CREATE_PRS=false`. The check verifies
