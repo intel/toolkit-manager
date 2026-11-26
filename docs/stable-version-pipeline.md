@@ -61,8 +61,8 @@ environments.
    Configure trusted CA certificates for the agent and container if the proxy
    performs TLS inspection. Do not copy environment-specific proxy credentials
    into Git.
-3. Configure the Jenkins **Username with password** credential `gh-sys-aibot`
-   for discovery; its password field is passed to Renovate as the GitHub token.
+3. Configure the Jenkins **Secret text** credential `renovate-github-token`
+   for discovery; its value is passed to Renovate as the GitHub token.
    PR creation uses the separate **Username with password**
    credential `validation-agent-github-pat`, whose password field is passed to
    Renovate as the GitHub token. The credential owners must authorize the job
