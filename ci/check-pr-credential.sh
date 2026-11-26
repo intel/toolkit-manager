@@ -7,7 +7,7 @@ if [[ ! "$RENOVATE_TOKEN" =~ ^[[:alnum:]_]+$ ]]; then
   echo "Cannot check PR credential: unexpected token format." >&2
   exit 1
 fi
-for command in curl jq; do
+for command in curl node; do
   if ! command -v "$command" >/dev/null; then
     echo "Cannot check PR credential: $command is not installed." >&2
     exit 1
@@ -36,7 +36,14 @@ if [[ "$status" != 200 ]]; then
   echo "GitHub credential identity check failed: HTTP $status." >&2
   exit 1
 fi
-if ! login=$(jq -er '.login | select(type == "string" and test("^[A-Za-z0-9-]+$"))' "$response"); then
+if ! login=$(node -e '
+  let data;
+  try { data = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); }
+  catch { process.exit(1); }
+  if (!data || typeof data !== "object") process.exit(1);
+  if (typeof data.login !== "string" || !/^[A-Za-z0-9-]+$/.test(data.login)) process.exit(1);
+  console.log(data.login);
+' "$response"); then
   echo "GitHub returned an invalid account identity." >&2
   exit 1
 fi
@@ -48,9 +55,15 @@ if [[ "$status" != 200 ]]; then
   echo "This does not check renamed forks or forks owned by organizations."
   exit 1
 fi
-if ! jq -er '
-  select(.fork == true and .parent.full_name == "intel/agent-toolkit") |
-  "Fork: \(.full_name); parent: \(.parent.full_name); push permission: \(.permissions.push)"
+if ! node -e '
+  let data;
+  try { data = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); }
+  catch { process.exit(1); }
+  if (!data || typeof data !== "object") process.exit(1);
+  if (data.fork !== true || data.parent?.full_name !== "intel/agent-toolkit" ||
+      typeof data.full_name !== "string" || !/^[A-Za-z0-9-]+\/agent-toolkit$/i.test(data.full_name)) process.exit(1);
+  const push = typeof data.permissions?.push === "boolean" ? data.permissions.push : "unknown";
+  console.log(`Fork: ${data.full_name}; parent: ${data.parent.full_name}; push permission: ${push}`);
 ' "$response"; then
   echo "The conventional account repository is not a verified Agent Toolkit fork." >&2
   exit 1

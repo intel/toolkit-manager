@@ -116,12 +116,14 @@ spec:
         stage('Verify PR credential') {
             when { expression { params.VERIFY_PR_CREDENTIAL } }
             steps {
-                withCredentials([usernamePassword(credentialsId: 'validation-agent-github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'RENOVATE_TOKEN')]) {
-                    sh '''#!/usr/bin/env bash
-                        set -euo pipefail
-                        set +x
-                        bash ci/check-pr-credential.sh
-                    '''
+                container('renovate') {
+                    withCredentials([usernamePassword(credentialsId: 'validation-agent-github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'RENOVATE_TOKEN')]) {
+                        sh '''#!/usr/bin/env bash
+                            set -euo pipefail
+                            set +x
+                            bash ci/check-pr-credential.sh
+                        '''
+                    }
                 }
             }
         }
