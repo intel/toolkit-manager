@@ -61,12 +61,13 @@ environments.
    Configure trusted CA certificates for the agent and container if the proxy
    performs TLS inspection. Do not copy environment-specific proxy credentials
    into Git.
-3. Create a Jenkins **Secret text** credential with ID
-   `renovate-github-token`. Use a dedicated GitHub bot with read access to
-   repository contents and metadata. A read-only token is sufficient for an
-   initial discovery-only run. For PR creation use a personal access token
-   authorized to create or use forks, push branches to those forks, and open
-   pull requests against the parent repositories. Repository and organization
+3. Configure the Jenkins **Username with password** credential
+   `pljanot-github-token` for this job; its password field is passed to Renovate
+   as the GitHub token. The credential owner must authorize the job and the
+   token must have read access to repository contents and metadata. A read-only
+   token is sufficient for an initial discovery-only run. For PR creation the
+   account must be authorized to create or use forks, push branches to those
+   forks, and open pull requests against the parent repositories. Repository and organization
    policies can restrict these operations; use organization-approved
    credentials and confirm permissions before enabling PR creation. GitHub
    vulnerability-alert access is also required for the currently enabled alert
