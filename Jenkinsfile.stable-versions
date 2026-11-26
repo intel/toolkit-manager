@@ -7,16 +7,20 @@ pipeline {
         timestamps()
     }
 
+    triggers {
+        cron('TZ=UTC\nH 2 * * 1')
+    }
+
     parameters {
         string(
             name: 'REPOSITORIES',
-            defaultValue: 'intel/toolkit-manager,intel/inference-toolkit,intel/agent-toolkit',
+            defaultValue: 'intel/agent-toolkit',
             description: 'Comma-separated GitHub repositories with bot access'
         )
         booleanParam(
             name: 'CREATE_PRS',
-            defaultValue: false,
-            description: 'Create or update pull requests after discovery'
+            defaultValue: true,
+            description: 'Create or update pull requests after successful discovery; disable for discovery-only runs'
         )
     }
 

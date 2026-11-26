@@ -3,7 +3,9 @@
 The pipeline in `Jenkinsfile.stable-versions` uses self-hosted Renovate to
 discover dependency updates and open pull requests in their owning GitHub
 repositories. It does not install or validate updates and does not access a
-Kubernetes cluster.
+Kubernetes cluster. It runs weekly at 02:00 UTC on Monday, within Renovate's
+weekly update window, and creates pull requests after successful discovery by
+default. Set `CREATE_PRS=false` for a discovery-only run.
 
 ## What it covers
 
@@ -15,6 +17,12 @@ and Node Feature Discovery. Some rules may not match if the monitored branch
 uses a different file layout or variable name. Matching files in a repository can
 include disabled components and dependencies unrelated to the deployed stack.
 The discovery report is not an inventory of what is actually running.
+
+Agent Toolkit-specific rules for KubeRay and its version references are defined
+in the target repository's `renovate.json`. That file must be present on the
+scanned default branch for the self-hosted run to apply those rules. Until
+[PR #41](https://github.com/intel/agent-toolkit/pull/41) is merged, do not treat
+the Jenkins discovery as covering those custom version fields.
 
 Renovate ignores versions it recognizes as unstable or prerelease. A proposed
 version is an upstream candidate, not an Intel-certified compatibility claim.
@@ -54,23 +62,25 @@ environments.
    `Jenkinsfile.stable-versions` as the script path. Restrict who can configure
    or run the job and access its artifacts. Never expose the credential to
    untrusted pull request builds or untrusted repository configurations.
-5. Run with `CREATE_PRS=false` first. Set `REPOSITORIES` to the exact GitHub
-   repositories the bot may access, in `owner/repo,owner/repo` format with no
-   spaces. Defaults use the canonical repository names `intel/toolkit-manager`,
-   `intel/inference-toolkit`, and `intel/agent-toolkit`; use canonical names
-   rather than aliases so that report keys match. Check the
+5. Run once manually with `CREATE_PRS=false` first. The default
+   `REPOSITORIES` value is the canonical `intel/agent-toolkit`; change it only
+   when intentionally running against another authorized repository. Values
+   must use `owner/repo,owner/repo` format with no spaces so report keys match.
+   Check the
    `stable-discovery.jsonl` artifact and reconcile its
    extracted dependencies with the intended component inventory.
-6. After reviewing coverage, run with `CREATE_PRS=true`. Renovate opens or
+6. After reviewing coverage, run with `CREATE_PRS=true` or allow the next
+   scheduled build to create proposals. Renovate opens or
    updates pull requests against the parent repositories using Renovate's
    experimental fork mode. It can create missing forks and update a fork's default branch;
    use dedicated bot-owned forks rather than forks containing personal work.
    It does not merge PRs. Target repositories must permit the bot to create
    pull requests. The configured repository default branch is the base; arrange
    a repository-specific base branch policy if another branch is needed.
-7. Once the dry run and pull requests are verified, set an approved Jenkins
-   build schedule. Scheduled builds use the parameter defaults; change the
-   default of `CREATE_PRS` deliberately if scheduled runs should create PRs.
+7. Jenkins applies the in-file weekly trigger after the pipeline has run from
+   the configured SCM branch. Scheduled builds use the parameter defaults, so
+   they create PRs after successful discovery. Confirm the job is authorized to
+   run this trusted branch and that Jenkins honors the explicit UTC schedule.
 
 Both stages fail if Renovate logs warnings or errors, or if its report does not
 show extracted dependencies for every requested repository. Investigate the
