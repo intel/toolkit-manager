@@ -51,7 +51,7 @@ spec:
         booleanParam(
             name: 'VERIFY_PR_CREDENTIAL',
             defaultValue: false,
-            description: 'Read-only check of the PR credential account and its Agent Toolkit fork'
+            description: 'Read-only check of the PR credential account and configured Agent Toolkit fork'
         )
     }
 

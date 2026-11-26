@@ -49,10 +49,14 @@ if ! login=$(node -e '
 fi
 echo "PR credential GitHub account: $login"
 
-status=$(request "https://api.github.com/repos/$login/agent-toolkit")
+fork='nishi252003/enterprise-agent-toolkit'
+if [[ "${login,,}" != 'nishi252003' ]]; then
+  echo "The configured fork is not owned by the credential account; review fork selection." >&2
+  exit 1
+fi
+status=$(request "https://api.github.com/repos/$fork")
 if [[ "$status" != 200 ]]; then
-  echo "Conventional account fork $login/agent-toolkit: HTTP $status."
-  echo "This does not check renamed forks or forks owned by organizations."
+  echo "Fork $fork: HTTP $status." >&2
   exit 1
 fi
 if ! node -e '
@@ -61,10 +65,11 @@ if ! node -e '
   catch { process.exit(1); }
   if (!data || typeof data !== "object") process.exit(1);
   if (data.fork !== true || data.parent?.full_name !== "intel/agent-toolkit" ||
-      typeof data.full_name !== "string" || !/^[A-Za-z0-9-]+\/agent-toolkit$/i.test(data.full_name)) process.exit(1);
+      typeof data.full_name !== "string" || data.full_name.toLowerCase() !== process.argv[2].toLowerCase()) process.exit(1);
   const push = typeof data.permissions?.push === "boolean" ? data.permissions.push : "unknown";
   console.log(`Fork: ${data.full_name}; parent: ${data.parent.full_name}; push permission: ${push}`);
-' "$response"; then
-  echo "The conventional account repository is not a verified Agent Toolkit fork." >&2
+  if (push !== true) process.exit(1);
+' "$response" "$fork"; then
+  echo "Fork identity or push permission could not be verified." >&2
   exit 1
 fi

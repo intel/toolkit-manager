@@ -21,13 +21,18 @@ while (($#)); do
   esac
 done
 if [[ "$url" == https://api.github.com/user ]]; then
-  printf '%s' '{"login":"test-bot","email":"private@example.com"}' >"$output"
+  if [[ -n "${MOCK_USER_BODY:-}" ]]; then
+    printf '%s' "$MOCK_USER_BODY" >"$output"
+  else
+    printf '%s' '{"login":"nishi252003","email":"private@example.com"}' >"$output"
+  fi
   printf '%s' "${MOCK_USER_STATUS:-200}"
 else
+  [[ "$url" == https://api.github.com/repos/nishi252003/enterprise-agent-toolkit ]]
   if [[ -n "${MOCK_FORK_BODY:-}" ]]; then
     printf '%s' "$MOCK_FORK_BODY" >"$output"
   else
-    printf '%s' '{"fork":true,"full_name":"test-bot/agent-toolkit","parent":{"full_name":"intel/agent-toolkit"},"permissions":{"push":true}}' >"$output"
+    printf '%s' '{"fork":true,"full_name":"nishi252003/enterprise-agent-toolkit","parent":{"full_name":"intel/agent-toolkit"},"permissions":{"push":true}}' >"$output"
   fi
   printf '%s' "${MOCK_FORK_STATUS:-200}"
 fi
@@ -36,7 +41,8 @@ chmod +x "$tmp/curl"
 export PATH="$tmp:$PATH" RENOVATE_TOKEN="test_token"
 
 output=$(bash ci/check-pr-credential.sh)
-[[ "$output" == *"PR credential GitHub account: test-bot"* ]]
+[[ "$output" == *"PR credential GitHub account: nishi252003"* ]]
+[[ "$output" == *"Fork: nishi252003/enterprise-agent-toolkit"* ]]
 [[ "$output" == *"parent: intel/agent-toolkit; push permission: true"* ]]
 [[ "$output" != *"$RENOVATE_TOKEN"* && "$output" != *"private@example.com"* ]]
 
@@ -50,6 +56,14 @@ if MOCK_FORK_STATUS=404 bash ci/check-pr-credential.sh >/dev/null 2>&1; then
 fi
 if MOCK_FORK_BODY='{"fork":false}' bash ci/check-pr-credential.sh >/dev/null 2>&1; then
   echo "Expected an unrelated repository to fail the check" >&2
+  exit 1
+fi
+if MOCK_FORK_BODY='{"fork":true,"full_name":"nishi252003/enterprise-agent-toolkit","parent":{"full_name":"intel/agent-toolkit"},"permissions":{"push":false}}' bash ci/check-pr-credential.sh >/dev/null 2>&1; then
+  echo "Expected missing push permission to fail the check" >&2
+  exit 1
+fi
+if MOCK_USER_BODY='{"login":"someone-else"}' bash ci/check-pr-credential.sh >/dev/null 2>&1; then
+  echo "Expected mismatched fork owner to fail the check" >&2
   exit 1
 fi
 echo "PR credential diagnostic checks passed"
