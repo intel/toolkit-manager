@@ -89,6 +89,11 @@ spec:
                                 set -euo pipefail
                                 set +x
                                 renovate | tee stable-discovery.jsonl
+                                if grep -Fq 'Cannot access vulnerability alerts.' stable-discovery.jsonl; then
+                                    if ! bash ci/check-github-alert-access.sh; then
+                                        echo "Alert access diagnostic could not complete; inspect the error above." >&2
+                                    fi
+                                fi
                             '''
                         }
                     }

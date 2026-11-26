@@ -105,6 +105,11 @@ Both stages fail if Renovate logs warnings or errors, or if its report does not
 show extracted dependencies for every requested repository. The report check
 also fails if it finds a proposed Ray image update for Agent Toolkit. Investigate
 the archived log instead of treating an incomplete scan as a successful run.
+When discovery reports that it cannot access vulnerability alerts, it also
+requests the same GitHub endpoint and prints only its HTTP status and whether
+GitHub reports SSO authorization is required. This diagnostic requires `curl`
+in the Renovate container; it does not print the token or alert contents and
+does not bypass the report check.
 
 The PR stage performs its own lookup; releases or base branches can change
 between the two stages, so a PR may differ from the discovery report. Renovate
