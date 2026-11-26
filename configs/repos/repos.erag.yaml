@@ -20,9 +20,9 @@ repos:
     model_catalog: "model_manager/models.yaml"
 
   - layer: "erag"
-    url: "https://github.com/intel/enterprise-rag"
+    url: "https://github.com/intel/chatbot-toolkit"
     dest: "enterprise.ai-erag"
-    rev: "main"
+    rev: "6fa81aa0a9852cbf195317d45bfe8648ebc7a955" # v3.1.0-rc.1
     deployment_subdir: "deployment"
     config_dir: "pipelines"
     default_flavour: "chatqna"
