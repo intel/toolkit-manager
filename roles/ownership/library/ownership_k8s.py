@@ -109,7 +109,7 @@ options:
 META_LIST = "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1,application/json"
 
 # Groups served by Kubernetes itself. Everything else is a custom resource, deleted
-# first, while the operator that holds its finalizers still runs.
+# right after the webhooks, while the operator that holds its finalizers still runs.
 BUILTIN_GROUPS = {
     "", "apps", "batch", "autoscaling", "policy", "networking.k8s.io", "rbac.authorization.k8s.io",
     "storage.k8s.io", "scheduling.k8s.io", "coordination.k8s.io", "discovery.k8s.io", "node.k8s.io",
@@ -117,9 +117,11 @@ BUILTIN_GROUPS = {
     "certificates.k8s.io", "flowcontrol.apiserver.k8s.io", "resource.k8s.io",
 }
 
-# Delete phases, in order. Webhooks and APIServices go before the workloads behind
-# them, so the API never calls a backend that is already gone.
-PHASES = ("custom", "webhooks", "namespaced", "namespaces", "cluster", "crds")
+# Delete phases, in order. Admission webhooks go first: an operator's webhook may refuse
+# to delete its own objects (KServe's well-known LLMInferenceServiceConfigs). APIServices
+# go after the custom resources they may serve. Both go before the workloads behind them,
+# so the API never calls a backend that is already gone.
+PHASES = ("webhooks", "custom", "apiservices", "namespaced", "namespaces", "cluster", "crds")
 
 
 def _get(api, path, query=None, headers=None):
@@ -203,8 +205,10 @@ def _all_objects(api, resources, selector=None):
 def _phase(res):
     if res["resource"] == "customresourcedefinitions":
         return "crds"
-    if res["resource"] in ("validatingwebhookconfigurations", "mutatingwebhookconfigurations", "apiservices"):
+    if res["resource"] in ("validatingwebhookconfigurations", "mutatingwebhookconfigurations"):
         return "webhooks"
+    if res["resource"] == "apiservices":
+        return "apiservices"
     if res["group"] not in BUILTIN_GROUPS:
         return "custom"
     if res["resource"] == "namespaces":
