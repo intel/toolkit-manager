@@ -30,6 +30,8 @@ pipeline {
         RENOVATE_CONFIG_FILE = '/config/renovate-config.json'
         LOG_FORMAT = 'json'
         LOG_LEVEL = 'info'
+        HTTPS_PROXY = 'http://proxy-dmz.intel.com:912'
+        https_proxy = 'http://proxy-dmz.intel.com:912'
     }
 
     stages {
@@ -50,7 +52,7 @@ pipeline {
                               -v "$WORKSPACE/ci/renovate-config.json:/config/renovate-config.json:ro" \
                               -e RENOVATE_TOKEN -e RENOVATE_REPOSITORIES -e RENOVATE_PLATFORM \
                               -e RENOVATE_CONFIG_FILE -e RENOVATE_DRY_RUN -e LOG_FORMAT -e LOG_LEVEL \
-                              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+                              -e HTTP_PROXY -e http_proxy -e HTTPS_PROXY -e https_proxy -e NO_PROXY -e no_proxy \
                               "$RENOVATE_IMAGE" | tee stable-discovery.jsonl
                             bash ci/check-renovate-report.sh stable-discovery.jsonl
                         '''
@@ -72,7 +74,7 @@ pipeline {
                               -v "$WORKSPACE/ci/renovate-config.json:/config/renovate-config.json:ro" \
                               -e RENOVATE_TOKEN -e RENOVATE_FORK_TOKEN -e RENOVATE_REPOSITORIES -e RENOVATE_PLATFORM \
                               -e RENOVATE_CONFIG_FILE -e LOG_FORMAT -e LOG_LEVEL \
-                              -e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY \
+                              -e HTTP_PROXY -e http_proxy -e HTTPS_PROXY -e https_proxy -e NO_PROXY -e no_proxy \
                               "$RENOVATE_IMAGE" | tee stable-pull-requests.jsonl
                             bash ci/check-renovate-report.sh stable-pull-requests.jsonl
                         '''

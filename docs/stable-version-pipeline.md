@@ -46,10 +46,13 @@ environments.
 2. Provide a trusted Jenkins agent labeled `docker`, with Bash, Docker, `jq`, access
    to `renovate/renovate:44.257.9`, GitHub, and the relevant package registries.
    The job launches a container through the agent's Docker daemon; it does not
-   mount the daemon socket into that container. Configure `HTTP_PROXY`,
-   `HTTPS_PROXY`, and `NO_PROXY` on the agent if required. Configure trusted CA
-   certificates for the agent and container if the proxy performs TLS
-   inspection. Do not copy environment-specific proxy credentials into Git.
+   mount the daemon socket into that container. HTTPS requests use
+   `http://proxy-dmz.intel.com:912` (set in both `HTTPS_PROXY` and `https_proxy`);
+   ensure this proxy is reachable and approved for GitHub access. Configure
+   `HTTP_PROXY`, `http_proxy`, `NO_PROXY`, and `no_proxy` on the agent as required.
+   Configure trusted CA certificates for the agent and container if the proxy
+   performs TLS inspection. Do not copy environment-specific proxy credentials
+   into Git.
 3. Create a Jenkins **Secret text** credential with ID
    `renovate-github-token`. Use a dedicated GitHub bot with read access to
    repository contents and metadata. A read-only token is sufficient for an
