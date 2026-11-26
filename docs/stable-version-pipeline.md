@@ -7,6 +7,13 @@ deployment cluster. It runs weekly during the 02:00 UTC hour on Monday, within
 Renovate's weekly update window. By default it runs discovery only; set
 `CREATE_PRS=true` after reviewing the discovery results.
 
+Renovate's GitHub vulnerability-alert integration is disabled for all
+repositories in this job because its discovery credential cannot read the
+Agent Toolkit Dependabot alerts. This does not change GitHub's repository
+settings, but Renovate will not use those alerts to identify or prioritize
+security updates. A separate approved vulnerability scan is needed; this
+pipeline does not currently provide one.
+
 ## What it covers
 
 Renovate reads the default branch of each configured repository. It inspects
@@ -71,10 +78,7 @@ environments.
    forks, push branches to those forks, and open pull requests against the parent
    repositories. Repository and organization
    policies can restrict these operations; use organization-approved
-   credentials and confirm permissions before enabling PR creation. GitHub
-   vulnerability-alert access is also required for the currently enabled alert
-   integration. Have a repository administrator grant the approved bot the
-   necessary access; do not suppress a missing-access warning.
+   credentials and confirm permissions before enabling PR creation.
    The configured Git author is the approved Nishi Shah GitHub no-reply
    identity; update it if the organization assigns a dedicated bot identity.
 4. Create a Pipeline job using **Pipeline script from SCM** and select
@@ -105,7 +109,7 @@ Both stages fail if Renovate logs warnings or errors, or if its report does not
 show extracted dependencies for every requested repository. The report check
 also fails if it finds a proposed Ray image update for Agent Toolkit. Investigate
 the archived log instead of treating an incomplete scan as a successful run.
-When discovery reports that it cannot access vulnerability alerts, it also
+If discovery unexpectedly reports that it cannot access vulnerability alerts, it also
 requests the same GitHub endpoint and prints only its HTTP status and whether
 GitHub reports SSO authorization is required. This diagnostic requires `curl`
 in the Renovate container; it does not print the token or alert contents and

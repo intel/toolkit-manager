@@ -18,7 +18,10 @@
   ],
   "force": {
     "automerge": false,
-    "ignoreUnstable": true
+    "ignoreUnstable": true,
+    "vulnerabilityAlerts": {
+      "enabled": false
+    }
   },
   "packageRules": [
     {

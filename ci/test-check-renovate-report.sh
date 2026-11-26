@@ -15,7 +15,8 @@ jq -e '
     .matchDatasources == ["docker"] and
     (.matchPackageNames | sort) == ["langfuse/langfuse", "langfuse/langfuse-worker"] and
     .groupName == "langfuse images") and
-  .force.automerge == false
+  .force.automerge == false and
+  .force.vulnerabilityAlerts.enabled == false
 ' ci/renovate-config.json >/dev/null
 
 jq -nc '{level:30,report:{repositories:{"example/one":{packageFiles:{helmv3:[{}]}},"example/two":{packageFiles:{regex:[{}]}}}}}' >"$report"

@@ -68,6 +68,7 @@ spec:
                 }
                 sh '''#!/usr/bin/env bash
                     set -euo pipefail
+                    echo "WARNING: Renovate Dependabot alert integration is disabled; this run does not check GitHub vulnerability alerts."
                     echo "Jenkins agent identity:"
                     id
                     echo "Workspace ownership and permissions (numeric uid:gid mode path):"
