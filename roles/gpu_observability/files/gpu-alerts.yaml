@@ -32,10 +32,10 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "GPU {{ $labels.gpu }} on {{ $labels.Hostname }} has < 2 GiB memory free"
+            summary: "GPU {{ $labels.gpu }} on {{ $labels.hostname }} has < 2 GiB memory free"
             description: >-
               GPU {{ $labels.gpu }} ({{ $labels.modelName }}) on host
-              {{ $labels.Hostname }} has had {{ $value }} MiB of framebuffer
+              {{ $labels.hostname }} has had {{ $value }} MiB of framebuffer
               memory free for over 5 minutes. Serving pod:
               {{ $labels.namespace }}/{{ $labels.pod }}.
 
@@ -47,10 +47,10 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "GPU {{ $labels.gpu }} on {{ $labels.Hostname }} temp > 80C"
+            summary: "GPU {{ $labels.gpu }} on {{ $labels.hostname }} temp > 80C"
             description: >-
               GPU {{ $labels.gpu }} ({{ $labels.modelName }}) on host
-              {{ $labels.Hostname }} has run at {{ $value }}C (> 80C) for over
+              {{ $labels.hostname }} has run at {{ $value }}C (> 80C) for over
               5 minutes and is likely thermally throttling.
 
         # Any double-bit ECC error is uncorrectable and indicates hardware
@@ -61,23 +61,23 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "GPU {{ $labels.gpu }} on {{ $labels.Hostname }} ECC double-bit error"
+            summary: "GPU {{ $labels.gpu }} on {{ $labels.hostname }} ECC double-bit error"
             description: >-
               GPU {{ $labels.gpu }} ({{ $labels.modelName }}) on host
-              {{ $labels.Hostname }} recorded new double-bit ECC errors in the last
+              {{ $labels.hostname }} recorded new double-bit ECC errors in the last
               5 minutes. DBE errors are uncorrectable and indicate hardware degradation
               requiring investigation.
 
-        # Sustained non-zero throttle bitmask means clocks are being held below
-        # boost frequency, silently reducing inference throughput.
+        # The count is per 5-minute window, so 10 minutes means sustained throttling.
+        # Power-cap events are normal at full load: the dashboard shows them.
         - alert: GPUThrottling
-          expr: DCGM_FI_DEV_CLOCK_THROTTLE_REASONS > 0
-          for: 5m
+          expr: DCGM_EXP_CLOCK_EVENTS_COUNT{clock_event=~"hw_slowdown|sw_thermal|hw_thermal|hw_power_brake"} > 0
+          for: 10m
           labels:
             severity: warning
           annotations:
-            summary: "GPU {{ $labels.gpu }} on {{ $labels.Hostname }} is clock-throttling"
+            summary: "GPU {{ $labels.gpu }} on {{ $labels.hostname }} is clock-throttling"
             description: >-
               GPU {{ $labels.gpu }} ({{ $labels.modelName }}) on host
-              {{ $labels.Hostname }} has been clock-throttling (reasons bitmask:
-              {{ $value }}) for over 5 minutes, reducing inference throughput.
+              {{ $labels.hostname }} has been clock-throttling ({{ $labels.clock_event }})
+              for over 10 minutes, reducing inference throughput.

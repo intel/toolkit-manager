@@ -8,13 +8,13 @@
 # The cluster's one NFD, installed before the GPU operator so the operator does
 # not bring its own copy. On OpenShift the Node Feature Discovery Operator is
 # checked instead (vars/openshift.yaml). The release name (node-feature-discovery),
-# namespace, chart and values match the inference layer's former nfd role, which
+# namespace and values match the inference layer's former nfd role, which
 # preflight leaves out of the plan, so the labels the inference layer relies on
-# (cpu-cpuid.AMXBF16, ...) are unchanged. The nfd_* overrides of that role apply here too.
+# (cpu-cpuid.AMXBF16, ...) are unchanged. Its nfd_namespace, nfd_helm_chart and
+# nfd_version overrides apply here too.
 # =============================================================================
 
 node_feature_discovery_namespace: "{{ nfd_namespace | default('node-feature-discovery') }}"
-node_feature_discovery_helm_repo: "{{ nfd_helm_repo | default('https://kubernetes-sigs.github.io/node-feature-discovery/charts') }}"
-node_feature_discovery_helm_repo_name: "{{ nfd_helm_repo_name | default('nfd') }}"
-node_feature_discovery_chart: "{{ nfd_helm_chart | default('nfd/node-feature-discovery') }}"
-node_feature_discovery_version: "{{ nfd_version | default('0.17.1') }}"
+# 0.20 and later are published only as this OCI chart: the Helm repo stops at 0.19.
+node_feature_discovery_chart: "{{ nfd_helm_chart | default('oci://registry.k8s.io/nfd/charts/node-feature-discovery') }}"
+node_feature_discovery_version: "{{ nfd_version | default('0.20.1') }}"

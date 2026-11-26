@@ -13,7 +13,7 @@
 
 # --- NVIDIA GPU Operator ---
 nvidia_gpu_operator_namespace: "gpu-operator"
-nvidia_gpu_operator_version: "v25.3.0"
+nvidia_gpu_operator_version: "v26.7.3"
 nvidia_gpu_operator_helm_repo: "https://helm.ngc.nvidia.com/nvidia"
 nvidia_gpu_operator_helm_repo_name: "nvidia"
 nvidia_gpu_operator_chart: "nvidia/gpu-operator"

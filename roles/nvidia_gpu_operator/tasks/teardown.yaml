@@ -45,7 +45,8 @@
         name: "{{ item }}"
         state: absent
       loop: >-
-        {{ ['clusterpolicies.nvidia.com', 'nvidiadrivers.nvidia.com']
+        {{ ['clusterpolicies.nvidia.com', 'nvidiadrivers.nvidia.com', 'gpuclusters.nvidia.com',
+            'computedomains.resource.nvidia.com', 'computedomaincliques.resource.nvidia.com']
            + (['nodefeatures.nfd.k8s-sigs.io', 'nodefeaturerules.nfd.k8s-sigs.io', 'nodefeaturegroups.nfd.k8s-sigs.io']
               if nvidia_gpu_operator_nfd_enabled | bool else []) }}
       failed_when: false

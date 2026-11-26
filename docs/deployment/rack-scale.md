@@ -83,10 +83,14 @@ another cluster. See
   `lsblk` on each node right before deploying.
 - **Healthy package state:** no half-installed or failed packages, for example
   DKMS modules that do not build against the running kernel.
-- **GPU nodes:** the GPU operator installs the NVIDIA driver
+- **GPU nodes:** the GPU operator installs the NVIDIA driver in a container
   (`nvidia_gpu_operator_driver_enabled: true`) or uses a driver already
   installed on the host, which it detects. On HGX systems with a host driver,
   NVIDIA Fabric Manager must also be installed and running on the host.
+  The host driver with `nvidia_gpu_operator_driver_enabled: false` is the
+  hardened option: no driver container runs privileged on the GPU nodes with
+  the compiler and kernel headers it builds the driver with, and the driver
+  gets its fixes from the host's package updates.
 
 ---
 
@@ -530,9 +534,10 @@ racks:
 
 **What happens automatically:**
 - Parser detects `accelerator:` → sets `rack_scale_gpu_vendor=nvidia`
-- `node_feature_discovery`, first in the platform layer, installs the cluster's one NFD (release `node-feature-discovery` in namespace `node-feature-discovery`). It does this on every cluster, rack-scale or not, with or without GPUs, and the inference layer's `nfd` component is left out of install, validate and teardown; `nfd_enabled: false` turns NFD off
-- `nvidia_gpu_operator` role installs the NVIDIA GPU operator without the chart's bundled NFD (NVIDIA only; other vendors log a warning and get no stack from this role)
+- `node_feature_discovery`, first in the platform layer, installs the cluster's one NFD (chart 0.20.1, release `node-feature-discovery` in namespace `node-feature-discovery`). It does this on every cluster, rack-scale or not, with or without GPUs, and the inference layer's `nfd` component is left out of install, validate and teardown; `nfd_enabled: false` turns NFD off
+- `nvidia_gpu_operator` role installs the NVIDIA GPU operator v26.7.3 (driver 595.91.07) without the chart's bundled NFD (NVIDIA only; other vendors log a warning and get no stack from this role)
 - Both are platform components: `teardown inference` keeps them, `teardown platform` removes the GPU operator and NFD, and with NFD the node labels it set. On OpenShift the GPU operator and `gpu_observability` are not installed for now
+- `install platform` from a newer release upgrades the GPU operator, and the chart's upgrade hook updates its ClusterPolicy, NVIDIADriver and GPUCluster CRDs. With the driver container (`nvidia_gpu_operator_driver_enabled: true`), the operator then replaces the driver one GPU node at a time, deleting the GPU pods on that node first; their controllers recreate them. The DCGM exporter of v26.7.3 labels its series `hostname` (`Hostname` before), so the GPU dashboard shows no data from before the upgrade. NFD is upgraded in place too ([Upgrade a Layer](upgrade.md#node-feature-discovery))
 - Node labels applied: `gpu-vendor=nvidia`, `gpu-model=b300`, `gpu-form=hgx`, `gpu-count=8` (and `cpu-gen` / `cpu-sku` from `node_family` / `sku`)
 - These labels describe the hardware for you and your tools. GPU model pods are placed by their `nvidia.com/gpu` request, which the GPU operator makes the node advertise
 

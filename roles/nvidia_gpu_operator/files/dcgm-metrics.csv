@@ -8,15 +8,17 @@
 # licensed under the Apache License, Version 2.0.
 #
 # This is the stock NVIDIA dcp-metrics-included.csv PLUS reliability and
-# throughput-diagnostic fields the default set leaves out (ECC, clock-throttle
-# reasons, thermal/power violation time, NVLink error counters, total
-# framebuffer, and SM activity). All added fields are standard DCGM fields that
-# this driver/B300 hardware reports (ECC verified Enabled via nvidia-smi).
+# throughput-diagnostic fields the default set leaves out (ECC, clock
+# events, thermal/power violation time, NVLink error counters, total
+# framebuffer, and SM activity). The added fields are standard DCGM fields that
+# this driver/B300 hardware reports (ECC verified Enabled via nvidia-smi), and
+# DCGM_EXP_CLOCK_EVENTS_COUNT, which the exporter computes from DCGM's clock events.
 #
-# Wired in by playbooks/deploy-nvidia-gpu-operator.yml via the GPU Operator's
-# dcgmExporter.config ConfigMap, which mounts this file and points
-# DCGM_EXPORTER_COLLECTORS at it. Editing this file + re-running that playbook
-# (or the operator reconcile) rolls the exporter with the new set.
+# Wired in by the nvidia_gpu_operator role (tasks/install.yaml) via the GPU
+# Operator's dcgmExporter.config ConfigMap, which mounts this file and points
+# DCGM_EXPORTER_COLLECTORS at it. After editing this file, re-run install
+# platform to update the ConfigMap, then restart the nvidia-dcgm-exporter pods:
+# the file is mounted with subPath, so running pods keep the old set.
 #
 # Format:  DCGM_FIELD, prometheus_type, help string
 # ─────────────────────────────────────────────────────────────────────────────
@@ -45,7 +47,7 @@ DCGM_FI_DEV_DEC_UTIL ,     gauge, Decoder utilization (in %).
 
 # ── Errors / reliability ─────────────────────────────────────────────────────
 DCGM_FI_DEV_XID_ERRORS,            gauge,   Value of the last XID error encountered.
-DCGM_FI_DEV_CLOCK_THROTTLE_REASONS, gauge,  Current clock throttle reasons (bitmask).
+DCGM_EXP_CLOCK_EVENTS_COUNT,       gauge,   Clock events per reason in the exporter's time window.
 DCGM_FI_DEV_THERMAL_VIOLATION,     counter, Throttling duration due to thermal constraints (in us).
 DCGM_FI_DEV_POWER_VIOLATION,       counter, Throttling duration due to power constraints (in us).
 

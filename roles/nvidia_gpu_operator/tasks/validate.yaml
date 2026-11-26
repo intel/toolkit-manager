@@ -167,7 +167,7 @@
             restartPolicy: Never
             containers:
               - name: smi
-                image: nvidia/cuda:12.4.0-base-ubuntu22.04
+                image: nvidia/cuda:12.9.2-base-ubuntu24.04
                 command: ["nvidia-smi"]
                 resources:
                   limits:

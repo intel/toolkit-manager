@@ -218,6 +218,23 @@ solution layer the env holds, as `run_backup.sh` does. `restore` refuses without
 
 ---
 
+## Node Feature Discovery
+
+`install platform` upgrades the NFD release in place with the role's values, also the one the
+inference layer installed before NFD moved to the platform layer. The chart now comes from
+`oci://registry.k8s.io/nfd/charts/node-feature-discovery`, which has 0.18 and later: remove an
+`nfd_version` pin to an older version. `nfd_helm_repo` and `nfd_helm_repo_name` are no longer
+read, so an `nfd_helm_chart` override must be an OCI reference. Helm leaves a chart's CRDs as
+they are on an upgrade, so an upgraded NFD keeps the CRDs of the version first installed; NFD
+0.20.1 runs with those of 0.17. Only a NodeFeatureRule or NodeFeatureGroup of your own that uses a
+matcher added since (for example the `Ge` and `Le` operators) needs this release's CRDs:
+
+```bash
+helm show crds oci://registry.k8s.io/nfd/charts/node-feature-discovery --version 0.20.1 | kubectl apply -f -
+```
+
+---
+
 ## Rolling back a failed upgrade
 
 There is no automatic rollback. The procedure has three steps, in this order:

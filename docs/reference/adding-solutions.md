@@ -214,7 +214,7 @@ components:
 | `layer` | yes | Your layer, or an existing one you're extending. |
 | `depends_on` | yes (may be `[]`) | Component names. Only names **in the same layer** set the order; see below. |
 | `enabled` | no (default `true`) | `true`/`false`, or a Jinja expression rendering to one. |
-| `teardown` | no (default `labels`) | `labels`: delete what install labelled (see [Ownership labels](#ownership-labels)). `role`: run the role's `teardown.yaml` instead. `both`: delete by label, then run `teardown.yaml`, for components that also change hosts. |
+| `teardown` | no (default `labels`) | `labels`: delete what install labelled (see [Ownership labels](#ownership-labels)). `role`: run the role's `teardown.yaml` instead. `both`: delete by label, then run `teardown.yaml`, for components that also change hosts, or whose objects lose their labels. |
 | `teardown_tasks` | no | With `teardown: labels`, a tasks file of the role that runs before the labelled objects are deleted, to take back what the component changed in other components' objects (its portal entry and path on the gateway). The role needs `vars/<cluster_distribution>.yaml`. |
 | `used_by` | no | Component names, any layer, for a component that exists only to serve them. It is installed only while one of them is enabled, and tearing them down takes it along, unless one outside that teardown is still enabled (preflight prints `Kept: …`). Names not in the registry are ignored. |
 
@@ -302,7 +302,7 @@ roles/<name>/
 | File | Required | Contract |
 |---|---|---|
 | `tasks/install.yaml` | yes | Idempotent - a second run with no config change reports zero `changed`. |
-| `tasks/teardown.yaml` | yes | Runs only with `teardown: role` or `both`. Removes what labels cannot: host changes, changes other than labels to objects that existed before. Succeeds when nothing is installed. |
+| `tasks/teardown.yaml` | yes | Runs only with `teardown: role` or `both`. Removes what labels cannot: host changes, changes other than labels to objects that existed before, and objects that lose their labels (CRDs a chart hook replaces). Succeeds when nothing is installed. |
 | `tasks/validate.yaml` | yes | Read-only; never mutates the cluster. |
 | `vars/kubernetes.yaml`, `vars/openshift.yaml` | no | Both or neither, with the same keys. Literal values, named `_<name>_*`: `include_vars` keeps them for the rest of the play. A role without them has no `Load` step in its dispatcher. |
 | `defaults/main.yaml` | yes | Every variable the role reads, flat-named, with a working default. |
