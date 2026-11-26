@@ -59,7 +59,14 @@ spec:
                         error('REPOSITORIES must be a comma-separated list of GitHub owner/repository names without spaces.')
                     }
                 }
-                sh 'rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl'
+                sh '''#!/usr/bin/env bash
+                    set -euo pipefail
+                    echo "Jenkins agent identity:"
+                    id
+                    echo "Workspace ownership and permissions (numeric uid:gid mode path):"
+                    stat -c '%u:%g %a %n' "$WORKSPACE" "${WORKSPACE}@tmp"
+                    rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl
+                '''
                 container('renovate') {
                     withCredentials([string(credentialsId: 'renovate-github-token', variable: 'RENOVATE_TOKEN')]) {
                         withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}", "RENOVATE_CONFIG_FILE=${env.WORKSPACE}/ci/renovate-config.json", 'RENOVATE_DRY_RUN=full']) {
