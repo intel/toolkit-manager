@@ -62,7 +62,7 @@ environments.
    performs TLS inspection. Do not copy environment-specific proxy credentials
    into Git.
 3. Configure the Jenkins **Username with password** credential
-   `pljanot-github-token` for this job; its password field is passed to Renovate
+   `validation-agent-github-pat` for this job; its password field is passed to Renovate
    as the GitHub token. The credential owner must authorize the job and the
    token must have read access to repository contents and metadata. A read-only
    token is sufficient for an initial discovery-only run. For PR creation the
