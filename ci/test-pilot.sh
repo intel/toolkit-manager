@@ -11,6 +11,10 @@ jq -e '
   .force.enabledManagers == ["custom.regex"] and
   .force.automerge == false and .force.vulnerabilityAlerts.enabled == false and
   .force.dependencyDashboard.enabled == false and
+  .force.dependencyDashboard.title == "Agent Sandbox Pilot Dependency Dashboard" and
+  .force.pruneStaleBranches == false and
+  .force.branchPrefix == "renovate-agent-sandbox-pilot/" and
+  .force.prConcurrentLimit == 1 and
   .force.packageRules[0].matchPackageNames == ["!kubernetes-sigs/agent-sandbox"] and
   .force.packageRules[0].enabled == false and
   .force.packageRules[1].allowedVersions == "=1.0.12"

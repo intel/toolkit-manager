@@ -4,8 +4,8 @@ The pipeline in `Jenkinsfile.stable-versions` uses self-hosted Renovate to
 discover dependency updates and open pull requests in their owning GitHub
 repositories. It does not install or validate updates and does not access a
 deployment cluster. It runs weekly during the 02:00 UTC hour on Monday, within
-Renovate's weekly update window. By default it runs discovery only; set
-`CREATE_PRS=true` after reviewing the discovery results.
+Renovate's weekly update window. By default it runs discovery only. The optional
+PR-creation path is restricted to the approved Agent Sandbox pilot.
 
 Renovate's GitHub vulnerability-alert integration is disabled for all
 repositories in this job because its discovery credential cannot read the
@@ -97,8 +97,7 @@ environments.
    `REPOSITORIES=intel/agent-toolkit`. The pilot requires exactly one proposal
    changing both version references from v1.0.10 to v1.0.12. If upstream
    changes, the check intentionally fails and requires review. This run does
-   not create a PR; its config and result must be reviewed before a separately
-   controlled PR-creation implementation.
+   not create a PR.
    To check the PR credential account and its existing
    `nishi252003/enterprise-agent-toolkit` fork without changing GitHub, run
    with `VERIFY_PR_CREDENTIAL=true` and `CREATE_PRS=false`. The check verifies
@@ -106,17 +105,18 @@ environments.
    requests. The fork contains existing work; obtain approval for Renovate to
    update its default branch before PR creation. This check runs in the
    Renovate container and requires curl and Node.js there.
-6. After reviewing coverage, run with `CREATE_PRS=true`. Renovate opens or
-   updates pull requests against the parent repositories using Renovate's
-   experimental fork mode. It can create missing forks and update a fork's default branch;
-   use dedicated bot-owned forks rather than forks containing personal work.
-   It does not merge PRs. Target repositories must permit the bot to create
-   pull requests. The configured repository default branch is the base; arrange
-   a repository-specific base branch policy if another branch is needed.
+6. To test PR creation, explicitly set `CREATE_PRS=true` with the repository
+   set to `intel/agent-toolkit`. The job repeats the scoped dry run and verifies
+   the PR credential before running Renovate against the same pilot config.
+   It creates or updates only the Agent Sandbox pilot proposal in the
+   `renovate-agent-sandbox-pilot/` namespace. The job checks for the open PR,
+   but the live run can make changes before a subsequent check fails. Inspect
+   GitHub and the archived report after any failure. The fork mode can update
+   the approved personal fork's default branch. The job does not merge PRs,
+   prove compatibility, or verify the PR's checks.
 7. Jenkins applies the in-file weekly trigger after the pipeline has run from
    the configured SCM branch. Scheduled builds use parameter defaults and run
-   discovery only until the PR-creation default is deliberately changed after
-   approval. Confirm the job is authorized to run this trusted branch and that
+   discovery only. Confirm the job is authorized to run this trusted branch and that
    Jenkins honors the explicit UTC schedule.
 
 Both stages fail if Renovate logs warnings or errors, or if its report does not

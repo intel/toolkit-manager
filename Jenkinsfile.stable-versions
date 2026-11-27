@@ -46,7 +46,7 @@ spec:
         booleanParam(
             name: 'CREATE_PRS',
             defaultValue: false,
-            description: 'Create or update pull requests after successful discovery; disable for discovery-only runs'
+            description: 'Create or update the approved Agent Sandbox pilot PR after a successful scoped dry run'
         )
         booleanParam(
             name: 'VERIFY_PR_CREDENTIAL',
@@ -72,11 +72,8 @@ spec:
         stage('Identify stable versions') {
             steps {
                 script {
-                    if (params.VERIFY_PR_CREDENTIAL && params.CREATE_PRS) {
-                        error('VERIFY_PR_CREDENTIAL requires CREATE_PRS=false.')
-                    }
-                    if (params.PILOT_DRY_RUN && (params.CREATE_PRS || params.REPOSITORIES != 'intel/agent-toolkit')) {
-                        error('PILOT_DRY_RUN requires CREATE_PRS=false and REPOSITORIES=intel/agent-toolkit.')
+                    if ((params.PILOT_DRY_RUN || params.CREATE_PRS) && params.REPOSITORIES != 'intel/agent-toolkit') {
+                        error('The Agent Sandbox pilot requires REPOSITORIES=intel/agent-toolkit.')
                     }
                     if (!(params.REPOSITORIES ==~ /[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(,[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)*/)) {
                         error('REPOSITORIES must be a comma-separated list of GitHub owner/repository names without spaces.')
@@ -122,7 +119,7 @@ spec:
         }
 
         stage('Agent Sandbox pilot dry run') {
-            when { expression { params.PILOT_DRY_RUN } }
+            when { expression { params.PILOT_DRY_RUN || params.CREATE_PRS } }
             steps {
                 sh '''#!/usr/bin/env bash
                     set -euo pipefail
@@ -150,7 +147,7 @@ spec:
         }
 
         stage('Verify PR credential') {
-            when { expression { params.VERIFY_PR_CREDENTIAL } }
+            when { expression { params.VERIFY_PR_CREDENTIAL || params.CREATE_PRS } }
             steps {
                 container('renovate') {
                     withCredentials([usernamePassword(credentialsId: 'validation-agent-github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'RENOVATE_TOKEN')]) {
@@ -164,23 +161,28 @@ spec:
             }
         }
 
-        stage('Create change and pull requests') {
+        stage('Create Agent Sandbox pilot PR') {
             when { expression { params.CREATE_PRS } }
             steps {
                 container('renovate') {
                     withCredentials([usernamePassword(credentialsId: 'validation-agent-github-pat', usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'RENOVATE_TOKEN')]) {
-                        withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}", "RENOVATE_CONFIG_FILE=${env.WORKSPACE}/ci/renovate-config.json"]) {
+                        withEnv(['RENOVATE_REPOSITORIES=intel/agent-toolkit', "RENOVATE_CONFIG_FILE=${env.WORKSPACE}/stable-pilot-config.json", 'RENOVATE_DRY_RUN=']) {
                             sh '''#!/usr/bin/env bash
                                 set -euo pipefail
                                 set +x
                                 export RENOVATE_FORK_TOKEN="$RENOVATE_TOKEN"
                                 renovate | tee stable-pull-requests.jsonl
+                                bash ci/check-pilot-pr.sh
                             '''
                         }
                     }
                 }
-                withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}"]) {
-                    sh 'bash ci/check-renovate-report.sh stable-pull-requests.jsonl'
+                withEnv(['RENOVATE_REPOSITORIES=intel/agent-toolkit']) {
+                    sh '''#!/usr/bin/env bash
+                        set -euo pipefail
+                        bash ci/check-renovate-report.sh stable-pull-requests.jsonl
+                        bash ci/check-pilot-report.sh stable-pull-requests.jsonl
+                    '''
                 }
             }
         }
