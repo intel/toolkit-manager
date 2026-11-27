@@ -85,20 +85,35 @@ function checkCheckout(source, sourceCommit, execute = run) {
   return [commit, dirty];
 }
 
+function checkTools(source, execute = run) {
+  const specifications = [
+    { command: 'helm', args: ['version', '--short'], version: /^v3\./, expected: 'Helm v3' },
+    { command: 'yq', args: ['--version'], version: /mikefarah\/yq.*\bversion v4\./, expected: 'mikefarah/yq v4' },
+    { command: 'bash', args: ['--version'], version: /GNU bash, version/, expected: 'GNU Bash' },
+  ];
+  const tools = specifications.map(tool => execute(tool.command, tool.args, source));
+  const failures = tools.flatMap((tool, index) => {
+    const specification = specifications[index];
+    if (tool.status !== 'passed') return [`${specification.expected}: ${tool.output.trim() || 'command failed'}`];
+    if (!specification.version.test(tool.stdout.trim())) {
+      return [`${specification.expected} required; received: ${tool.stdout.trim() || '(no stdout)'}`];
+    }
+    return [];
+  });
+  if (failures.length) {
+    const error = new Error(`Static validation tool preflight failed:\n${failures.join('\n')}`);
+    error.tools = tools;
+    throw error;
+  }
+  return tools;
+}
+
 function validate(source, matrix) {
   const checkout = checkCheckout(source, matrix.sourceCommit);
   for (const check of checkout) {
     if (check.stderr.trim()) console.warn(`Git checkout diagnostic: ${check.stderr.trim()}`);
   }
-  const tools = [
-    run('helm', ['version', '--short'], source),
-    run('yq', ['--version'], source),
-    run('bash', ['--version'], source),
-  ];
-  if (tools.some(tool => tool.status !== 'passed') ||
-      !tools[1].output.includes('mikefarah/yq') || !/\bversion v4\./.test(tools[1].output)) {
-    throw new Error('Static checks require Helm, Bash and mikefarah/yq v4 on the validation agent');
-  }
+  const tools = checkTools(source);
   verifyReferences(source, matrix);
   const report = { sourceCommit: matrix.sourceCommit, generatedAt: new Date().toISOString(), checkout, tools, baseline: checkConfiguration(source), candidates: [] };
   for (const row of matrix.components) {
@@ -129,7 +144,7 @@ function validate(source, matrix) {
   return report;
 }
 
-module.exports = { applyProposal, verifyReferences, checkConfiguration, checkCheckout, run, validate };
+module.exports = { applyProposal, verifyReferences, checkConfiguration, checkCheckout, checkTools, run, validate };
 if (require.main === module) {
   let reportWritten = false;
   try {
@@ -144,7 +159,7 @@ if (require.main === module) {
     if (report.status !== 'passed') throw new Error('Static validation failed; inspect stable-static-validation.json for baseline and candidate errors. No deployment was performed.');
   } catch (error) {
     if (!reportWritten && process.argv.length === 6) {
-      fs.writeFileSync(process.argv[5], `${JSON.stringify({ status: 'failed', phase: 'preflight', error: error.message }, null, 2)}\n`);
+      fs.writeFileSync(process.argv[5], `${JSON.stringify({ status: 'failed', phase: 'preflight', error: error.message, tools: error.tools }, null, 2)}\n`);
     }
     console.error(error.message);
     process.exitCode = 1;

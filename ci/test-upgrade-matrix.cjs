@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { makeMatrix, writeMatrix } = require('./make-upgrade-matrix.cjs');
-const { applyProposal, checkConfiguration, checkCheckout, run } = require('./validate-toolkit-config.cjs');
+const { applyProposal, checkConfiguration, checkCheckout, checkTools, run } = require('./validate-toolkit-config.cjs');
 const manifest = require('./toolkit-components.json');
 const policy = require('./toolkit-upgrade-policy.json');
 
@@ -69,6 +69,29 @@ function fixture() {
 }
 
 function test() {
+  const toolResult = (command, output) => ({
+    command, status: 'passed', stdout: output, stderr: '', output,
+  });
+  const tools = {
+    helm: 'v3.20.2+g8fb76d6\n',
+    yq: 'yq (https://github.com/mikefarah/yq/) version v4.53.2\n',
+    bash: 'GNU bash, version 5.2.21\n',
+  };
+  assert.equal(checkTools('/unused', command => toolResult(command, tools[command])).length, 3);
+  for (const command of Object.keys(tools)) {
+    assert.throws(() => checkTools('/unused', name => name === command ?
+      { ...toolResult(name, ''), status: 'failed', output: `spawnSync ${name} ENOENT` } :
+      toolResult(name, tools[name])), error => {
+      assert.match(error.message, new RegExp(command === 'bash' ? 'Bash' : command === 'helm' ? 'Helm' : 'yq'));
+      assert.match(error.message, /ENOENT/);
+      assert.equal(error.tools.length, 3);
+      return true;
+    });
+  }
+  for (const [command, version] of [['helm', 'v4.0.0'], ['yq', 'yq 3.4.3'], ['yq', 'yq (https://github.com/mikefarah/yq/) version v3.4.0']]) {
+    assert.throws(() => checkTools('/unused', name =>
+      toolResult(name, name === command ? version : tools[name])), /required; received/);
+  }
   const warning = "warning: unable to access '/home/ubuntu/.config/git/ignore': Permission denied\n";
   const commandResult = run(process.execPath, ['-e', 'process.stdout.write("clean"); process.stderr.write("warning");'], process.cwd());
   assert.equal(commandResult.stdout, 'clean');

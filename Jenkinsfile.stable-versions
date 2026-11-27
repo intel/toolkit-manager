@@ -7,6 +7,39 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
+  volumes:
+    - name: validation-tools
+      emptyDir:
+        sizeLimit: 128Mi
+  initContainers:
+    - name: validation-helm
+      image: alpine/helm:3.20.2@sha256:0dc15c3084f75cdf39823f63efbe7c21084d2dbffefce2637effc1b093485d81
+      command: ['/bin/sh', '-ec']
+      args:
+        - 'cp "$(command -v helm)" /validation-tools/helm; chmod 0555 /validation-tools/helm'
+      securityContext:
+        runAsUser: 0
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ['ALL']
+      volumeMounts:
+        - name: validation-tools
+          mountPath: /validation-tools
+    - name: validation-yq
+      image: mikefarah/yq:4.53.2@sha256:0cb4a78491b6e62ee8a9bf4fbeacbd15b5013d19bc420591b05383a696315e60
+      command: ['/bin/sh', '-ec']
+      args:
+        - 'cp "$(command -v yq)" /validation-tools/yq; chmod 0555 /validation-tools/yq'
+      securityContext:
+        runAsUser: 0
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ['ALL']
+      volumeMounts:
+        - name: validation-tools
+          mountPath: /validation-tools
   containers:
     - name: agent
       image: ger-is-registry.caas.intel.com/nwcsp/jenkins-agent-docker:3.6
@@ -23,6 +56,12 @@ spec:
       env:
         - name: HOME
           value: /tmp/renovate
+        - name: XDG_CONFIG_HOME
+          value: /tmp/renovate/.config
+      volumeMounts:
+        - name: validation-tools
+          mountPath: /validation-tools
+          readOnly: true
 '''
         }
     }
@@ -88,6 +127,13 @@ spec:
                     stat -c '%u:%g %a %n' "$WORKSPACE" "${WORKSPACE}@tmp"
                     rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl stable-pilot.jsonl stable-inventory.tsv stable-components.json stable-components.tsv stable-upgrade-matrix.json stable-upgrade-matrix.tsv stable-static-validation.json
                 '''
+                container('renovate') {
+                    sh '''#!/usr/bin/env bash
+                        set -euo pipefail
+                        export PATH="/validation-tools:$PATH"
+                        node -e "require('./ci/validate-toolkit-config.cjs').checkTools(process.cwd()).forEach(tool => console.log(tool.command + ': ' + tool.stdout.trim()))"
+                    '''
+                }
             }
         }
 
@@ -160,6 +206,7 @@ spec:
                 container('renovate') {
                     sh '''#!/usr/bin/env bash
                         set -euo pipefail
+                        export PATH="/validation-tools:$PATH"
                         source_commit=$(node -p "require('./stable-components.json').sourceCommit")
                         [[ "$source_commit" =~ ^[a-f0-9]{40}$ ]]
                         source_dir=$(mktemp -d)

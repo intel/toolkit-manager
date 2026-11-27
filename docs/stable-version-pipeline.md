@@ -223,9 +223,19 @@ they are requirements, not implemented/passing runtime tests.
    to pull both images, and access to GitHub and relevant package registries.
    The Renovate container uses UID and GID 1000 to match the observed Jenkins
    workspace owner; verify or adjust these IDs if the agent setup changes.
-   The Renovate container must also provide Git, Bash, Helm and mikefarah/yq
-   v4 for static checks. Missing tools fail explicitly; inspect the preflight
-   error report and provision an approved pinned validation image if needed.
+   The pod provisions Helm 3.20.2 and mikefarah/yq 4.53.2 from digest-pinned
+   `alpine/helm` and `mikefarah/yq` init-container images into a pod-local
+   `emptyDir`. Allow those two images in the Jenkins cluster's image policy.
+   The init containers run as UID 0 only to copy their binaries into that
+   volume, with all capabilities dropped and read-only image filesystems.
+   The nonroot Renovate container mounts the tools read-only. No host runtime,
+   host filesystem, or target-cluster configuration is changed. Git, Bash and
+   Node remain supplied by the existing Renovate image.
+   Preparation checks tool execution/major versions before discovery; missing
+   or incompatible tools report their individual command errors rather than
+   one generic message. Static validation also records tool diagnostics on
+   preflight failure. `XDG_CONFIG_HOME` points to the container's temporary
+   home instead of the image's inaccessible `/home/ubuntu` configuration.
    No Docker daemon is required. HTTPS requests use
    `http://proxy-dmz.intel.com:912` (set in both `HTTPS_PROXY` and `https_proxy`);
    ensure this proxy is reachable and approved for GitHub access. Configure
