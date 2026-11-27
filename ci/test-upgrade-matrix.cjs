@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { makeMatrix, writeMatrix } = require('./make-upgrade-matrix.cjs');
-const { applyProposal, checkConfiguration } = require('./validate-toolkit-config.cjs');
+const { applyProposal, checkConfiguration, checkCheckout, run } = require('./validate-toolkit-config.cjs');
 const manifest = require('./toolkit-components.json');
 const policy = require('./toolkit-upgrade-policy.json');
 
@@ -69,6 +69,26 @@ function fixture() {
 }
 
 function test() {
+  const warning = "warning: unable to access '/home/ubuntu/.config/git/ignore': Permission denied\n";
+  const commandResult = run(process.execPath, ['-e', 'process.stdout.write("clean"); process.stderr.write("warning");'], process.cwd());
+  assert.equal(commandResult.stdout, 'clean');
+  assert.equal(commandResult.stderr, 'warning');
+  assert.equal(commandResult.output, 'cleanwarning');
+  const checkoutResult = (args, stdout = '', status = 'passed') => ({
+    status, stdout: args.includes('rev-parse') ? 'a'.repeat(40) + '\n' : stdout,
+    stderr: warning, output: warning,
+  });
+  assert.equal(checkCheckout('/unused', 'a'.repeat(40), (command, args) => {
+    assert(args.includes('core.excludesFile=/dev/null'));
+    assert(args.includes('core.attributesFile=/dev/null'));
+    return checkoutResult(args);
+  }).length, 2);
+  assert.throws(() => checkCheckout('/unused', 'b'.repeat(40), (command, args) => checkoutResult(args)), /does not match/);
+  assert.throws(() => checkCheckout('/unused', 'a'.repeat(40), (command, args) => checkoutResult(args, ' M config.yaml\n')), /must be clean/);
+  assert.throws(() => checkCheckout('/unused', 'a'.repeat(40), (command, args) =>
+    checkoutResult(args, '', args.includes('status') ? 'failed' : 'passed')), /Cannot inspect/);
+  assert.throws(() => checkCheckout('/unused', 'a'.repeat(40), (command, args) =>
+    checkoutResult(args, '', 'failed')), /Cannot read/);
   const { components, logs } = fixture();
   const matrix = makeMatrix(components, logs);
   assert.equal(matrix.components.length, 14);

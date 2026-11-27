@@ -158,6 +158,11 @@ modifying the pipeline checkout or an existing deployment. It runs:
   are not patched or validated as if complete.
 
 Results and tool versions are archived in `stable-static-validation.json`.
+Checkout checks parse Git stdout separately from stderr, so container user
+configuration warnings cannot masquerade as dirty files or a different commit.
+Global Git ignore/attributes files are disabled for these checks; remaining
+diagnostics are printed and recorded. Real Git failures or dirty files still
+block validation.
 The matrix records static status independently from artifact digest, security,
 deployment, smoke and rollback validation. A failing baseline is a blocking
 pre-existing issue, not automatically a version regression. Candidate results

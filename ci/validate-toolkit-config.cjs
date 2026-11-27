@@ -12,6 +12,8 @@ function run(command, args, cwd) {
   return {
     command: [command, ...args].join(' '),
     status: !result.error && result.status === 0 ? 'passed' : 'failed',
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
     output: result.error?.message || `${result.stdout || ''}${result.stderr || ''}`,
   };
 }
@@ -70,13 +72,24 @@ function checkConfiguration(source, execute = run) {
   return { status: checks.every(check => check.status === 'passed') ? 'passed' : 'failed', checks };
 }
 
-function validate(source, matrix) {
-  const commit = run('git', ['rev-parse', 'HEAD'], source);
-  if (commit.status !== 'passed' || commit.output.trim() !== matrix.sourceCommit) {
+function checkCheckout(source, sourceCommit, execute = run) {
+  const gitOptions = ['-c', 'core.excludesFile=/dev/null', '-c', 'core.attributesFile=/dev/null'];
+  const commit = execute('git', [...gitOptions, 'rev-parse', 'HEAD'], source);
+  if (commit.status !== 'passed') throw new Error(`Cannot read validation checkout commit: ${commit.output}`);
+  if (commit.stdout.trim() !== sourceCommit) {
     throw new Error('Validation checkout does not match the discovery source commit');
   }
-  const dirty = run('git', ['status', '--porcelain', '--untracked-files=all'], source);
-  if (dirty.status !== 'passed' || dirty.output.trim()) throw new Error('Validation checkout must be clean');
+  const dirty = execute('git', [...gitOptions, 'status', '--porcelain', '--untracked-files=all'], source);
+  if (dirty.status !== 'passed') throw new Error(`Cannot inspect validation checkout status: ${dirty.output}`);
+  if (dirty.stdout.trim()) throw new Error(`Validation checkout must be clean:\n${dirty.stdout}`);
+  return [commit, dirty];
+}
+
+function validate(source, matrix) {
+  const checkout = checkCheckout(source, matrix.sourceCommit);
+  for (const check of checkout) {
+    if (check.stderr.trim()) console.warn(`Git checkout diagnostic: ${check.stderr.trim()}`);
+  }
   const tools = [
     run('helm', ['version', '--short'], source),
     run('yq', ['--version'], source),
@@ -87,7 +100,7 @@ function validate(source, matrix) {
     throw new Error('Static checks require Helm, Bash and mikefarah/yq v4 on the validation agent');
   }
   verifyReferences(source, matrix);
-  const report = { sourceCommit: matrix.sourceCommit, generatedAt: new Date().toISOString(), tools, baseline: checkConfiguration(source), candidates: [] };
+  const report = { sourceCommit: matrix.sourceCommit, generatedAt: new Date().toISOString(), checkout, tools, baseline: checkConfiguration(source), candidates: [] };
   for (const row of matrix.components) {
     for (const proposal of row.proposals.filter(candidate => candidate.status === 'candidate-unvalidated')) {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), 'toolkit-static-'));
@@ -116,7 +129,7 @@ function validate(source, matrix) {
   return report;
 }
 
-module.exports = { applyProposal, verifyReferences, checkConfiguration, validate };
+module.exports = { applyProposal, verifyReferences, checkConfiguration, checkCheckout, run, validate };
 if (require.main === module) {
   let reportWritten = false;
   try {
