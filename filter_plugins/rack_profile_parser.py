@@ -63,6 +63,9 @@ VALID_NODE_KEYS = {
 VALID_FABRIC_NIC_KEYS = {
     "nic", "fabric_ip", "prefix", "leaf", "peer",
 }
+VALID_RDMA_NIC_KEYS = {"nic", "rdma_ip"}
+RDMA_DEFAULTS = {"mtu": 9000, "dscp": 26, "priority": 3, "pfc": True, "ecn": True}
+VALID_RDMA_KEYS = {"subnet", *RDMA_DEFAULTS}
 KNOWN_CPU_FAMILIES = {"cpu-gnr-ap", "cpu-gnr-sp", "cpu-cwf", "cpu-spr"}
 VALID_ACCELERATOR_VENDORS = {"nvidia", "intel", "amd"}
 KNOWN_ROLES = {
@@ -422,6 +425,119 @@ def _ceph_address_faults(all_nodes, public_net, cluster_net, cp_on_fabric):
     return faults
 
 
+def _rdma_settings(block, errors):
+    """network.rdma with its defaults; subnet is None when not set."""
+    if block is None:
+        block = {}
+    if not isinstance(block, dict):
+        errors.append(f"network.rdma must be a mapping, got {type(block).__name__}")
+        return {**RDMA_DEFAULTS, "subnet": None}
+    _check_keys(block, VALID_RDMA_KEYS, "network.rdma", errors)
+    rdma = {**RDMA_DEFAULTS, "subnet": None, **block}
+    for key, lo, hi in (("mtu", 1280, 65535), ("dscp", 0, 63), ("priority", 0, 7)):
+        if not _whole(rdma[key], lo, hi):
+            errors.append(f"network.rdma.{key} must be a whole number from {lo} to {hi}, "
+                          f"got {rdma[key]!r}")
+            rdma[key] = RDMA_DEFAULTS[key]
+    for key in ("pfc", "ecn"):
+        if not isinstance(rdma[key], bool):
+            errors.append(f"network.rdma.{key} must be true or false, got {rdma[key]!r}")
+            rdma[key] = RDMA_DEFAULTS[key]
+    if rdma["subnet"] is not None:
+        rdma["subnet"] = _safe_ip_network(rdma["subnet"], "network.rdma.subnet", errors)
+        if rdma["subnet"] is not None and rdma["subnet"].version != 4:
+            errors.append(f"network.rdma.subnet must be IPv4, got {rdma['subnet']}")
+        elif rdma["subnet"] is not None and rdma["subnet"].prefixlen > 30:
+            errors.append(f"network.rdma.subnet {rdma['subnet']} leaves no addresses for the nodes: "
+                          f"use /30 or larger")
+    return rdma
+
+
+def _rdma_nic_entries(value, node_name):
+    """A node's rdma_nics as [{nic, rdma_ip?}], and the schema errors."""
+    where = f"node '{node_name}' rdma_nics"
+    if not isinstance(value, list):
+        return [], [f"{where} must be a list, e.g. rdma_nics: [ens28np0], "
+                    f"got {type(value).__name__}"]
+    entries, errors = [], []
+    for i, item in enumerate(value):
+        if isinstance(item, str):
+            item = {"nic": item}
+        if not isinstance(item, dict):
+            errors.append(f"{where}[{i}] must be a NIC name or a mapping with 'nic'")
+            continue
+        _check_keys(item, VALID_RDMA_NIC_KEYS, f"{where}[{i}]", errors)
+        if not isinstance(item.get("nic"), str) or not item["nic"]:
+            errors.append(f"{where}[{i}] is missing required field 'nic'")
+            continue
+        if any(e["nic"] == item["nic"] for e in entries):
+            errors.append(f"{where} lists '{item['nic']}' twice")
+            continue
+        if "rdma_ip" in item and not (isinstance(item["rdma_ip"], str) and item["rdma_ip"]):
+            errors.append(f"{where}[{i}] rdma_ip must be an address such as 192.168.40.11, "
+                          f"got {item['rdma_ip']!r}")
+            continue
+        entries.append(dict(item))
+    return entries, errors
+
+
+def _rdma_faults(all_nodes, rdma, fabric_mtu, fabric_prefix, pod_cidr, service_cidr):
+    """Errors for the RDMA NICs; sets each entry's mtu, shared and prefix.
+
+    A dedicated RDMA NIC is the default. An RDMA NIC that is also one of the
+    node's fabric NICs is shared: RDMA runs on its fabric_ip and fabric MTU.
+    """
+    errors = []
+    subnet = rdma["subnet"]
+    for name, node in sorted(all_nodes.items()):
+        fabric = {fn["nic"] for fn in node.get("fabric_nics", [])}
+        for rn in node.get("rdma_nics", []):
+            where = f"node '{name}' RDMA NIC '{rn['nic']}'"
+            rn["shared"] = rn["nic"] in fabric
+            rn["mtu"] = fabric_mtu if rn["shared"] else rdma["mtu"]
+            if not rn.get("rdma_ip"):
+                continue
+            ip = ipaddress.ip_address(rn["rdma_ip"])
+            if rn["shared"]:
+                errors.append(f"{where} is also a fabric NIC, so RDMA uses its fabric_ip "
+                              f"— remove rdma_ip")
+            elif subnet is None:
+                errors.append(f"{where} has rdma_ip {ip}, but network.rdma.subnet is not set")
+            elif ip not in subnet:
+                errors.append(f"{where} rdma_ip {ip} is outside network.rdma.subnet {subnet}")
+            elif ip in (subnet.network_address, subnet.broadcast_address):
+                errors.append(f"{where} rdma_ip {ip} is the network or broadcast address of "
+                              f"{subnet} — not assignable")
+            else:
+                rn["prefix"] = subnet.prefixlen
+        with_ip = [rn["nic"] for rn in node.get("rdma_nics", []) if rn.get("rdma_ip") and not rn["shared"]]
+        if len(with_ip) > 1:
+            errors.append(f"node '{name}' has rdma_ip on {', '.join(with_ip)}: network.rdma has one "
+                          f"subnet, so a node gets at most one dedicated RDMA NIC with rdma_ip "
+                          f"(per-rail subnets are not supported yet)")
+
+    if subnet is not None:
+        for sup in _fabric_supernets(all_nodes, fabric_prefix):
+            if subnet.overlaps(ipaddress.ip_network(sup)):
+                errors.append(
+                    f"network.rdma.subnet {subnet} overlaps fabric prefix {sup} — a dedicated "
+                    f"RDMA NIC needs its own network. To run RDMA on a fabric NIC, list it in "
+                    f"rdma_nics without rdma_ip")
+        for label, value in (("network.pod_cidr", pod_cidr),
+                             ("network.service_cidr", service_cidr)):
+            try:
+                other = ipaddress.ip_network(value, strict=False)
+            except (ValueError, TypeError):
+                continue  # _cluster_cidr_faults reports it
+            if subnet.overlaps(other):
+                errors.append(f"network.rdma.subnet {subnet} overlaps {label} {value}")
+        for name, node in sorted(all_nodes.items()):
+            if node.get("mgmt_ip") and ipaddress.ip_address(node["mgmt_ip"]) in subnet:
+                errors.append(f"network.rdma.subnet {subnet} contains mgmt_ip {node['mgmt_ip']} "
+                              f"of node '{name}' — RDMA does not run on the management network")
+    return errors
+
+
 # ── Netplan helpers ──────────────────────────────────────────────────────────
 
 def _star_hub(all_nodes):
@@ -520,6 +636,7 @@ def _parse_and_validate(profile):
                       f"got {fabric_mtu - vxlan_overhead}")
     fabric_prefix = network.get("fabric_prefix", 16)
     netplan_renderer = network.get("netplan_renderer", "networkd")
+    rdma = _rdma_settings(network.get("rdma"), errors)
 
     access = profile.get("access", {})
     default_ansible_user = access.get("ansible_user", "ubuntu")
@@ -619,6 +736,9 @@ def _parse_and_validate(profile):
             schema_errors.append(
                 f"node '{node_name}' gpu_count must be an integer, "
                 f"got {type(node['gpu_count']).__name__!r}")
+        if "rdma_nics" in node:
+            node["rdma_nics"], rdma_problems = _rdma_nic_entries(node["rdma_nics"], node_name)
+            schema_errors.extend(rdma_problems)
 
     if schema_errors:
         errors.extend(schema_errors)
@@ -746,6 +866,7 @@ def _parse_and_validate(profile):
     # Duplicate address detection + H2: validate IP format.
     _mgmt_claims = {}
     _fabric_claims = {}
+    _rdma_claims = {}
     for node_name, node in all_nodes.items():
         mgmt = node.get("mgmt_ip")
         if mgmt:
@@ -757,13 +878,14 @@ def _parse_and_validate(profile):
                 if _safe_ip_address(fip, f"node '{node_name}' fabric_ip", errors):
                     _fabric_claims.setdefault(fip, []).append(
                         f"{node_name}:{fn.get('nic', '?')}")
-    for ip, owners in sorted(_mgmt_claims.items()):
-        if len(owners) > 1:
-            errors.append(f"duplicate mgmt_ip {ip} claimed by: {', '.join(owners)}")
-    for ip, owners in sorted(_fabric_claims.items()):
-        if len(owners) > 1:
-            errors.append(
-                f"duplicate fabric_ip {ip} claimed by: {', '.join(owners)}")
+        for rn in node.get("rdma_nics", []):
+            rip = rn.get("rdma_ip")
+            if rip and _safe_ip_address(rip, f"node '{node_name}' rdma_ip", errors):
+                _rdma_claims.setdefault(rip, []).append(f"{node_name}:{rn['nic']}")
+    for label, claims in (("mgmt_ip", _mgmt_claims), ("fabric_ip", _fabric_claims),
+                          ("rdma_ip", _rdma_claims)):
+        errors.extend(f"duplicate {label} {ip} claimed by: {', '.join(owners)}"
+                      for ip, owners in sorted(claims.items()) if len(owners) > 1)
 
     # Star topology invariants.
     if topology == "star":
@@ -881,6 +1003,7 @@ def _parse_and_validate(profile):
         errors.extend(_l2_segment_faults(all_nodes, fabric_prefix))
     errors.extend(_ceph_address_faults(all_nodes, ceph_public_net,
                                        ceph_cluster_net, cp_on_fabric))
+    errors.extend(_rdma_faults(all_nodes, rdma, fabric_mtu, fabric_prefix, pod_cidr, service_cidr))
 
     # Pack everything the generators need into a context dict.
     ctx = {
@@ -902,6 +1025,7 @@ def _parse_and_validate(profile):
         "ceph_nic": ceph_nic,
         "ceph_public_net": ceph_public_net,
         "ceph_cluster_net": ceph_cluster_net,
+        "rdma": rdma,
         "all_nodes": all_nodes,
         "storage": storage,
         "node_profiles": node_profiles,
@@ -971,6 +1095,16 @@ def _gen_hosts_yaml(ctx):
                 if fn.get("leaf"):
                     lines.append(f"          leaf: {fn['leaf']}")
 
+        if node.get("rdma_nics"):
+            lines.append("      node_rdma_nics:")
+            for rn in node["rdma_nics"]:
+                lines.append(f"        - nic: {rn['nic']}")
+                lines.append(f"          mtu: {rn['mtu']}")
+                lines.append(f"          shared: {str(rn['shared']).lower()}")
+                if rn.get("rdma_ip"):
+                    lines.append(f"          rdma_ip: {rn['rdma_ip']}")
+                    lines.append(f"          prefix: {rn['prefix']}")
+
         if node_family:
             lines.append(f"      node_family: {node_family}")
         if sku:
@@ -1011,6 +1145,7 @@ def _gen_hosts_yaml(ctx):
     cwf_nodes = with_family("cpu-cwf")
     spr_nodes = with_family("cpu-spr")
     gpu_nodes = [n for n, cfg in all_nodes.items() if cfg.get("accelerator")]
+    rdma_nodes = [n for n, cfg in all_nodes.items() if cfg.get("rdma_nics")]
 
     # hosts.yaml.j2 pins it for nodes.yaml too (under k8s_cluster): a delegated
     # async task (Kubespray's drain in remove-node.yml) is polled with the
@@ -1053,6 +1188,10 @@ def _gen_hosts_yaml(ctx):
     if gpu_nodes:
         lines += ["    gpu_nodes:", "      hosts:"]
         for n in gpu_nodes:
+            lines.append(f"        {n}:")
+    if rdma_nodes:
+        lines += ["    rdma_nodes:", "      hosts:"]
+        for n in rdma_nodes:
             lines.append(f"        {n}:")
     if ceph_storage:
         lines += ["    ceph_storage_nodes:", "      hosts:"]
@@ -1484,6 +1623,7 @@ def _build_summary(ctx):
         "fabric_mtu": ctx["fabric_mtu"],
         "fabric_cidrs": _fabric_cidrs(ctx),
         "node_count": len(all_nodes),
+        "rdma": {k: ctx["rdma"][k] for k in ("dscp", "priority", "pfc", "ecn")},
         "gpu_vendor": gpu_vendor,
         "gpu_model": gpu_model,
         "gpu_form": gpu_form,
