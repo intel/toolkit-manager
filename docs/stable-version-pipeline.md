@@ -2,9 +2,10 @@
 
 The pipeline in `Jenkinsfile.stable-versions` uses self-hosted Renovate to
 discover dependency updates and open pull requests in their owning GitHub
-repositories. It does not install or validate updates and does not access a
-deployment cluster. It runs weekly during the 02:00 UTC hour on Monday, within
-Renovate's weekly update window. By default it runs discovery only. The optional
+repositories. It builds an evidence-based upgrade matrix and runs offline static
+checks, but does not install updates or access a deployment cluster.
+It runs weekly during the 02:00 UTC hour on Monday, within
+Renovate's weekly update window. By default it runs discovery and static checks only. The optional
 PR-creation path is restricted to the approved Agent Sandbox pilot.
 
 Renovate's GitHub vulnerability-alert integration is disabled for all
@@ -104,6 +105,107 @@ Agent-toolkit and inference files under `ext/` and environment files under
 repositories do not update those existing local copies or already deployed
 environments.
 
+## Upgrade matrix and static gate
+
+`ci/make-upgrade-matrix.cjs` joins the component report with the final Renovate
+report using file, dependency name and exact current value. It requires the
+complete curated inventory, fails on missing extraction/current-reference
+drift, and rejects proposals without extracted lookup evidence. It writes:
+
+- `stable-upgrade-matrix.json`: source commit, current references, registry/
+  release lookup candidates, proposed changes per Renovate branch, blockers,
+  required validation, and separate validation states.
+- `stable-upgrade-matrix.tsv`: a readable current-to-candidate table.
+
+The `ci/toolkit-upgrade-policy.json` policy defines the expected coordinated
+references and required component-specific validation. Branch alternatives are
+preserved rather than silently selecting a major upgrade. Candidate sets must
+cover all coordinated references with matching versions. Ray, OpenShell and
+pgvector stay explicitly blocked. An empty candidate list is `no-candidate`,
+not proof that an image is current or available. Every row remains
+`prEligible: false`: the matrix never authorizes PR creation.
+
+Build #30 illustrates why source and artifact evidence must stay separate:
+
+| Component | Current reference | Lookup proposal | Disposition |
+|---|---|---|---|
+| Agent Sandbox | v1.0.10 | v1.0.12 | Both references; release artifact checks pending |
+| KubeRay operator | 1.3.0 | 1.8.0 | Both references; exact Helm download/CRD tests pending |
+| Flowise | 3.1.2 | 3.1.4 | Unvalidated image candidate |
+| ClickHouse | legacy mirror 25.2.1 | legacy mirror 25.7.5 | Not upstream 26.9.40.9 |
+| MinIO | legacy mirror 2024.12.18 | legacy mirror 2025.7.23 | Not inferred from upstream release name |
+| Langfuse web/worker | 3.106.1 | 3.227.1 or 4.88.0 | Separate coordinated alternatives; migration tests pending |
+| vLLM CPU | v0.28.0 | v0.34.0 | CPU image candidate; hardware/model tests pending |
+| OpenVINO Model Server | 2025.4.1 / 2025.4.1-py | plain 2026.4.1 only | Blocked: no matching Python proposal |
+| yq | v4.44.1 | v4.54.3 | Binary checksum/execution tests pending |
+| Redis Stack | 7.4.0-v8 | None | No candidate; not an artifact-availability check |
+| LiteLLM | v1.83.14-stable.patch.2 | None | Stable image channel not resolved by upstream v1.111.0 |
+| Ray | 2.40.0-py312 | Disabled | Coordinated image/client/chart update required |
+| OpenShell | 0.1.6 | Not managed | Chart registry/image/CLI mapping required |
+| pgvector | PostgreSQL 16 / pg16 | Invalid-value skip | Extension version unknown; do not replace with 0.8.7 |
+
+`ci/validate-toolkit-config.cjs` validates a clean checkout at the exact
+component report commit and verifies every current reference against the
+manifest. Jenkins fetches this public source into a temporary directory, never
+modifying the pipeline checkout or an existing deployment. It runs:
+
+- Bash syntax checks for the deployment and Compose generator scripts.
+- YAML parsing of the referenced configuration/defaults/values/metadata files.
+- Helm lint and offline template rendering for KubeRay, pgvector and Redis
+  Stack, using explicitly synthetic non-production passwords.
+- The same checks on disposable copies containing each complete candidate
+  proposal, with exact-match version substitutions. Partial/blocked proposals
+  are not patched or validated as if complete.
+
+Results and tool versions are archived in `stable-static-validation.json`.
+The matrix records static status independently from artifact digest, security,
+deployment, smoke and rollback validation. A failing baseline is a blocking
+pre-existing issue, not automatically a version regression. Candidate results
+list failing commands already failing at baseline separately from newly failing
+commands; this classification does not prove identical root causes.
+
+At source commit `b3a29592ff6cb0dbc3adce0de8b334964db38e27`, Helm 3.20.2
+reports a baseline Redis lint error: the locally vendored `redis-stack-server`
+chart is absent from the parent dependency metadata. Template rendering passes,
+but the lint gate intentionally fails. No toolkit source fix or lint suppression
+is included here. Review and fix that issue in the source repository before
+treating static validation as passing.
+
+These are static syntax/render checks, not full Ansible lint, generated Compose
+semantic validation, Kubernetes server-schema validation, chart/image digest
+verification, vulnerability scanning or compatibility certification. Passing
+them cannot enable non-pilot PR creation or deployments. A baseline failure also
+prevents the existing pilot PR stage from running.
+
+## Dedicated disposable-cluster setup (deployment disabled)
+
+No cluster credential is bound and no deployment/smoke stage is enabled.
+The user selected a dedicated disposable cluster; a GitHub credential such as
+`gh-sys-aibot` is not a substitute for its Kubernetes kubeconfig.
+
+1. Have the cluster owner provide a kubeconfig for an explicitly disposable
+   cluster, not a production/shared-cluster context. Sandbox and KubeRay can
+   change cluster-scoped CRDs/RBAC; a namespace alone does not isolate those.
+2. In Jenkins, open the appropriate folder's **Credentials**, choose **Add
+   Credentials**, and select **Secret file**. Upload that kubeconfig, choose a
+   descriptive ID (for example `agent-toolkit-disposable-kubeconfig`), and
+   restrict access to this trusted job. Never place the kubeconfig in Git or chat.
+3. Supply only the credential ID and approved context name to the pipeline
+   maintainer. The expected API server/cluster identity, Kubernetes version,
+   resource/storage capacity, registry egress, and approved small inference
+   model must also be confirmed before execution.
+4. Before adding write operations, implement a fail-closed context/server
+   allowlist, connectivity/RBAC checks, explicit manual opt-in, serialized
+   cluster use, unique namespaces/resource ownership, bounded timeouts and
+   scoped cleanup. Do not bind a credential or deploy until these gates and the
+   component-specific smoke assertions are implemented and reviewed.
+5. Test baseline install, candidate upgrade, component smoke assertions,
+   persistence/backup/restore and rollback on disposable data. Archive test
+   results and exact image/chart digests; skipped tests must not count as passed.
+
+The per-component smoke requirements are in `ci/toolkit-upgrade-policy.json`;
+they are requirements, not implemented/passing runtime tests.
+
 ## Jenkins setup
 
 1. Commit `Jenkinsfile.stable-versions` and `ci/renovate-config.json` to a
@@ -116,6 +218,9 @@ environments.
    to pull both images, and access to GitHub and relevant package registries.
    The Renovate container uses UID and GID 1000 to match the observed Jenkins
    workspace owner; verify or adjust these IDs if the agent setup changes.
+   The Renovate container must also provide Git, Bash, Helm and mikefarah/yq
+   v4 for static checks. Missing tools fail explicitly; inspect the preflight
+   error report and provision an approved pinned validation image if needed.
    No Docker daemon is required. HTTPS requests use
    `http://proxy-dmz.intel.com:912` (set in both `HTTPS_PROXY` and `https_proxy`);
    ensure this proxy is reachable and approved for GitHub access. Configure
@@ -199,9 +304,10 @@ guarantee that every expected component was recognized: inspect the report,
 including skipped dependencies, and add explicit coverage checks
 before relying on it as a complete inventory.
 
-Pull requests require human review and a separate compatibility, deployment,
-and validation workflow. Renovate is configured not to automerge; this pipeline
-does not provide test, compatibility, backup, or rollback gates. In particular,
+Pull requests require human review and additional artifact/security,
+compatibility and deployment validation. Renovate is configured not to
+automerge; this pipeline's static gate does not provide runtime compatibility,
+backup, or rollback gates. In particular,
 Istio's four chart dependencies must match and their chart lock and appVersion
 need review. KServe and platform Envoy Gateway versions are cross-repository
 dependencies and must be coordinated manually. Do not treat grouped proposals

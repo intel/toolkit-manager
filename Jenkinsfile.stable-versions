@@ -86,7 +86,7 @@ spec:
                     id
                     echo "Workspace ownership and permissions (numeric uid:gid mode path):"
                     stat -c '%u:%g %a %n' "$WORKSPACE" "${WORKSPACE}@tmp"
-                    rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl stable-pilot.jsonl stable-inventory.tsv stable-components.json stable-components.tsv
+                    rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl stable-pilot.jsonl stable-inventory.tsv stable-components.json stable-components.tsv stable-upgrade-matrix.json stable-upgrade-matrix.tsv stable-static-validation.json
                 '''
             }
         }
@@ -137,6 +137,37 @@ spec:
                         set -euo pipefail
                         bash ci/summarize-renovate-report.sh stable-discovery.jsonl stable-inventory.tsv
                         bash ci/check-renovate-report.sh stable-discovery.jsonl
+                    '''
+                }
+            }
+        }
+
+        stage('Build upgrade matrix') {
+            when { expression { params.REPOSITORIES.split(',').contains('intel/agent-toolkit') } }
+            steps {
+                container('renovate') {
+                    sh '''#!/usr/bin/env bash
+                        set -euo pipefail
+                        node ci/make-upgrade-matrix.cjs stable-components.json stable-discovery.jsonl stable-upgrade-matrix
+                    '''
+                }
+            }
+        }
+
+        stage('Static configuration validation') {
+            when { expression { params.REPOSITORIES.split(',').contains('intel/agent-toolkit') } }
+            steps {
+                container('renovate') {
+                    sh '''#!/usr/bin/env bash
+                        set -euo pipefail
+                        source_commit=$(node -p "require('./stable-components.json').sourceCommit")
+                        [[ "$source_commit" =~ ^[a-f0-9]{40}$ ]]
+                        source_dir=$(mktemp -d)
+                        trap 'rm -rf -- "$source_dir"' EXIT
+                        git -C "$source_dir" init --quiet
+                        git -C "$source_dir" fetch --quiet --depth 1 https://github.com/intel/agent-toolkit.git "$source_commit"
+                        git -C "$source_dir" checkout --quiet --detach FETCH_HEAD
+                        node ci/validate-toolkit-config.cjs "$source_dir" stable-upgrade-matrix.json stable-upgrade-matrix stable-static-validation.json
                     '''
                 }
             }
@@ -214,7 +245,7 @@ spec:
 
     post {
         always {
-            archiveArtifacts artifacts: 'stable-*.jsonl,stable-*.tsv,stable-components.json', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'stable-*.jsonl,stable-*.tsv,stable-components.json,stable-upgrade-matrix.json,stable-static-validation.json', allowEmptyArchive: true
         }
     }
 }
