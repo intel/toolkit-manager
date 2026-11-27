@@ -144,7 +144,24 @@ function validate(source, matrix) {
   return report;
 }
 
-module.exports = { applyProposal, verifyReferences, checkConfiguration, checkCheckout, checkTools, run, validate };
+function summarizeValidation(report, log = console.log) {
+  log(`Baseline static checks: ${report.baseline.status}`);
+  for (const check of report.baseline.checks.filter(check => check.status === 'failed')) {
+    log(`BASELINE FAILURE: ${check.command}\n${check.output.trim()}`);
+  }
+  for (const result of report.candidates) {
+    log(`${result.component} (${result.branch}): ${result.status}`);
+    for (const check of result.checks.filter(check => check.status === 'failed')) {
+      if (result.inheritedFailingChecks.includes(check.command)) {
+        log(`  Also fails at baseline: ${check.command}`);
+      } else {
+        log(`CANDIDATE FAILURE: ${check.command}\n${check.output.trim()}`);
+      }
+    }
+  }
+}
+
+module.exports = { applyProposal, verifyReferences, checkConfiguration, checkCheckout, checkTools, run, validate, summarizeValidation };
 if (require.main === module) {
   let reportWritten = false;
   try {
@@ -154,8 +171,7 @@ if (require.main === module) {
     fs.writeFileSync(process.argv[5], `${JSON.stringify(report, null, 2)}\n`);
     reportWritten = true;
     writeMatrix(matrix, process.argv[4]);
-    console.log(`Baseline static checks: ${report.baseline.status}`);
-    for (const result of report.candidates) console.log(`${result.component} (${result.branch}): ${result.status}`);
+    summarizeValidation(report);
     if (report.status !== 'passed') throw new Error('Static validation failed; inspect stable-static-validation.json for baseline and candidate errors. No deployment was performed.');
   } catch (error) {
     if (!reportWritten && process.argv.length === 6) {

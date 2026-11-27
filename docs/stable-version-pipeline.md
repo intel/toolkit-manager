@@ -176,6 +176,25 @@ but the lint gate intentionally fails. No toolkit source fix or lint suppression
 is included here. Review and fix that issue in the source repository before
 treating static validation as passing.
 
+The source fix is published as commit
+`ea16d845a200f125be85b9630660472f7e52fa66` on the approved fork branch
+[`fix/redis-vendored-chart-metadata`](https://github.com/nishi252003/enterprise-agent-toolkit/tree/fix/redis-vendored-chart-metadata).
+It declares the exact vendored chart version with
+`repository: file://charts/redis-stack-server`, never an upstream chart
+repository. Redis manifests rendered before and after the change are
+byte-identical. The full baseline and all nine complete Build #30 candidate
+snapshots pass the static gate on that commit. These are local static results,
+not new registry discovery, runtime tests or a successful Jenkins build.
+Submit and merge the source fix into `intel/agent-toolkit` `main` before
+rerunning the job expecting a passing baseline; pushing the fork branch alone
+does not change the monitored source. The pipeline does not apply the fix
+silently to its validation checkout or suppress the failure.
+
+Static console output prints each failing baseline command with its diagnostic
+output. Candidate summaries identify checks that also failed at baseline and
+print diagnostics for newly failing commands. The complete results remain in
+the archived JSON report.
+
 These are static syntax/render checks, not full Ansible lint, generated Compose
 semantic validation, Kubernetes server-schema validation, chart/image digest
 verification, vulnerability scanning or compatibility certification. Passing

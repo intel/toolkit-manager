@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { makeMatrix, writeMatrix } = require('./make-upgrade-matrix.cjs');
-const { applyProposal, checkConfiguration, checkCheckout, checkTools, run } = require('./validate-toolkit-config.cjs');
+const { applyProposal, checkConfiguration, checkCheckout, checkTools, run, summarizeValidation } = require('./validate-toolkit-config.cjs');
 const manifest = require('./toolkit-components.json');
 const policy = require('./toolkit-upgrade-policy.json');
 
@@ -69,6 +69,21 @@ function fixture() {
 }
 
 function test() {
+  const summaries = [];
+  summarizeValidation({
+    baseline: { status: 'failed', checks: [{ status: 'failed', command: 'helm lint redis', output: 'missing dependency metadata\n' }] },
+    candidates: [{
+      component: 'Redis Stack', branch: 'test/redis', status: 'failed',
+      inheritedFailingChecks: ['helm lint redis'],
+      checks: [
+        { status: 'failed', command: 'helm lint redis', output: 'missing dependency metadata\n' },
+        { status: 'failed', command: 'helm template redis', output: 'candidate render error\n' },
+      ],
+    }],
+  }, line => summaries.push(line));
+  assert(summaries.some(line => line.includes('BASELINE FAILURE: helm lint redis\nmissing dependency metadata')));
+  assert(summaries.some(line => line.includes('Also fails at baseline: helm lint redis')));
+  assert(summaries.some(line => line.includes('CANDIDATE FAILURE: helm template redis\ncandidate render error')));
   const toolResult = (command, output) => ({
     command, status: 'passed', stdout: output, stderr: '', output,
   });
