@@ -12,7 +12,7 @@
 
 repos:
   - layer: "inference"
-    url: "https://github.com/intel/enterprise-inference"
+    url: "https://github.com/intel/inference-toolkit"
     dest: "enterprise.ai-inference"
     rev: "main"
     deployment_subdir: ""

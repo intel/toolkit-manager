@@ -191,11 +191,11 @@ External repos are declared in per-layer manifests at `configs/repos/repos.<laye
 ```yaml
 repos:
   - layer: "inference"
-    url: "https://github.com/intel/enterprise-inference"   # redirects to intel/inference-toolkit
+    url: "https://github.com/intel/inference-toolkit"
     dest: "enterprise.ai-inference"
     deployment_subdir: ""          # roles/, components.yaml, config.yaml at repo root
   - layer: "erag"
-    url: "https://github.com/intel/enterprise-rag"
+    url: "https://github.com/intel/chatbot-toolkit"
     dest: "enterprise.ai-erag"
     deployment_subdir: "deployment" # Ansible tree lives under deployment/
 ```
