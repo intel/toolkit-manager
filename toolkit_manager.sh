@@ -51,6 +51,7 @@ readonly SOLUTIONS_BASE=".solutions.yaml"
 readonly SOLUTIONS_SCHEMA=2
 
 readonly YQ_VERSION="v4.53.2"
+readonly JQ_VERSION="jq-1.8.2"
 readonly KUBECTL_VERSION="v1.35.4"
 readonly HELM_VERSION="v3.20.2"
 
@@ -162,7 +163,7 @@ usage() {
   Usage:  $me <action> [args] [-- ansible-playbook args]
 
   Actions:
-    configure              install Python ≥ 3.11 + venv pkg + yq + kubectl + helm
+    configure              install Python ≥ 3.11 + venv pkg + yq + jq + kubectl + helm
                            (sudo, PERMANENT system changes). Run once per machine;
                            skip if those are already present.
     init <layer>           create env and seed configs. Clones every repo in
@@ -322,7 +323,7 @@ show_table() {
 }
 
 # =============================================================================
-# Host tooling — python, venv, yq, kubectl, helm
+# Host tooling — python, venv, yq, jq, kubectl, helm
 # =============================================================================
 # Python helpers — check for suitable Python, print hints if missing.
 _find_python() {
@@ -370,7 +371,7 @@ configure() {
     - install Python ≥ 3.11 (deadsnakes PPA on Ubuntu 22.04, base pkgs elsewhere)
     - install the matching python<ver>-venv package
     - install a UTF-8 locale (en_US.UTF-8)
-    - install yq, kubectl, and helm into /usr/local/bin
+    - install yq, jq, kubectl, and helm into /usr/local/bin
     - create the installer's Python venv under .venv/
 
 EOF
@@ -387,10 +388,11 @@ EOF
     case "$(_detect_os)" in
         debian) _configure_debian ;;
         rhel)   _configure_rhel ;;
-        *)      err "Unsupported OS. Install Python ≥ 3.11, the matching venv pkg, yq, kubectl, and helm manually." ;;
+        *)      err "Unsupported OS. Install Python ≥ 3.11, the matching venv pkg, yq, jq, kubectl, and helm manually." ;;
     esac
     _configure_locale
     _install_yq
+    _install_jq
     _install_kubectl
     _install_helm
     _ensure_venv
@@ -498,6 +500,23 @@ _install_yq() {
     hash -r
     yq --version &>/dev/null \
         || err "yq install failed: /usr/local/bin/yq is not runnable (downloaded yq_linux_${arch} — check network/arch)."
+}
+
+_install_jq() {
+    if command -v jq &>/dev/null; then warn "jq exists ($(jq --version 2>&1)) — ensure ≥ ${JQ_VERSION}"; return 0; fi
+    local arch; arch=$(_arch)
+    infon "Installing jq ${JQ_VERSION} (${arch})"
+    local tmp; tmp=$(mktemp -d)
+    # shellcheck disable=SC2064
+    trap "rm -rf '$tmp'" RETURN
+    _quiet _download \
+        "https://github.com/jqlang/jq/releases/download/${JQ_VERSION}/jq-linux-${arch}" \
+        "$tmp/jq"
+    sudo install -m 0755 "$tmp/jq" /usr/local/bin/jq \
+        || err "jq install failed: could not install binary into /usr/local/bin."
+    hash -r
+    jq --version &>/dev/null \
+        || err "jq install failed: /usr/local/bin/jq is not runnable (downloaded jq-linux-${arch} — check network/arch)."
 }
 
 _install_kubectl() {

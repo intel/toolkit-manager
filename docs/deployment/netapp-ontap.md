@@ -30,7 +30,7 @@ Both flows assume the array side already exists. The installer creates nothing o
 
 ### Flow A: array-backed persistent volumes
 
-1. Prepare the installer host. Once per machine, installs Python, `yq`, `kubectl`, `helm`
+1. Prepare the installer host. Once per machine, installs Python, `yq`, `jq`, `kubectl`, `helm`
    and the installer venv:
 
    ```bash

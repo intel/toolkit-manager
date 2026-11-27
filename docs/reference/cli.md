@@ -58,7 +58,7 @@ It makes **permanent** changes, using `sudo`:
 - installs Python 3.11 or newer and its `venv` package (Ubuntu 22.04 uses the deadsnakes PPA;
   Ubuntu 24.04 and RHEL/Rocky use their own packages),
 - installs the `en_US.UTF-8` locale,
-- installs `yq`, `kubectl` and `helm` into `/usr/local/bin`. A tool that is already installed is
+- installs `yq`, `jq`, `kubectl` and `helm` into `/usr/local/bin`. A tool that is already installed is
   left as it is, with a warning to check its version,
 - creates the installer's Python environment in `.venv/`.
 

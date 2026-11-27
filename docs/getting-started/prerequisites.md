@@ -96,12 +96,13 @@ done
 
 ## Tooling
 
-`./toolkit_manager.sh configure` installs the tools below. Run it once per machine before anything else; it lists the changes and asks you to confirm (type `y`). Python comes from the OS package manager; `yq`, `kubectl` and `helm` are downloaded at the pinned versions into `/usr/local/bin`. A tool that is already on your `PATH` is kept as it is, with a warning to check that its version is at least the pinned one. `configure` also creates the installer's Python environment in `.venv/`.
+`./toolkit_manager.sh configure` installs the tools below. Run it once per machine before anything else; it lists the changes and asks you to confirm (type `y`). Python comes from the OS package manager; `yq`, `jq`, `kubectl` and `helm` are downloaded at the pinned versions into `/usr/local/bin`. A tool that is already on your `PATH` is kept as it is, with a warning to check that its version is at least the pinned one. `configure` also creates the installer's Python environment in `.venv/`.
 
 | Tool | Version | Notes |
 |---|---|---|
 | Python | ≥ 3.11 | Also installs the matching `python<ver>-venv` package |
 | yq | v4.53.2 | [mikefarah/yq](https://github.com/mikefarah/yq) — YAML processor used by the installer |
+| jq | jq-1.8.2 | [jqlang/jq](https://github.com/jqlang/jq) — JSON processor used by the installer's roles |
 | kubectl | v1.35.4 | |
 | helm | v3.20.2 | |
 

@@ -56,7 +56,7 @@ Install the layer you need on one machine with the default settings. The layers 
 ```bash
 git clone https://github.com/intel/toolkit-manager.git
 cd toolkit-manager
-./toolkit_manager.sh configure      # once per machine (sudo, asks first): Python 3.11+, yq, kubectl, helm, .venv/
+./toolkit_manager.sh configure      # once per machine (sudo, asks first): Python 3.11+, yq, jq, kubectl, helm, .venv/
 ./toolkit_manager.sh init platform  # creates env/local/ with your settings
 ```
 
