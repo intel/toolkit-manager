@@ -1,0 +1,61 @@
+{
+  "Agent Sandbox": {
+    "dependencies": ["kubernetes-sigs/agent-sandbox", "kubernetes-sigs/agent-sandbox"],
+    "requiredValidation": ["Fetch release manifests and verify all controller/router/runtime image digests", "Validate CRDs and admission configuration", "Install baseline then upgrade controller/router/runtime together", "Create and claim a sandbox; execute Python through authenticated router; test denied access and egress policy", "Exercise rollback on disposable data"]
+  },
+  "KubeRay operator": {
+    "dependencies": ["kuberay-operator", "kuberay-operator"],
+    "requiredValidation": ["Pull and render the exact Helm chart", "Verify CRD upgrade and Ray/Python support matrix", "Install baseline then upgrade operator", "Create RayCluster, submit distributed job, scale workers and test rollback"]
+  },
+  "Ray": {
+    "dependencies": [null, "rayproject/ray", null],
+    "blocked": "Standalone Ray updates disabled; coordinate role image, chart image, appVersion, client package and Python ABI.",
+    "requiredValidation": ["Verify matching Python image and client artifacts", "Render RayCluster", "Run distributed task and worker scale/recovery tests against supported KubeRay", "Test upgrade and rollback"]
+  },
+  "OpenShell": {
+    "dependencies": [null, null, null],
+    "blocked": "Chart/image/CLI release mapping and registry migration need explicit review.",
+    "requiredValidation": ["Resolve chart registry and verify matching chart/image/CLI artifacts", "Validate CRDs and policy configuration", "Test authenticated and denied shell sessions, network/filesystem isolation, upgrade and rollback"]
+  },
+  "pgvector": {
+    "dependencies": [null, "pgvector/pgvector", "pgvector/pgvector"],
+    "blocked": "pg16 identifies PostgreSQL, not the extension; query installed extension version and select an immutable compatible image first.",
+    "requiredValidation": ["Verify PostgreSQL major and SELECT extversion FROM pg_extension", "Pin image digest", "Backup/restore test", "Run vector insert, distance/index queries, data-preserving upgrade and rollback"]
+  },
+  "Redis Stack": {
+    "dependencies": ["redis/redis-stack-server", "redis/redis-stack-server"],
+    "requiredValidation": ["Verify image digest and bundled modules", "Helm lint/render vendored chart", "Test authenticated PING, denied unauthenticated access, RediSearch vector query, persistence/restart, backup/restore and rollback"]
+  },
+  "LiteLLM": {
+    "dependencies": ["docker.litellm.ai/berriai/litellm"],
+    "requiredValidation": ["Verify stable.patch channel artifact and digest", "Validate configuration and database migrations", "Run health/readiness, authenticated model-list and completion against a test backend, denied-access and rollback tests"]
+  },
+  "Flowise": {
+    "dependencies": ["flowiseai/flowise"],
+    "requiredValidation": ["Verify image digest and Compose configuration", "Test authenticated health and a saved flow with mock model backend", "Test data migration, persistence/restart and rollback"]
+  },
+  "ClickHouse": {
+    "dependencies": ["bitnamilegacy/clickhouse"],
+    "requiredValidation": ["Verify legacy-mirror image digest; do not substitute upstream tag", "Test authentication, schema migration, query, persistence, backup/restore and rollback with Langfuse"]
+  },
+  "MinIO": {
+    "dependencies": ["bitnamilegacy/minio"],
+    "requiredValidation": ["Verify legacy-mirror image digest; do not substitute upstream release tag", "Test authenticated bucket/object put/get/delete, denied access, persistence, upgrade and rollback with Langfuse"]
+  },
+  "Langfuse": {
+    "dependencies": ["langfuse/langfuse", "langfuse/langfuse-worker"],
+    "requiredValidation": ["Verify matching web/worker image digests", "Review major-version database and configuration migrations", "Test trace ingestion through worker and UI/API retrieval with ClickHouse, MinIO, Redis and PostgreSQL", "Test upgrade, backup/restore and rollback"]
+  },
+  "vLLM": {
+    "dependencies": ["vllm/vllm-openai-cpu"],
+    "requiredValidation": ["Verify CPU image digest and host instruction-set support", "Validate generated Compose configuration", "Load approved small test model and run readiness, model-list and completion tests", "Check memory/latency thresholds agreed for test hardware and rollback"]
+  },
+  "OpenVINO Model Server": {
+    "dependencies": ["openvino/model_server", "openvino/model_server"],
+    "requiredValidation": ["Verify both plain and Python image variants at the same release", "Validate generated Compose configuration and model configuration", "Load approved test model and test readiness/inference on target CPU", "Test Python variant, upgrade and rollback"]
+  },
+  "yq installer utility": {
+    "dependencies": ["mikefarah/yq"],
+    "requiredValidation": ["Verify release binary checksum and architecture", "Run --version and representative deployment YAML read/write tests", "Run shell syntax and Compose generation checks"]
+  }
+}

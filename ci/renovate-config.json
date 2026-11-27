@@ -1,0 +1,171 @@
+{
+  "platform": "github",
+  "autodiscover": false,
+  "onboarding": false,
+  "requireConfig": "optional",
+  "exitCodeForErrors": true,
+  "gitAuthor": "Nishi Shah <292722984+nishi252003@users.noreply.github.com>",
+  "reportType": "logging",
+  "allowScripts": false,
+  "allowPlugins": false,
+  "enabledManagers": [
+    "helmv3",
+    "helm-values",
+    "dockerfile",
+    "docker-compose",
+    "pip_requirements",
+    "github-actions",
+    "custom.regex"
+  ],
+  "force": {
+    "automerge": false,
+    "ignoreUnstable": true,
+    "vulnerabilityAlerts": {
+      "enabled": false
+    }
+  },
+  "packageRules": [
+    {
+      "matchPackageNames": ["kuberay-operator"],
+      "matchDatasources": ["helm"],
+      "groupName": "kuberay operator version"
+    },
+    {
+      "matchPackageNames": ["kubernetes-sigs/agent-sandbox"],
+      "groupName": "agent sandbox version"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["langfuse/langfuse", "langfuse/langfuse-worker"],
+      "groupName": "langfuse images"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["openvino/model_server"],
+      "groupName": "openvino model server images"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["rayproject/ray"],
+      "enabled": false
+    },
+    {
+      "matchPackageNames": ["base", "istiod", "cni", "ztunnel"],
+      "matchFileNames": ["charts/istio/Chart.yaml"],
+      "groupName": "istio chart dependencies"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^config\\.yaml$/", "/^roles/kuberay/defaults/main\\.yaml$/"],
+      "matchStrings": ["(?:^|\\n)kuberay_operator_version:[ \\t]*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"],
+      "datasourceTemplate": "helm",
+      "packageNameTemplate": "kuberay-operator",
+      "registryUrlTemplate": "https://ray-project.github.io/kuberay-helm/",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^docker/scripts/generate-docker-compose\\.sh$/"],
+      "matchStrings": ["(?:^|\\n)(?:VLLM_IMAGE|OVMS_IMAGE|OVMS_IMAGE_PY)=\"(?<depName>[^\"\\s]+):(?<currentValue>[^\"\\s:]+)\""],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^docker/deploy\\.sh$/"],
+      "matchStrings": ["local yq_version=\"(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)\""],
+      "datasourceTemplate": "github-releases",
+      "packageNameTemplate": "mikefarah/yq",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)config\\.yaml$/",
+        "/(^|/)roles/agent_sandbox/defaults/main\\.yaml$/"
+      ],
+      "matchStrings": [
+        "(?:^|\\n)agent_sandbox_version:[ \\t]*[\"']?(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "packageNameTemplate": "kubernetes-sigs/agent-sandbox",
+      "versioningTemplate": "semver-coerced"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)charts/redis-stack/charts/redis-stack-server/values\\.yaml$/"
+      ],
+      "matchStrings": [
+        "image:[ \\t]*[\"']?redis/redis-stack-server[\"']?[ \\t]*\\r?\\n[ \\t]*tag:[ \\t]*[\"'](?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+-v[0-9]+)[\"']"
+      ],
+      "datasourceTemplate": "docker",
+      "packageNameTemplate": "redis/redis-stack-server",
+      "versioningTemplate": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-v(?<build>\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)roles/postgresql/defaults/main\\.yaml$/"],
+      "matchStrings": ["(?:^|\\n)cnpg_version:[ \\t]*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"],
+      "datasourceTemplate": "helm",
+      "packageNameTemplate": "cloudnative-pg",
+      "registryUrlTemplate": "https://cloudnative-pg.github.io/charts",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)roles/metallb/defaults/main\\.yaml$/"],
+      "matchStrings": ["(?:^|\\n)metallb_version:[ \\t]*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"],
+      "datasourceTemplate": "helm",
+      "packageNameTemplate": "metallb",
+      "registryUrlTemplate": "https://metallb.github.io/metallb",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)roles/keda/defaults/main\\.yaml$/"],
+      "matchStrings": ["(?:^|\\n)keda_version:[ \\t]*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"],
+      "datasourceTemplate": "helm",
+      "packageNameTemplate": "keda",
+      "registryUrlTemplate": "https://kedacore.github.io/charts",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)roles/metrics_server/defaults/main\\.yaml$/"],
+      "matchStrings": ["(?:^|\\n)metrics_server_version:[ \\t]*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"],
+      "datasourceTemplate": "helm",
+      "packageNameTemplate": "metrics-server",
+      "registryUrlTemplate": "https://kubernetes-sigs.github.io/metrics-server/",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)roles/seaweedfs/defaults/main\\.yaml$/"],
+      "matchStrings": ["(?:^|\\n)seaweedfs_chart_version:[ \\t]*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"],
+      "datasourceTemplate": "helm",
+      "packageNameTemplate": "seaweedfs",
+      "registryUrlTemplate": "https://seaweedfs.github.io/seaweedfs/helm",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)roles/langfuse/defaults/main\\.yaml$/"],
+      "matchStrings": ["(?:^|\\n)langfuse_version:[ \\t]*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"],
+      "datasourceTemplate": "helm",
+      "packageNameTemplate": "langfuse",
+      "registryUrlTemplate": "https://langfuse.github.io/langfuse-k8s",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)roles/nfd/defaults/main\\.yaml$/"],
+      "matchStrings": ["(?:^|\\n)nfd_version:[ \\t]*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"],
+      "datasourceTemplate": "helm",
+      "packageNameTemplate": "node-feature-discovery",
+      "registryUrlTemplate": "https://kubernetes-sigs.github.io/node-feature-discovery/charts",
+      "versioningTemplate": "semver"
+    }
+  ]
+}

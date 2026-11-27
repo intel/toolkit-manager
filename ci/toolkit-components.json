@@ -1,0 +1,122 @@
+{
+  "repository": "intel/agent-toolkit",
+  "components": [
+    {
+      "name": "Agent Sandbox",
+      "upstream": "kubernetes-sigs/agent-sandbox",
+      "refs": [
+        {"file": "config.yaml", "pattern": "^agent_sandbox_version: *\"([^\"]+)\""},
+        {"file": "roles/agent_sandbox/defaults/main.yaml", "pattern": "^agent_sandbox_version: *\"([^\"]+)\""}
+      ],
+      "note": "Controller, router and Python runtime derive from this version; verify all release artifacts."
+    },
+    {
+      "name": "KubeRay operator",
+      "upstream": "kuberay-project/kuberay",
+      "refs": [
+        {"file": "config.yaml", "pattern": "^kuberay_operator_version: *\"([^\"]+)\""},
+        {"file": "roles/kuberay/defaults/main.yaml", "pattern": "^kuberay_operator_version: *\"([^\"]+)\""}
+      ],
+      "note": "Latest upstream release; Helm chart availability is checked separately by Renovate."
+    },
+    {
+      "name": "Ray",
+      "upstream": "ray-project/ray",
+      "refs": [
+        {"file": "roles/kuberay/defaults/main.yaml", "pattern": "^kuberay_ray_image: *\"([^\"]+)\""},
+        {"file": "charts/kuberay/values.yaml", "pattern": "^ *rayImage: *([^\\s#]+)"},
+        {"file": "charts/kuberay/Chart.yaml", "pattern": "^appVersion: *\"([^\"]+)\""}
+      ],
+      "note": "Report only: coordinate image, Python ABI, chart appVersion and KubeRay compatibility."
+    },
+    {
+      "name": "OpenShell",
+      "upstream": "ai-openshell/openshell",
+      "refs": [
+        {"file": "roles/openshell/defaults/main.yaml", "pattern": "^openshell_chart_version: *\"([^\"]+)\""},
+        {"file": "roles/openshell/defaults/main.yaml", "pattern": "^openshell_image_tag: *\"([^\"]+)\""},
+        {"file": "roles/openshell/defaults/main.yaml", "pattern": "^openshell_release_tag: *\"([^\"]+)\""}
+      ],
+      "note": "Report only: existing GHCR chart reference may require migration; release is not proof of chart/image availability."
+    },
+    {
+      "name": "pgvector",
+      "upstream": "pgvector/pgvector",
+      "source": "tags",
+      "refs": [
+        {"file": "roles/pgvector/defaults/main.yaml", "pattern": "^pgvector_version: *\"([^\"]+)\""},
+        {"file": "charts/pgvector/values.yaml", "pattern": "^ *tag: *(pg[0-9]+)"},
+        {"file": "docker/docker-compose.yml", "pattern": "^ *image: *(pgvector/pgvector:[^\\s#]+)"}
+      ],
+      "note": "Latest stable extension tag. Current pg16/16 denotes PostgreSQL major, NOT the installed pgvector extension version; no direct version comparison."
+    },
+    {
+      "name": "Redis Stack",
+      "upstream": "redis-stack/redis-stack",
+      "refs": [
+        {"file": "charts/redis-stack/charts/redis-stack-server/values.yaml", "pattern": "^ *tag: *\"([^\"]+)\""},
+        {"file": "docker/docker-compose.yml", "pattern": "^ *image: *(redis/redis-stack-server:[^\\s#]+)"}
+      ],
+      "note": "Product release; bundled modules and local vendored Helm chart need coordinated review."
+    },
+    {
+      "name": "LiteLLM",
+      "upstream": "BerriAI/litellm",
+      "refs": [{"file": "docker/docker-compose.yml", "pattern": "^ *image: *(docker\\.litellm\\.ai/berriai/litellm:[^\\s#]+)"}],
+      "note": "Compose image pin only. Upstream stable release may differ from the stable.patch image channel; Kubernetes deployment is inherited."
+    },
+    {
+      "name": "Flowise",
+      "upstream": "FlowiseAI/Flowise",
+      "refs": [{"file": "docker/docker-compose.yml", "pattern": "^ *image: *(flowiseai/flowise:[^\\s#]+)"}],
+      "note": "Compose image; release tag may include a flowise@ prefix."
+    },
+    {
+      "name": "ClickHouse",
+      "upstream": "ClickHouse/ClickHouse",
+      "refs": [{"file": "docker/docker-compose.yml", "pattern": "^ *image: *(bitnamilegacy/clickhouse:[^\\s#]+)"}],
+      "note": "Upstream release does not establish availability in the bitnamilegacy image repository."
+    },
+    {
+      "name": "MinIO",
+      "upstream": "minio/minio",
+      "refs": [{"file": "docker/docker-compose.yml", "pattern": "^ *image: *(bitnamilegacy/minio:[^\\s#]+)"}],
+      "note": "Upstream release does not establish availability in the bitnamilegacy image repository."
+    },
+    {
+      "name": "Langfuse",
+      "upstream": "langfuse/langfuse",
+      "refs": [
+        {"file": "docker/docker-compose.yml", "pattern": "^ *image: *(langfuse/langfuse:[^\\s#]+)"},
+        {"file": "docker/docker-compose.yml", "pattern": "^ *image: *(langfuse/langfuse-worker:[^\\s#]+)"}
+      ],
+      "note": "Web and worker images must stay aligned; major upgrades need migration tests."
+    },
+    {
+      "name": "vLLM",
+      "upstream": "vllm-project/vllm",
+      "refs": [{"file": "docker/scripts/generate-docker-compose.sh", "pattern": "^VLLM_IMAGE=\"([^\"]+)\""}],
+      "note": "Compose generator CPU image pin. Verify CPU image publication independently."
+    },
+    {
+      "name": "OpenVINO Model Server",
+      "upstream": "openvinotoolkit/model_server",
+      "refs": [
+        {"file": "docker/scripts/generate-docker-compose.sh", "pattern": "^OVMS_IMAGE=\"([^\"]+)\""},
+        {"file": "docker/scripts/generate-docker-compose.sh", "pattern": "^OVMS_IMAGE_PY=\"([^\"]+)\""}
+      ],
+      "note": "Plain and Python image variants require coordinated updates."
+    },
+    {
+      "name": "yq installer utility",
+      "upstream": "mikefarah/yq",
+      "refs": [{"file": "docker/deploy.sh", "pattern": "^ *local yq_version=\"([^\"]+)\""}],
+      "note": "Deployment utility, not an installed application service."
+    }
+  ],
+  "external": [
+    "Keycloak, Istio, gateway, observability and other Kubernetes inference/platform services are configured in other repositories; not covered by this repository-only inventory.",
+    "Models, OS packages, Docker engine and unpinned downloaded dependencies have no release pin here and are not represented as version-upgrade candidates.",
+    "Local chart versions describe toolkit-owned packaging, not an upstream product version. CI tools and GitHub Actions are tracked separately by Renovate."
+  ]
+}

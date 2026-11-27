@@ -1,0 +1,467 @@
+# Jenkins stable-version discovery
+
+The pipeline in `Jenkinsfile.stable-versions` uses self-hosted Renovate to
+discover dependency updates and open pull requests in their owning GitHub
+repositories. It builds an evidence-based upgrade matrix and runs offline static
+checks, but does not install updates or access a deployment cluster.
+It runs weekly during the 02:00 UTC hour on Monday, within
+Renovate's weekly update window. By default it runs discovery, static,
+artifact and image-vulnerability gates without deployment. The optional
+PR-creation path is restricted to the approved Agent Sandbox pilot.
+
+Renovate's GitHub vulnerability-alert integration is disabled for all
+repositories in this job because its discovery credential cannot read the
+Agent Toolkit Dependabot alerts. This does not change GitHub's repository
+settings, but Renovate will not use those alerts to identify or prioritize
+security updates. A separate Trivy candidate-image scan now enforces the
+approved HIGH/CRITICAL policy described below; it does not restore Dependabot
+integration or scan already deployed services.
+
+## What it covers
+
+Renovate reads the default branch of each configured repository. It inspects
+recognized Helm charts, Helm values, Dockerfiles, Docker Compose files, and pip
+requirements and GitHub Actions. Custom rules cover Agent Sandbox, KubeRay
+operator, the vendored Redis Stack server image tag, vLLM CPU and OpenVINO Model
+Server image variables, and the yq installer utility. Additional rules for
+CloudNativePG, MetalLB, KEDA, Metrics Server, SeaweedFS, Langfuse,
+and Node Feature Discovery apply only where those role paths exist; these
+inherited roles are not present in the current Agent Toolkit repository.
+Some rules may not match if the monitored branch
+uses a different file layout or variable name. Matching files in a repository can
+include disabled components and dependencies unrelated to the deployed stack.
+The discovery report is not an inventory of what is actually running.
+
+The self-hosted configuration now discovers both KubeRay operator version
+references without requiring the unmerged
+[PR #41](https://github.com/intel/agent-toolkit/pull/41). If that PR merges,
+review duplicate custom rules in the effective Renovate config.
+The self-hosted configuration groups Langfuse web and worker image updates,
+groups OpenVINO Model Server image variants, and
+disables Ray image updates until the image and chart application versions can
+be updated consistently. Verify these safeguards in the discovery report before
+enabling PR creation; they do not prove compatibility.
+
+Renovate ignores versions it recognizes as unstable or prerelease. A proposed
+version is an upstream candidate, not an Intel-certified compatibility claim.
+Image tag conventions differ and some floating tags do not identify an
+immutable release. The pipeline does not update firmware, OS packages,
+Kubernetes installations, models, external services, or versions hidden in
+unrecognized templates and runtime environment overrides. For complete
+coverage, compare the discovery report to your deployment inventory and add
+verified managers or rules for each missing component.
+
+### Explicit repository component report
+
+Before Renovate runs, `ci/discover-toolkit-releases.cjs` uses the read-only
+discovery credential to resolve Agent Toolkit's `main` commit and inspect
+the exact references declared in `ci/toolkit-components.json`. It queries
+upstream GitHub releases for these 13 runtime products:
+
+- Agent Sandbox
+- KubeRay operator
+- Ray
+- OpenShell
+- pgvector
+- Redis Stack
+- LiteLLM
+- Flowise
+- ClickHouse
+- MinIO
+- Langfuse (web and worker)
+- vLLM (CPU image reference)
+- OpenVINO Model Server (plain and Python image references)
+
+The yq installer utility is reported separately as a fourteenth entry.
+`stable-components.json` includes the source commit, observation timestamp,
+current references, latest upstream stable release, source URL, status and
+component-specific limitations. `stable-components.tsv` is the readable table.
+GitHub's designated latest published non-prerelease is used for release-based
+sources; this is not necessarily the numerically highest version of every
+maintained release line. pgvector has no GitHub releases, so its explicit source
+is all paginated tags and its highest stable `vMAJOR.MINOR.PATCH` tag.
+
+The pgvector `pg16` image tag and `pgvector_version: "16"` identify the
+PostgreSQL major, not the extension version. The report does not pretend the
+installed extension version is known. Similarly, a source release is not proof
+that a Bitnami legacy, LiteLLM stable-channel, CPU, Python or Helm artifact
+exists. Consult Renovate's separate registry candidate report for those checks.
+Ray and OpenShell are informational detections, not authorization for standalone
+updates. OpenShell chart/image/CLI compatibility and registry migration require
+review.
+
+Missing expected references, failed upstream lookups (including HTTP 403/rate
+limits), and invalid/draft/prerelease responses fail the component stage. Per-
+component failures are written into the archived reports rather than skipped.
+A failure to resolve the source commit is fatal before a component report can
+be produced. Partial reports are never a successful coverage gate. This is a
+curated inventory: additions to the toolkit require a reviewed manifest entry;
+it does not automatically classify new components.
+
+Keycloak deployment, Istio, inherited inference/platform services, and versions
+in other repositories or existing environment overrides remain outside this
+repository-only scope. This report does not claim whole-platform coverage.
+
+Agent-toolkit and inference files under `ext/` and environment files under
+`env/` are ignored by this checkout. Pull requests against the source
+repositories do not update those existing local copies or already deployed
+environments.
+
+## Upgrade matrix and static gate
+
+`ci/make-upgrade-matrix.cjs` joins the component report with the final Renovate
+report using file, dependency name and exact current value. It requires the
+complete curated inventory, fails on missing extraction/current-reference
+drift, and rejects proposals without extracted lookup evidence. It writes:
+
+- `stable-upgrade-matrix.json`: source commit, current references, registry/
+  release lookup candidates, proposed changes per Renovate branch, blockers,
+  required validation, and separate validation states.
+- `stable-upgrade-matrix.tsv`: a readable current-to-candidate table.
+
+The `ci/toolkit-upgrade-policy.json` policy defines the expected coordinated
+references and required component-specific validation. Branch alternatives are
+preserved rather than silently selecting a major upgrade. Candidate sets must
+cover all coordinated references with matching versions. Ray, OpenShell and
+pgvector stay explicitly blocked. An empty candidate list is `no-candidate`,
+not proof that an image is current or available. Every row remains
+`prEligible: false`: the matrix never authorizes PR creation.
+
+Build #30 illustrates why source and artifact evidence must stay separate:
+
+| Component | Current reference | Lookup proposal | Disposition |
+|---|---|---|---|
+| Agent Sandbox | v1.0.10 | v1.0.12 | Both references; release artifact checks pending |
+| KubeRay operator | 1.3.0 | 1.8.0 | Both references; exact Helm download/CRD tests pending |
+| Flowise | 3.1.2 | 3.1.4 | Unvalidated image candidate |
+| ClickHouse | legacy mirror 25.2.1 | legacy mirror 25.7.5 | Not upstream 26.9.40.9 |
+| MinIO | legacy mirror 2024.12.18 | legacy mirror 2025.7.23 | Not inferred from upstream release name |
+| Langfuse web/worker | 3.106.1 | 3.227.1 or 4.88.0 | Separate coordinated alternatives; migration tests pending |
+| vLLM CPU | v0.28.0 | v0.34.0 | CPU image candidate; hardware/model tests pending |
+| OpenVINO Model Server | 2025.4.1 / 2025.4.1-py | plain 2026.4.1 only | Blocked: no matching Python proposal |
+| yq | v4.44.1 | v4.54.3 | Binary checksum/execution tests pending |
+| Redis Stack | 7.4.0-v8 | None | No candidate; not an artifact-availability check |
+| LiteLLM | v1.83.14-stable.patch.2 | None | Stable image channel not resolved by upstream v1.111.0 |
+| Ray | 2.40.0-py312 | Disabled | Coordinated image/client/chart update required |
+| OpenShell | 0.1.6 | Not managed | Chart registry/image/CLI mapping required |
+| pgvector | PostgreSQL 16 / pg16 | Invalid-value skip | Extension version unknown; do not replace with 0.8.7 |
+
+`ci/validate-toolkit-config.cjs` validates a clean checkout at the exact
+component report commit and verifies every current reference against the
+manifest. Jenkins fetches this public source into a temporary directory, never
+modifying the pipeline checkout or an existing deployment. It runs:
+
+- Bash syntax checks for the deployment and Compose generator scripts.
+- YAML parsing of the referenced configuration/defaults/values/metadata files.
+- Helm lint and offline template rendering for KubeRay, pgvector and Redis
+  Stack, using explicitly synthetic non-production passwords.
+- The same checks on disposable copies containing each complete candidate
+  proposal, with exact-match version substitutions. Partial/blocked proposals
+  are not patched or validated as if complete.
+
+Results and tool versions are archived in `stable-static-validation.json`.
+Checkout checks parse Git stdout separately from stderr, so container user
+configuration warnings cannot masquerade as dirty files or a different commit.
+Global Git ignore/attributes files are disabled for these checks; remaining
+diagnostics are printed and recorded. Real Git failures or dirty files still
+block validation.
+The matrix records static status independently from artifact digest, security,
+deployment, smoke and rollback validation. A failing baseline is a blocking
+pre-existing issue, not automatically a version regression. Candidate results
+list failing commands already failing at baseline separately from newly failing
+commands; this classification does not prove identical root causes.
+
+At source commit `b3a29592ff6cb0dbc3adce0de8b334964db38e27`, Helm 3.20.2
+reports a baseline Redis lint error: the locally vendored `redis-stack-server`
+chart is absent from the parent dependency metadata. Template rendering passes,
+but the lint gate intentionally fails. No toolkit source fix or lint suppression
+is included here. Review and fix that issue in the source repository before
+treating static validation as passing.
+
+The source fix is published as commit
+`ea16d845a200f125be85b9630660472f7e52fa66` on the approved fork branch
+[`fix/redis-vendored-chart-metadata`](https://github.com/nishi252003/enterprise-agent-toolkit/tree/fix/redis-vendored-chart-metadata).
+It declares the exact vendored chart version with
+`repository: file://charts/redis-stack-server`, never an upstream chart
+repository. Redis manifests rendered before and after the change are
+byte-identical. The full baseline and all nine complete Build #30 candidate
+snapshots pass the static gate on that commit. These are local static results,
+not new registry discovery, runtime tests or a successful Jenkins build.
+Submit and merge the source fix into `intel/agent-toolkit` `main` before
+rerunning the job expecting a passing baseline; pushing the fork branch alone
+does not change the monitored source. The pipeline does not apply the fix
+silently to its validation checkout or suppress the failure.
+
+### Validate the unmerged fix without changing upstream
+
+For an explicitly requested manual test, set `VALIDATE_REDIS_FIX=true`,
+`REPOSITORIES=intel/agent-toolkit`, and leave `CREATE_PRS`, `PILOT_DRY_RUN`
+and `VERIFY_PR_CREDENTIAL` false. The preparation gate rejects other
+combinations. Jenkins may need one run of the updated Jenkinsfile before the
+new checkbox appears.
+
+Discovery remains read-only against upstream main. Only the static-validation
+checkout switches to the exact approved fork commit
+`ea16d845a200f125be85b9630660472f7e52fa66`. This mode is valid only when
+discovery's source commit is its exact parent
+`b3a29592ff6cb0dbc3adce0de8b334964db38e27`; if upstream changes, it fails and
+requires review/rebase rather than silently testing stale source.
+
+The static JSON records the validation commit and discovery commit separately.
+The matrix JSON retains upstream `sourceCommit` and adds `validationSource`;
+its TSV includes that validation source on each row. Passing this mode means
+the upstream lookup candidates pass static checks on the unmerged fix, not
+that upstream main passes. The later artifact and image-vulnerability stages
+still run normally in this mode. No PRs, merges or deployments are performed.
+
+The checkbox defaults to false. Scheduled runs therefore continue to validate
+upstream main and still fail on the source issue until it is merged. There is
+no blanket ignore, automatic patch application, or change to the default branch.
+
+Static console output prints each failing baseline command with its diagnostic
+output. Candidate summaries identify checks that also failed at baseline and
+print diagnostics for newly failing commands. The complete results remain in
+the archived JSON report.
+
+These are static syntax/render checks, not full Ansible lint, generated Compose
+semantic validation, Kubernetes server-schema validation, or compatibility
+certification. Artifact and vulnerability checks run as separate later gates. Passing
+them cannot enable non-pilot PR creation or deployments. A baseline failure also
+prevents the existing pilot PR stage from running.
+
+## Candidate artifact gate
+
+After passing static validation, `ci/verify-toolkit-artifacts.cjs` verifies only
+complete, statically passing proposals. It writes
+`stable-artifact-verification.json` and updates the matrix's separate
+`artifactDigests` states. Blocked/no-candidate components remain explicitly
+unverified; a successful artifact stage is not whole-inventory certification.
+
+- Images: anonymous HTTPS registry-v2 lookup, including standard bearer token
+  exchange; verify raw manifest/config SHA-256 values and registry digest
+  headers, require linux/amd64, and record immutable platform digest references.
+  Tokens are not logged or archived. Registry errors/rate limits/authentication
+  failures fail the gate rather than selecting another image or tag.
+- Sandbox: download the exact release's core/extension manifest and seven
+  router manifests; hash them and parse their image references. Apply the same
+  router `latest`-to-release image substitution as the role when selecting
+  effective images to verify; also verify the pinned Python runtime image.
+- KubeRay: pull the exact operator chart version, check chart metadata, hash
+  the archive, render offline and verify its image references. All Helm home,
+  repository-cache/config, registry-config and plugin paths are explicitly
+  isolated under that proposal's temporary download directory. This overrides
+  image-inherited `/home/ubuntu` paths without changing permissions or the
+  global Helm configuration; normal temporary-directory cleanup removes them.
+- yq: download the proposed linux/amd64 binary, hash it and verify its x86-64
+  ELF header. Do not execute it. Publisher checksum/signature verification
+  remains pending; a computed hash is not publisher authentication.
+
+Downloaded bytes are temporary; hashes, sizes, sources and verified image
+digests are archived. Successful partial evidence is retained if a later
+artifact in the same proposal fails. HTTPS certificate verification stays
+enabled. No Docker daemon, installed workload or privileged runtime is used.
+The metadata gate does not pull image layers, verify signatures, test CPU
+instruction sets, or prove that containers can start. Later Trivy scanning
+fetches image content separately by the recorded digest.
+
+Local live verification of all nine complete Build #30 proposals passed the
+artifact gate. This is separate from Jenkins execution and does not include
+the four blocked products or the two products without proposals.
+
+## Candidate image vulnerability gate
+
+The approved initial policy blocks **all HIGH and CRITICAL vulnerabilities,
+including unfixed findings, with no exceptions**.
+`ci/scan-toolkit-images.cjs` requires successful matching artifact evidence,
+then scans immutable linux/amd64 image references with Trivy 0.76.x. Jenkins
+provisions digest-pinned Trivy 0.76.2. It scans OS and language-package
+vulnerabilities only, without contacting a Docker daemon or uploading image
+content to a third-party scanning service. Registry and vulnerability-database
+network access is required.
+
+The scanner uses an explicit empty ignore file and empty configuration,
+`--ignore-unfixed=false`, no severity exceptions, sequential image analysis,
+one image-layer analysis worker, and five minutes per image (six-minute process
+deadline). Identical immutable references are scanned once per run.
+Every image scan explicitly selects a temporary module directory, HOME,
+XDG cache/config/data directories and TMPDIR; it never loads modules or state
+from the container image's `/home/ubuntu`. Inherited `TRIVY_*` settings are
+removed from the scanner child environment so hidden configuration cannot
+redirect paths or weaken the approved policy. Proxy and trusted CA settings
+are preserved. Progress bars are disabled to keep errors readable; findings
+and execution failures are still reported separately. Temporary scanner state
+is removed after the run, while per-image reports remain archived.
+Database/download/tool/time-limit errors fail the gate. Scanning large inference
+images can take substantial ephemeral disk, memory and time; provision adequate
+Jenkins worker capacity. Do not interpret a timeout or missing DB as a clean image.
+
+Artifacts:
+
+- `stable-security-summary.json`: approved policy, scanner version, source
+  provenance, per-proposal results and blocking findings, including fixed
+  versions when available.
+- `stable-image-scans-<build-number>/*.json`: original per-image Trivy JSON
+  reports, including available scanner/database metadata.
+- Updated matrix JSON/TSV: artifact and security states separate from static
+  and deployment results. No row becomes PR-eligible automatically.
+
+Non-container binaries such as yq are explicitly
+`not-applicable-no-container-images`, not security-passed. No license, secret,
+IaC, binary, signature, exploitability or runtime isolation assessment is
+provided by this stage. Existing GitHub alert integration remains disabled.
+No exception workflow is implemented; policy changes require separate approval.
+
+A local smoke scan of the verified Sandbox controller digest with installed
+Trivy 0.76.0 confirmed the command/report integration and returned a blocking
+finding under this policy. The complete candidate set has **not** been scanned
+locally. A Jenkins security-stage failure with findings can therefore be a
+correct gate outcome, not a pipeline malfunction; inspect the reports before
+changing candidate versions. This gate intentionally runs before any pilot PR
+creation.
+
+## Dedicated disposable-cluster setup (deployment disabled)
+
+No cluster credential is bound and no deployment/smoke stage is enabled.
+The user selected a dedicated disposable cluster; a GitHub credential such as
+`gh-sys-aibot` is not a substitute for its Kubernetes kubeconfig.
+
+1. Have the cluster owner provide a kubeconfig for an explicitly disposable
+   cluster, not a production/shared-cluster context. Sandbox and KubeRay can
+   change cluster-scoped CRDs/RBAC; a namespace alone does not isolate those.
+2. In Jenkins, open the appropriate folder's **Credentials**, choose **Add
+   Credentials**, and select **Secret file**. Upload that kubeconfig, choose a
+   descriptive ID (for example `agent-toolkit-disposable-kubeconfig`), and
+   restrict access to this trusted job. Never place the kubeconfig in Git or chat.
+3. Supply only the credential ID and approved context name to the pipeline
+   maintainer. The expected API server/cluster identity, Kubernetes version,
+   resource/storage capacity, registry egress, and approved small inference
+   model must also be confirmed before execution.
+4. Before adding write operations, implement a fail-closed context/server
+   allowlist, connectivity/RBAC checks, explicit manual opt-in, serialized
+   cluster use, unique namespaces/resource ownership, bounded timeouts and
+   scoped cleanup. Do not bind a credential or deploy until these gates and the
+   component-specific smoke assertions are implemented and reviewed.
+5. Test baseline install, candidate upgrade, component smoke assertions,
+   persistence/backup/restore and rollback on disposable data. Archive test
+   results and exact image/chart digests; skipped tests must not count as passed.
+
+The per-component smoke requirements are in `ci/toolkit-upgrade-policy.json`;
+they are requirements, not implemented/passing runtime tests.
+
+## Jenkins setup
+
+1. Commit `Jenkinsfile.stable-versions` and `ci/renovate-config.json` to a
+   trusted repository branch. Review this configuration before granting it
+   credentials.
+2. Provide a trusted Jenkins Kubernetes cloud with the `proxy` pod template.
+   The job uses the existing agent container for checkout and report checks,
+   and a `renovate/renovate:44.257.9` container for Renovate. It requires a
+   shared, writable workspace, Bash and `jq` in the agent container, permission
+   to pull both images, and access to GitHub and relevant package registries.
+   The Renovate container uses UID and GID 1000 to match the observed Jenkins
+   workspace owner; verify or adjust these IDs if the agent setup changes.
+   The pod provisions Helm 3.20.2, mikefarah/yq 4.53.2 and Trivy 0.76.2 from
+   digest-pinned `alpine/helm`, `mikefarah/yq` and `aquasec/trivy`
+   init-container images into a pod-local `emptyDir`. Allow all three images
+   in the Jenkins cluster's image policy.
+   The init containers run as UID 0 only to copy their binaries into that
+   volume, with all capabilities dropped and read-only image filesystems.
+   The nonroot Renovate container mounts the tools read-only. No host runtime,
+   host filesystem, or target-cluster configuration is changed. Git, Bash and
+   Node remain supplied by the existing Renovate image.
+   Preparation checks tool execution/major versions before discovery; missing
+   or incompatible tools report their individual command errors rather than
+   one generic message. Static validation also records tool diagnostics on
+   preflight failure. `XDG_CONFIG_HOME` points to the container's temporary
+   home instead of the image's inaccessible `/home/ubuntu` configuration.
+   No Docker daemon is required. HTTPS requests use
+   `http://proxy-dmz.intel.com:912` (set in both `HTTPS_PROXY` and `https_proxy`);
+   ensure this proxy is reachable and approved for GitHub access. Configure
+   `HTTP_PROXY`, `http_proxy`, `NO_PROXY`, and `no_proxy` on the agent as required.
+   Configure trusted CA certificates for the agent and container if the proxy
+   performs TLS inspection. Do not copy environment-specific proxy credentials
+   into Git.
+3. Configure the Jenkins **Secret text** credential `renovate-github-token`
+   for discovery; its value is passed to Renovate as the GitHub token.
+   PR creation uses the separate **Username with password**
+   credential `validation-agent-github-pat`, whose password field is passed to
+   Renovate as the GitHub token. The credential owners must authorize the job
+   and the discovery token must have read access to repository contents and
+   metadata. For PR creation the account must be authorized to create or use
+   forks, push branches to those forks, and open pull requests against the parent
+   repositories. Repository and organization
+   policies can restrict these operations; use organization-approved
+   credentials and confirm permissions before enabling PR creation.
+   The configured Git author is the approved Nishi Shah GitHub no-reply
+   identity; update it if the organization assigns a dedicated bot identity.
+4. Create a Pipeline job using **Pipeline script from SCM** and select
+   `Jenkinsfile.stable-versions` as the script path. Restrict who can configure
+   or run the job and access its artifacts. Never expose the credential to
+   untrusted pull request builds or untrusted repository configurations.
+5. Run once manually with `CREATE_PRS=false` first. The default
+   `REPOSITORIES` value is the canonical `intel/agent-toolkit`; change it only
+   when intentionally running against another authorized repository. Values
+   must use `owner/repo,owner/repo` format with no spaces so report keys match.
+   Check the
+   `stable-discovery.jsonl` artifact and reconcile its
+   extracted dependencies with the intended component inventory.
+   The `stable-inventory.tsv` artifact summarizes extracted versions, proposed
+   updates and skip reasons. It lists only dependencies Renovate recognized,
+   not all files, missing components, or deployed versions.
+   Also require all 14 entries in `stable-components.tsv` to have status `ok`;
+   inspect `stable-components.json` for source commit and compatibility notes.
+   That upstream-source report is separate from the registry candidates and
+   skipped dependencies in `stable-inventory.tsv`.
+   To test the approved Agent Sandbox patch in dry-run mode only, set
+   `PILOT_DRY_RUN=true`, leave `CREATE_PRS=false`, and use
+   `REPOSITORIES=intel/agent-toolkit`. The pilot requires exactly one proposal
+   changing both version references from v1.0.10 to v1.0.12. If upstream
+   changes, the check intentionally fails and requires review. This run does
+   not create a PR.
+   To check the PR credential account and its existing
+   `nishi252003/enterprise-agent-toolkit` fork without changing GitHub, run
+   with `VERIFY_PR_CREDENTIAL=true` and `CREATE_PRS=false`. The check verifies
+   the fork's parent and reported push access, not permission to create pull
+   requests. The fork contains existing work; obtain approval for Renovate to
+   update its default branch before PR creation. This check runs in the
+   Renovate container and requires curl and Node.js there.
+6. To test PR creation, explicitly set `CREATE_PRS=true` with the repository
+   set to `intel/agent-toolkit`. The job repeats the scoped dry run and verifies
+   the PR credential before running Renovate against the same pilot config.
+   It creates or updates only the Agent Sandbox pilot proposal in the
+   `renovate-agent-sandbox-pilot/` namespace. The job checks for the open PR,
+   but the live run can make changes before a subsequent check fails. Inspect
+   GitHub and the archived report after any failure. The fork mode can update
+   the approved personal fork's default branch. The job does not merge PRs,
+   prove compatibility, or verify the PR's checks.
+7. Jenkins applies the in-file weekly trigger after the pipeline has run from
+   the configured SCM branch. Scheduled builds use parameter defaults and run
+   discovery only. Confirm the job is authorized to run this trusted branch and that
+   Jenkins honors the explicit UTC schedule.
+
+Renovate report gates fail if Renovate logs warnings or errors, or if its report does not
+show extracted dependencies for every requested repository. The report check
+also fails if it finds a proposed Ray image update for Agent Toolkit. Investigate
+the archived log instead of treating an incomplete scan as a successful run.
+If discovery unexpectedly reports that it cannot access vulnerability alerts, it also
+requests the same GitHub endpoint and prints only its HTTP status and whether
+GitHub reports SSO authorization is required. This diagnostic requires `curl`
+in the Renovate container; it does not print the token or alert contents and
+does not bypass the report check.
+
+The PR stage performs its own lookup; releases or base branches can change
+between the two stages, so a PR may differ from the discovery report. Renovate
+can create some PRs before a later repository or registry fails. Inspect the
+logs and existing PRs after a failed run. A successful process exit does not
+guarantee that every expected component was recognized: inspect the report,
+including skipped dependencies, and add explicit coverage checks
+before relying on it as a complete inventory.
+
+Pull requests require human review and additional artifact/security,
+compatibility and deployment validation. Renovate is configured not to
+automerge; this pipeline's static gate does not provide runtime compatibility,
+backup, or rollback gates. In particular,
+Istio's four chart dependencies must match and their chart lock and appVersion
+need review. KServe and platform Envoy Gateway versions are cross-repository
+dependencies and must be coordinated manually. Do not treat grouped proposals
+as proof of compatibility or artifact availability.
