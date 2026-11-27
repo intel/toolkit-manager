@@ -6,8 +6,9 @@
 # fabric_inventory | facts
 # =============================================================================
 # Exports the rack-scale facts that later roles read (topology, fabric MTU,
-# GPU vendor/model, Ceph networks), checks that no_proxy covers the fabric
-# subnets, and on install that the MetalLB range is set and not on the fabric.
+# GPU vendor/model, pod and Service ranges, Ceph networks), checks that
+# no_proxy covers the fabric subnets, and on install that the MetalLB range is
+# set and not on the fabric.
 # Preflight includes this for every action, so validate, teardown and --only
 # runs see the same values as a full install. Missing or invalid profile:
 # nothing here; install and validate of fabric_inventory report it.
@@ -50,6 +51,57 @@
             rack_scale_site: "{{ _rack_parsed.summary.site }}"
             rook_ceph_public_network: "{{ (_rack_parsed.ceph_yml | regex_search('ceph_public_network:\\s*\"([^\"]+)\"', '\\1') | default([''], true)) | first | default('') }}"
             rook_ceph_cluster_network: "{{ (_rack_parsed.ceph_yml | regex_search('ceph_cluster_network:\\s*\"([^\"]+)\"', '\\1') | default([''], true)) | first | default('') }}"
+
+        # On rack-scale, network.pod_cidr and service_cidr in rack-profile.yaml set the
+        # cluster's ranges (kubespray_extra_auto.yml reads these two). The same keys in
+        # global_config.yaml are extra vars, which set_fact cannot override, so a
+        # different value there stops the install below rather than being used.
+        - name: "fabric_inventory | facts | Export the pod and Service ranges from the rack profile"
+          ansible.builtin.set_fact:
+            kubernetes_cluster_cidr: "{{ _rack_parsed.summary.pod_cidr }}"
+            kubernetes_service_cidr: "{{ _rack_parsed.summary.service_cidr }}"
+
+        - name: "fabric_inventory | facts | Fail if global_config.yaml sets a different pod or Service range"
+          ansible.builtin.fail:
+            msg: >-
+              {{ item.var }} in global_config.yaml ({{ lookup('vars', item.var) }}) differs from
+              network.{{ item.key }} in rack-profile.yaml ({{ _rack_parsed.summary[item.key] }}).
+              On rack-scale the rack profile sets the cluster's pod and Service ranges:
+              move the range to network.{{ item.key }} and delete {{ item.var }} from
+              global_config.yaml.
+          loop:
+            - {var: kubernetes_cluster_cidr, key: pod_cidr}
+            - {var: kubernetes_service_cidr, key: service_cidr}
+          loop_control:
+            label: "{{ item.var }}"
+          when:
+            - component_action | default('install') == 'install'
+            - lookup('vars', item.var) != _rack_parsed.summary[item.key]
+
+        # An installed cluster's ranges cannot change, and later roles read the two
+        # variables: stop if the profile names other ranges than the cluster runs.
+        - name: "fabric_inventory | facts | Read the installed cluster's pod and Service ranges"
+          ansible.builtin.command: kubectl -n kube-system get configmap kubeadm-config -o jsonpath={.data.ClusterConfiguration} --request-timeout=5s
+          environment:
+            KUBECONFIG: "{{ kubernetes_kubeconfig }}"
+          register: _rack_live
+          changed_when: false
+          failed_when: false
+          when: component_action | default('install') == 'install'
+
+        - name: "fabric_inventory | facts | Fail if rack-profile.yaml does not name the installed cluster's ranges"
+          ansible.builtin.fail:
+            msg: >-
+              This cluster runs pods on {{ _live.podSubnet }} and Services on {{ _live.serviceSubnet }},
+              and those cannot change, but rack-profile.yaml says {{ _rack_parsed.summary.pod_cidr }} and
+              {{ _rack_parsed.summary.service_cidr }}. Set network.pod_cidr: {{ _live.podSubnet }} and
+              network.service_cidr: {{ _live.serviceSubnet }} in rack-profile.yaml.
+          vars:
+            _live: "{{ (_rack_live.stdout | from_yaml).networking }}"
+          when:
+            - _rack_live.rc | default(1) == 0
+            - "'podSubnet:' in _rack_live.stdout"
+            - _live.podSubnet != _rack_parsed.summary.pod_cidr or _live.serviceSubnet != _rack_parsed.summary.service_cidr
 
         # On rack-scale, storage.nodes in rack-profile.yaml is the only source of the
         # Ceph OSD devices. A rook_ceph_devices in global_config.yaml is an extra var,

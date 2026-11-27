@@ -27,7 +27,7 @@ site:
 network:
   topology: star                    # star | clos
   calico_mode: vxlan                # vxlan (star) | bgp (clos)
-  pod_cidr: 10.244.0.0/16
+  pod_cidr: 10.233.64.0/18          # the cluster's pod and Service ranges, fixed at install
   service_cidr: 10.233.0.0/18
   mtu: 9000                         # every fabric NIC and switch port must carry it
   fabric_prefix: 30                 # /30 for star (point-to-point), /16 for clos
@@ -116,7 +116,7 @@ storage:
 # network:
 #   topology: clos
 #   calico_mode: bgp
-#   pod_cidr: 10.244.0.0/16
+#   pod_cidr: 10.233.64.0/18
 #   service_cidr: 10.233.0.0/18
 #   mtu: 9000
 #   fabric_prefix: 16
