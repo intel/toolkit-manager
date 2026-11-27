@@ -68,7 +68,8 @@ Do these in order: prerequisites, getting started, then a model.
 | [Deployment Guide](deployment/install-platform.md) | Step-by-step install, no Kubernetes experience needed: single machine, several machines, bastion host |
 | [Multi-node and BYO cluster](deployment/multi-node.md) | Several machines, or an existing cluster |
 | [Node scaling](deployment/node-scaling.md) | `add-node` and `remove-node` on a provisioned cluster |
-| [Rack-scale deployment](deployment/rack-scale.md) | The rack profile, star, Clos and L2 topologies, Ceph on the fabric, GPU nodes |
+| [Rack-scale deployment](deployment/rack-scale.md) | The rack profile, Ceph on the fabric, GPU nodes, validation and troubleshooting |
+| [Rack-scale topologies](deployment/rack-scale-topologies.md) | Star, Clos, L2 and none: cabling, routing and the profile keys each needs |
 | [Deploy on OpenShift](deployment/openshift.md) | Preparing an OpenShift and OpenShift AI cluster, then installing on top (preview) |
 | [NetApp ONTAP and Trident](deployment/netapp-ontap.md) | Trident and ONTAP as the storage backend |
 | [Upgrade a layer](deployment/upgrade.md) | Upgrading through `install`, the upgrade checks, backup, restore and rollback |

@@ -93,6 +93,45 @@ playbooks/site.yaml (runs on localhost, against the cluster API)
 
 Teardown of `kubernetes` or `infrastructure` works the same way around Kubespray's `reset.yml`: first everything that runs on the cluster is removed, then the cluster is reset, then what the cluster ran on (the rack-scale fabric). It asks for confirmation first, because the reset destroys the cluster. See [Ownership labels](adding-solutions.md#ownership-labels) for what teardown removes.
 
+### Rack-scale order
+
+With `rack_scale_enabled: true`, the infrastructure layer runs the fabric steps around Kubespray, so the
+fabric is up before Kubernetes installs. Steps a topology does not need are skipped. See
+[Rack-scale deployment](../deployment/rack-scale.md).
+
+**Star (rack_scale_enabled=true, no BGP):**
+```
+fabric_inventory → fabric_netplan → fabric_sysctl → kubernetes → fabric_validate → storage
+```
+
+**Clos (rack_scale_enabled=true, BGP on):**
+```
+fabric_inventory → fabric_netplan → fabric_sysctl → kubernetes → fabric_bgp → fabric_validate → storage
+```
+
+**L2 (rack_scale_enabled=true, topology=l2):**
+```
+fabric_inventory → fabric_netplan → kubernetes → fabric_validate → storage
+```
+fabric_sysctl and fabric_bgp are no-ops (no hub, no ToR peers).
+
+**None (rack_scale_enabled=true, topology=none):**
+```
+fabric_inventory → kubernetes → fabric_validate (labels only) → storage
+```
+fabric_netplan, fabric_sysctl, fabric_bgp all skip. No fabric network — rack-profile used for inventory and GPU labels only.
+
+**Platform layer**, after the infrastructure layer: NFD comes first on every cluster, and on a rack-scale env
+**with NVIDIA GPU nodes** (any topology) the GPU operator follows it:
+```
+node_feature_discovery → nvidia_gpu_operator → nri_cpu_balloons → cert_manager → …
+```
+
+**Default (rack_scale_enabled=false):**
+```
+kubernetes → storage
+```
+
 ---
 
 ## Repository Structure
