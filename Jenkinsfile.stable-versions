@@ -77,6 +77,11 @@ spec:
     }
 
     parameters {
+        booleanParam(
+            name: 'VALIDATE_REDIS_FIX',
+            defaultValue: false,
+            description: 'Validate upstream candidates on the exact unmerged Redis metadata fix; no PR creation or deployment'
+        )
         string(
             name: 'REPOSITORIES',
             defaultValue: 'intel/agent-toolkit',
@@ -111,6 +116,11 @@ spec:
         stage('Prepare discovery') {
             steps {
                 script {
+                    if (params.VALIDATE_REDIS_FIX &&
+                        (params.REPOSITORIES != 'intel/agent-toolkit' || params.CREATE_PRS ||
+                         params.PILOT_DRY_RUN || params.VERIFY_PR_CREDENTIAL)) {
+                        error('Redis fix validation requires only intel/agent-toolkit and all PR/pilot/credential flags disabled.')
+                    }
                     if ((params.PILOT_DRY_RUN || params.CREATE_PRS) && params.REPOSITORIES != 'intel/agent-toolkit') {
                         error('The Agent Sandbox pilot requires REPOSITORIES=intel/agent-toolkit.')
                     }
@@ -204,6 +214,7 @@ spec:
             when { expression { params.REPOSITORIES.split(',').contains('intel/agent-toolkit') } }
             steps {
                 container('renovate') {
+                    withEnv(["VALIDATE_REDIS_FIX=${params.VALIDATE_REDIS_FIX}"]) {
                     sh '''#!/usr/bin/env bash
                         set -euo pipefail
                         export PATH="/validation-tools:$PATH"
@@ -212,10 +223,16 @@ spec:
                         source_dir=$(mktemp -d)
                         trap 'rm -rf -- "$source_dir"' EXIT
                         git -C "$source_dir" init --quiet
-                        git -C "$source_dir" fetch --quiet --depth 1 https://github.com/intel/agent-toolkit.git "$source_commit"
+                        if [[ "$VALIDATE_REDIS_FIX" == "true" ]]; then
+                            echo "OPT-IN: validating unmerged fork commit ea16d845a200f125be85b9630660472f7e52fa66, not upstream main."
+                            git -C "$source_dir" fetch --quiet --depth 2 https://github.com/nishi252003/enterprise-agent-toolkit.git ea16d845a200f125be85b9630660472f7e52fa66
+                        else
+                            git -C "$source_dir" fetch --quiet --depth 1 https://github.com/intel/agent-toolkit.git "$source_commit"
+                        fi
                         git -C "$source_dir" checkout --quiet --detach FETCH_HEAD
                         node ci/validate-toolkit-config.cjs "$source_dir" stable-upgrade-matrix.json stable-upgrade-matrix stable-static-validation.json
                     '''
+                    }
                 }
             }
         }

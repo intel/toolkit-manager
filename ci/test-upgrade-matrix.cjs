@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { makeMatrix, writeMatrix } = require('./make-upgrade-matrix.cjs');
-const { applyProposal, checkConfiguration, checkCheckout, checkTools, run, summarizeValidation } = require('./validate-toolkit-config.cjs');
+const { applyProposal, checkConfiguration, checkCheckout, checkTools, run, validationSource, summarizeValidation } = require('./validate-toolkit-config.cjs');
 const manifest = require('./toolkit-components.json');
 const policy = require('./toolkit-upgrade-policy.json');
 
@@ -69,6 +69,11 @@ function fixture() {
 }
 
 function test() {
+  const parent = 'b3a29592ff6cb0dbc3adce0de8b334964db38e27';
+  assert.equal(validationSource(parent, false).commit, parent);
+  assert.equal(validationSource(parent, true).commit, 'ea16d845a200f125be85b9630660472f7e52fa66');
+  assert.equal(validationSource(parent, true).mode, 'unmerged-redis-fix');
+  assert.throws(() => validationSource('a'.repeat(40), true), /upstream changed/);
   const summaries = [];
   summarizeValidation({
     baseline: { status: 'failed', checks: [{ status: 'failed', command: 'helm lint redis', output: 'missing dependency metadata\n' }] },

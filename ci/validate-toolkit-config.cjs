@@ -108,14 +108,32 @@ function checkTools(source, execute = run) {
   return tools;
 }
 
-function validate(source, matrix) {
-  const checkout = checkCheckout(source, matrix.sourceCommit);
+const REDIS_FIX_COMMIT = 'ea16d845a200f125be85b9630660472f7e52fa66';
+const REDIS_FIX_PARENT = 'b3a29592ff6cb0dbc3adce0de8b334964db38e27';
+
+function validationSource(sourceCommit, useRedisFix) {
+  if (!useRedisFix) return { repository: 'intel/agent-toolkit', commit: sourceCommit, mode: 'upstream' };
+  if (sourceCommit !== REDIS_FIX_PARENT) {
+    throw new Error('Redis fix validation requires its exact upstream parent; upstream changed. Review/rebase the fix before proceeding.');
+  }
+  return {
+    repository: 'nishi252003/enterprise-agent-toolkit', commit: REDIS_FIX_COMMIT,
+    discoverySourceCommit: sourceCommit, mode: 'unmerged-redis-fix',
+    limitation: 'Static validation of upstream lookup proposals on an unmerged source fix; not validation of upstream main.',
+  };
+}
+
+function validate(source, matrix, useRedisFix = false) {
+  const selected = validationSource(matrix.sourceCommit, useRedisFix);
+  const checkout = checkCheckout(source, selected.commit);
   for (const check of checkout) {
     if (check.stderr.trim()) console.warn(`Git checkout diagnostic: ${check.stderr.trim()}`);
   }
   const tools = checkTools(source);
   verifyReferences(source, matrix);
-  const report = { sourceCommit: matrix.sourceCommit, generatedAt: new Date().toISOString(), checkout, tools, baseline: checkConfiguration(source), candidates: [] };
+  matrix.validationSource = selected;
+  const report = { sourceCommit: selected.commit, discoverySourceCommit: matrix.sourceCommit,
+    validationSource: selected, generatedAt: new Date().toISOString(), checkout, tools, baseline: checkConfiguration(source), candidates: [] };
   for (const row of matrix.components) {
     for (const proposal of row.proposals.filter(candidate => candidate.status === 'candidate-unvalidated')) {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), 'toolkit-static-'));
@@ -161,16 +179,20 @@ function summarizeValidation(report, log = console.log) {
   }
 }
 
-module.exports = { applyProposal, verifyReferences, checkConfiguration, checkCheckout, checkTools, run, validate, summarizeValidation };
+module.exports = { applyProposal, verifyReferences, checkConfiguration, checkCheckout, checkTools, run, validate, validationSource, summarizeValidation };
 if (require.main === module) {
   let reportWritten = false;
   try {
     if (process.argv.length !== 6) throw new Error('Usage: node validate-toolkit-config.cjs <clean-source-checkout> <matrix.json> <matrix-output-prefix> <static-report.json>');
     const matrix = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
-    const report = validate(path.resolve(process.argv[2]), matrix);
+    if (process.env.VALIDATE_REDIS_FIX && !['true', 'false'].includes(process.env.VALIDATE_REDIS_FIX)) {
+      throw new Error('VALIDATE_REDIS_FIX must be true or false');
+    }
+    const report = validate(path.resolve(process.argv[2]), matrix, process.env.VALIDATE_REDIS_FIX === 'true');
     fs.writeFileSync(process.argv[5], `${JSON.stringify(report, null, 2)}\n`);
     reportWritten = true;
     writeMatrix(matrix, process.argv[4]);
+    console.log(`Validation source: ${report.validationSource.repository}@${report.sourceCommit} (${report.validationSource.mode})`);
     summarizeValidation(report);
     if (report.status !== 'passed') throw new Error('Static validation failed; inspect stable-static-validation.json for baseline and candidate errors. No deployment was performed.');
   } catch (error) {

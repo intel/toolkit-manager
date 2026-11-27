@@ -190,6 +190,32 @@ rerunning the job expecting a passing baseline; pushing the fork branch alone
 does not change the monitored source. The pipeline does not apply the fix
 silently to its validation checkout or suppress the failure.
 
+### Validate the unmerged fix without changing upstream
+
+For an explicitly requested manual test, set `VALIDATE_REDIS_FIX=true`,
+`REPOSITORIES=intel/agent-toolkit`, and leave `CREATE_PRS`, `PILOT_DRY_RUN`
+and `VERIFY_PR_CREDENTIAL` false. The preparation gate rejects other
+combinations. Jenkins may need one run of the updated Jenkinsfile before the
+new checkbox appears.
+
+Discovery remains read-only against upstream main. Only the static-validation
+checkout switches to the exact approved fork commit
+`ea16d845a200f125be85b9630660472f7e52fa66`. This mode is valid only when
+discovery's source commit is its exact parent
+`b3a29592ff6cb0dbc3adce0de8b334964db38e27`; if upstream changes, it fails and
+requires review/rebase rather than silently testing stale source.
+
+The static JSON records the validation commit and discovery commit separately.
+The matrix JSON retains upstream `sourceCommit` and adds `validationSource`;
+its TSV includes that validation source on each row. Passing this mode means
+the upstream lookup candidates pass static checks on the unmerged fix, not
+that upstream main passes. No runtime/security/digest checks are added and
+no PRs, merges or deployments are performed.
+
+The checkbox defaults to false. Scheduled runs therefore continue to validate
+upstream main and still fail on the source issue until it is merged. There is
+no blanket ignore, automatic patch application, or change to the default branch.
+
 Static console output prints each failing baseline command with its diagnostic
 output. Candidate summaries identify checks that also failed at baseline and
 print diagnostics for newly failing commands. The complete results remain in
