@@ -62,7 +62,7 @@ Applications and frameworks connect through a familiar API — the same `base_ur
 
 ### Inference on Intel® Xeon® and Intel® GPUs
 
-Models run on Intel® Xeon® processors out of the box, with NUMA-aware CPU placement (NRI Balloons) and AMX acceleration, so a CPU-only cluster serves models with no accelerator. Nodes with Intel® GPUs (Arc Pro B-Series) get the Intel GPU device plugin automatically, and the inference layer's `vllm-xpu` runtime serves models on them.
+Models run on Intel® Xeon® processors out of the box, with NUMA-aware CPU placement (NRI Balloons) and AMX acceleration, so a CPU-only cluster serves models with no accelerator. Nodes with Intel® GPUs (Arc Pro B-Series, Crescent Island / CRI) get the Intel GPU device plugin automatically, and the inference layer's `vllm-xpu` runtime serves models on them.
 
 ### Modular by design
 
