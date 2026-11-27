@@ -247,7 +247,11 @@ unverified; a successful artifact stage is not whole-inventory certification.
   router `latest`-to-release image substitution as the role when selecting
   effective images to verify; also verify the pinned Python runtime image.
 - KubeRay: pull the exact operator chart version, check chart metadata, hash
-  the archive, render offline and verify its image references.
+  the archive, render offline and verify its image references. All Helm home,
+  repository-cache/config, registry-config and plugin paths are explicitly
+  isolated under that proposal's temporary download directory. This overrides
+  image-inherited `/home/ubuntu` paths without changing permissions or the
+  global Helm configuration; normal temporary-directory cleanup removes them.
 - yq: download the proposed linux/amd64 binary, hash it and verify its x86-64
   ELF header. Do not execute it. Publisher checksum/signature verification
   remains pending; a computed hash is not publisher authentication.

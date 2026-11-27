@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { digest, inspectImage, verify } = require('./verify-toolkit-artifacts.cjs');
+const { digest, inspectImage, verify, helmEnvironment } = require('./verify-toolkit-artifacts.cjs');
 
 function response(value, status = 200, headers = {}) {
   return { status, headers, body: Buffer.from(JSON.stringify(value)) };
@@ -54,6 +54,22 @@ function test() {
 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'toolkit-artifact-test-'));
   try {
+    const inherited = {
+      PATH: process.env.PATH, HTTPS_PROXY: 'http://example.test:912',
+      HOME: '/proc/inaccessible-home', XDG_CACHE_HOME: '/proc/inaccessible-cache',
+      XDG_CONFIG_HOME: '/proc/inaccessible-config', XDG_DATA_HOME: '/proc/inaccessible-data',
+      ...Object.fromEntries(['HELM_CACHE_HOME', 'HELM_CONFIG_HOME', 'HELM_DATA_HOME',
+        'HELM_REPOSITORY_CACHE', 'HELM_REPOSITORY_CONFIG', 'HELM_REGISTRY_CONFIG',
+        'HELM_PLUGINS'].map(key => [key, '/proc/inaccessible-helm'])),
+    };
+    const isolated = helmEnvironment(directory, inherited);
+    assert.equal(isolated.HTTPS_PROXY, inherited.HTTPS_PROXY);
+    assert.equal(inherited.HELM_CACHE_HOME, '/proc/inaccessible-helm');
+    for (const key of Object.keys(inherited).filter(key => key.startsWith('HELM_'))) {
+      assert(isolated[key].startsWith(path.join(directory, 'helm-state') + path.sep));
+    }
+    assert(fs.statSync(isolated.HELM_REPOSITORY_CACHE).isDirectory());
+    assert(fs.statSync(isolated.HELM_PLUGINS).isDirectory());
     const matrix = {
       sourceCommit: 'a'.repeat(40),
       components: [

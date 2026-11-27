@@ -108,10 +108,30 @@ function inspectImage(reference, get = fetchBytes) {
   };
 }
 
-function command(name, args, input) {
-  const result = spawnSync(name, args, { input, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+function command(name, args, input, env = process.env) {
+  const result = spawnSync(name, args, { input, env, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
   if (result.error || result.status !== 0) throw new Error(`${name} failed: ${result.error?.message || result.stderr}`);
   return result.stdout;
+}
+
+function helmEnvironment(directory, inherited = process.env) {
+  const root = path.resolve(directory, 'helm-state');
+  const cache = path.join(root, 'cache');
+  const config = path.join(root, 'config');
+  const data = path.join(root, 'data');
+  for (const dir of [cache, config, data, path.join(cache, 'repository'), path.join(data, 'plugins')]) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return {
+    ...inherited,
+    HELM_CACHE_HOME: cache,
+    HELM_CONFIG_HOME: config,
+    HELM_DATA_HOME: data,
+    HELM_REPOSITORY_CACHE: path.join(cache, 'repository'),
+    HELM_REPOSITORY_CONFIG: path.join(config, 'repositories.yaml'),
+    HELM_REGISTRY_CONFIG: path.join(config, 'registry.json'),
+    HELM_PLUGINS: path.join(data, 'plugins'),
+  };
 }
 
 function imagesInYaml(file) {
@@ -159,14 +179,16 @@ function verifyProposal(component, proposal, dir, get = fetchBytes, inspect = in
   } else if (component === 'KubeRay operator') {
     if (versions.length !== 1 || !/^\d+\.\d+\.\d+$/.test(versions[0])) throw new Error('Invalid coordinated KubeRay version');
     const version = versions[0];
-    command('helm', ['pull', 'kuberay-operator', '--repo', 'https://ray-project.github.io/kuberay-helm/', '--version', version, '--destination', dir]);
+    const env = helmEnvironment(dir);
+    const helm = args => command('helm', args, undefined, env);
+    helm(['pull', 'kuberay-operator', '--repo', 'https://ray-project.github.io/kuberay-helm/', '--version', version, '--destination', dir]);
     const filename = `kuberay-operator-${version}.tgz`;
     const file = path.join(dir, filename);
-    const metadata = JSON.parse(command('yq', ['-o=json', '.', '-'], command('helm', ['show', 'chart', file])));
+    const metadata = JSON.parse(command('yq', ['-o=json', '.', '-'], helm(['show', 'chart', file])));
     if (metadata.version !== version) throw new Error('Downloaded chart version mismatch');
     artifacts.push({ type: 'helm-chart', repository: 'https://ray-project.github.io/kuberay-helm/', version, file: filename, digest: digest(fs.readFileSync(file)) });
     const rendered = path.join(dir, 'kuberay-rendered.yaml');
-    fs.writeFileSync(rendered, command('helm', ['template', 'artifact-verification', file, '--namespace', 'artifact-verification']));
+    fs.writeFileSync(rendered, helm(['template', 'artifact-verification', file, '--namespace', 'artifact-verification']));
     for (const image of imagesInYaml(rendered)) images.add(image);
     if (!images.size) throw new Error('KubeRay chart rendered no images');
   } else if (component === 'yq installer utility') {
@@ -217,7 +239,7 @@ function verify(matrix, outputDirectory, get = fetchBytes, inspect = inspectImag
   };
 }
 
-module.exports = { digest, inspectImage, verifyProposal, verify };
+module.exports = { digest, inspectImage, verifyProposal, verify, helmEnvironment };
 if (require.main === module) {
   try {
     if (process.argv.length !== 6) throw new Error('Usage: node verify-toolkit-artifacts.cjs <matrix.json> <matrix-output-prefix> <report.json> <downloads-directory>');
