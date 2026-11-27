@@ -5,15 +5,17 @@ discover dependency updates and open pull requests in their owning GitHub
 repositories. It builds an evidence-based upgrade matrix and runs offline static
 checks, but does not install updates or access a deployment cluster.
 It runs weekly during the 02:00 UTC hour on Monday, within
-Renovate's weekly update window. By default it runs discovery and static checks only. The optional
+Renovate's weekly update window. By default it runs discovery, static,
+artifact and image-vulnerability gates without deployment. The optional
 PR-creation path is restricted to the approved Agent Sandbox pilot.
 
 Renovate's GitHub vulnerability-alert integration is disabled for all
 repositories in this job because its discovery credential cannot read the
 Agent Toolkit Dependabot alerts. This does not change GitHub's repository
 settings, but Renovate will not use those alerts to identify or prioritize
-security updates. A separate approved vulnerability scan is needed; this
-pipeline does not currently provide one.
+security updates. A separate Trivy candidate-image scan now enforces the
+approved HIGH/CRITICAL policy described below; it does not restore Dependabot
+integration or scan already deployed services.
 
 ## What it covers
 
@@ -209,8 +211,8 @@ The static JSON records the validation commit and discovery commit separately.
 The matrix JSON retains upstream `sourceCommit` and adds `validationSource`;
 its TSV includes that validation source on each row. Passing this mode means
 the upstream lookup candidates pass static checks on the unmerged fix, not
-that upstream main passes. No runtime/security/digest checks are added and
-no PRs, merges or deployments are performed.
+that upstream main passes. The later artifact and image-vulnerability stages
+still run normally in this mode. No PRs, merges or deployments are performed.
 
 The checkbox defaults to false. Scheduled runs therefore continue to validate
 upstream main and still fail on the source issue until it is merged. There is
@@ -222,10 +224,88 @@ print diagnostics for newly failing commands. The complete results remain in
 the archived JSON report.
 
 These are static syntax/render checks, not full Ansible lint, generated Compose
-semantic validation, Kubernetes server-schema validation, chart/image digest
-verification, vulnerability scanning or compatibility certification. Passing
+semantic validation, Kubernetes server-schema validation, or compatibility
+certification. Artifact and vulnerability checks run as separate later gates. Passing
 them cannot enable non-pilot PR creation or deployments. A baseline failure also
 prevents the existing pilot PR stage from running.
+
+## Candidate artifact gate
+
+After passing static validation, `ci/verify-toolkit-artifacts.cjs` verifies only
+complete, statically passing proposals. It writes
+`stable-artifact-verification.json` and updates the matrix's separate
+`artifactDigests` states. Blocked/no-candidate components remain explicitly
+unverified; a successful artifact stage is not whole-inventory certification.
+
+- Images: anonymous HTTPS registry-v2 lookup, including standard bearer token
+  exchange; verify raw manifest/config SHA-256 values and registry digest
+  headers, require linux/amd64, and record immutable platform digest references.
+  Tokens are not logged or archived. Registry errors/rate limits/authentication
+  failures fail the gate rather than selecting another image or tag.
+- Sandbox: download the exact release's core/extension manifest and seven
+  router manifests; hash them and parse their image references. Apply the same
+  router `latest`-to-release image substitution as the role when selecting
+  effective images to verify; also verify the pinned Python runtime image.
+- KubeRay: pull the exact operator chart version, check chart metadata, hash
+  the archive, render offline and verify its image references.
+- yq: download the proposed linux/amd64 binary, hash it and verify its x86-64
+  ELF header. Do not execute it. Publisher checksum/signature verification
+  remains pending; a computed hash is not publisher authentication.
+
+Downloaded bytes are temporary; hashes, sizes, sources and verified image
+digests are archived. Successful partial evidence is retained if a later
+artifact in the same proposal fails. HTTPS certificate verification stays
+enabled. No Docker daemon, installed workload or privileged runtime is used.
+The metadata gate does not pull image layers, verify signatures, test CPU
+instruction sets, or prove that containers can start. Later Trivy scanning
+fetches image content separately by the recorded digest.
+
+Local live verification of all nine complete Build #30 proposals passed the
+artifact gate. This is separate from Jenkins execution and does not include
+the four blocked products or the two products without proposals.
+
+## Candidate image vulnerability gate
+
+The approved initial policy blocks **all HIGH and CRITICAL vulnerabilities,
+including unfixed findings, with no exceptions**.
+`ci/scan-toolkit-images.cjs` requires successful matching artifact evidence,
+then scans immutable linux/amd64 image references with Trivy 0.76.x. Jenkins
+provisions digest-pinned Trivy 0.76.2. It scans OS and language-package
+vulnerabilities only, without contacting a Docker daemon or uploading image
+content to a third-party scanning service. Registry and vulnerability-database
+network access is required.
+
+The scanner uses an explicit empty ignore file and empty configuration,
+`--ignore-unfixed=false`, no severity exceptions, sequential image analysis,
+one image-layer analysis worker, and five minutes per image (six-minute process
+deadline). Identical immutable references are scanned once per run.
+Database/download/tool/time-limit errors fail the gate. Scanning large inference
+images can take substantial ephemeral disk, memory and time; provision adequate
+Jenkins worker capacity. Do not interpret a timeout or missing DB as a clean image.
+
+Artifacts:
+
+- `stable-security-summary.json`: approved policy, scanner version, source
+  provenance, per-proposal results and blocking findings, including fixed
+  versions when available.
+- `stable-image-scans-<build-number>/*.json`: original per-image Trivy JSON
+  reports, including available scanner/database metadata.
+- Updated matrix JSON/TSV: artifact and security states separate from static
+  and deployment results. No row becomes PR-eligible automatically.
+
+Non-container binaries such as yq are explicitly
+`not-applicable-no-container-images`, not security-passed. No license, secret,
+IaC, binary, signature, exploitability or runtime isolation assessment is
+provided by this stage. Existing GitHub alert integration remains disabled.
+No exception workflow is implemented; policy changes require separate approval.
+
+A local smoke scan of the verified Sandbox controller digest with installed
+Trivy 0.76.0 confirmed the command/report integration and returned a blocking
+finding under this policy. The complete candidate set has **not** been scanned
+locally. A Jenkins security-stage failure with findings can therefore be a
+correct gate outcome, not a pipeline malfunction; inspect the reports before
+changing candidate versions. This gate intentionally runs before any pilot PR
+creation.
 
 ## Dedicated disposable-cluster setup (deployment disabled)
 
@@ -268,9 +348,10 @@ they are requirements, not implemented/passing runtime tests.
    to pull both images, and access to GitHub and relevant package registries.
    The Renovate container uses UID and GID 1000 to match the observed Jenkins
    workspace owner; verify or adjust these IDs if the agent setup changes.
-   The pod provisions Helm 3.20.2 and mikefarah/yq 4.53.2 from digest-pinned
-   `alpine/helm` and `mikefarah/yq` init-container images into a pod-local
-   `emptyDir`. Allow those two images in the Jenkins cluster's image policy.
+   The pod provisions Helm 3.20.2, mikefarah/yq 4.53.2 and Trivy 0.76.2 from
+   digest-pinned `alpine/helm`, `mikefarah/yq` and `aquasec/trivy`
+   init-container images into a pod-local `emptyDir`. Allow all three images
+   in the Jenkins cluster's image policy.
    The init containers run as UID 0 only to copy their binaries into that
    volume, with all capabilities dropped and read-only image filesystems.
    The nonroot Renovate container mounts the tools read-only. No host runtime,

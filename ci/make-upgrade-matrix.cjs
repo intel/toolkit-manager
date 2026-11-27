@@ -101,14 +101,15 @@ function makeMatrix(components, logs) {
 function writeMatrix(matrix, prefix) {
   fs.writeFileSync(`${prefix}.json`, `${JSON.stringify(matrix, null, 2)}\n`);
   const cell = value => String(value ?? '').replace(/[\t\r\n]/g, ' ');
-  const table = [['component', 'current_references', 'latest_upstream', 'lookup_candidates', 'proposed_targets', 'status', 'static_validation', 'deployment_validation', 'reason', 'required_validation', 'validation_source']];
+  const table = [['component', 'current_references', 'latest_upstream', 'lookup_candidates', 'proposed_targets', 'status', 'static_validation', 'deployment_validation', 'reason', 'required_validation', 'validation_source', 'artifact_verification', 'image_vulnerability_scan']];
   for (const row of matrix.components) {
     table.push([row.component, row.currentReferences.map(ref => `${ref.file}: ${ref.value}`).join('; '),
       row.latestUpstream, row.currentReferences.flatMap(ref => ref.evidence.flatMap(dep =>
         dep.candidates.map(candidate => `${ref.dependency}: ${candidate}`))).join('; '),
       row.proposals.map(proposal => `${proposal.branch} [${proposal.status}]: ${proposal.changes.map(change => change.newValue).join(', ')}`).join('; '),
       row.status, row.validation.static, row.validation.deployment, row.reason, row.requiredValidation.join('; '),
-      matrix.validationSource ? `${matrix.validationSource.repository}@${matrix.validationSource.commit} (${matrix.validationSource.mode})` : 'not-run']);
+      matrix.validationSource ? `${matrix.validationSource.repository}@${matrix.validationSource.commit} (${matrix.validationSource.mode})` : 'not-run',
+      row.validation.artifactDigests, row.validation.security]);
   }
   fs.writeFileSync(`${prefix}.tsv`, `${table.map(row => row.map(cell).join('\t')).join('\n')}\n`);
 }

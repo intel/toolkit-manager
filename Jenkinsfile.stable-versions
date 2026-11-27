@@ -10,8 +10,22 @@ spec:
   volumes:
     - name: validation-tools
       emptyDir:
-        sizeLimit: 128Mi
+        sizeLimit: 512Mi
   initContainers:
+    - name: validation-trivy
+      image: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+      command: ['/bin/sh', '-ec']
+      args:
+        - 'cp "$(command -v trivy)" /validation-tools/trivy; chmod 0555 /validation-tools/trivy'
+      securityContext:
+        runAsUser: 0
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ['ALL']
+      volumeMounts:
+        - name: validation-tools
+          mountPath: /validation-tools
     - name: validation-helm
       image: alpine/helm:3.20.2@sha256:0dc15c3084f75cdf39823f63efbe7c21084d2dbffefce2637effc1b093485d81
       command: ['/bin/sh', '-ec']
@@ -135,13 +149,14 @@ spec:
                     id
                     echo "Workspace ownership and permissions (numeric uid:gid mode path):"
                     stat -c '%u:%g %a %n' "$WORKSPACE" "${WORKSPACE}@tmp"
-                    rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl stable-pilot.jsonl stable-inventory.tsv stable-components.json stable-components.tsv stable-upgrade-matrix.json stable-upgrade-matrix.tsv stable-static-validation.json
+                    rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl stable-pilot.jsonl stable-inventory.tsv stable-components.json stable-components.tsv stable-upgrade-matrix.json stable-upgrade-matrix.tsv stable-static-validation.json stable-artifact-verification.json stable-security-summary.json
                 '''
                 container('renovate') {
                     sh '''#!/usr/bin/env bash
                         set -euo pipefail
                         export PATH="/validation-tools:$PATH"
                         node -e "require('./ci/validate-toolkit-config.cjs').checkTools(process.cwd()).forEach(tool => console.log(tool.command + ': ' + tool.stdout.trim()))"
+                        trivy --version
                     '''
                 }
             }
@@ -237,6 +252,34 @@ spec:
             }
         }
 
+        stage('Verify candidate artifacts') {
+            when { expression { params.REPOSITORIES.split(',').contains('intel/agent-toolkit') } }
+            steps {
+                container('renovate') {
+                    sh '''#!/usr/bin/env bash
+                        set -euo pipefail
+                        export PATH="/validation-tools:$PATH"
+                        artifact_dir=$(mktemp -d)
+                        trap 'rm -rf -- "$artifact_dir"' EXIT
+                        node ci/verify-toolkit-artifacts.cjs stable-upgrade-matrix.json stable-upgrade-matrix stable-artifact-verification.json "$artifact_dir"
+                    '''
+                }
+            }
+        }
+
+        stage('Scan candidate image vulnerabilities') {
+            when { expression { params.REPOSITORIES.split(',').contains('intel/agent-toolkit') } }
+            steps {
+                container('renovate') {
+                    sh '''#!/usr/bin/env bash
+                        set -euo pipefail
+                        export PATH="/validation-tools:$PATH"
+                        node ci/scan-toolkit-images.cjs stable-upgrade-matrix.json stable-artifact-verification.json stable-upgrade-matrix stable-security-summary.json "stable-image-scans-${BUILD_NUMBER}"
+                    '''
+                }
+            }
+        }
+
         stage('Agent Sandbox pilot dry run') {
             when { expression { params.PILOT_DRY_RUN || params.CREATE_PRS } }
             steps {
@@ -309,7 +352,7 @@ spec:
 
     post {
         always {
-            archiveArtifacts artifacts: 'stable-*.jsonl,stable-*.tsv,stable-components.json,stable-upgrade-matrix.json,stable-static-validation.json', allowEmptyArchive: true
+            archiveArtifacts artifacts: "stable-*.jsonl,stable-*.tsv,stable-components.json,stable-upgrade-matrix.json,stable-static-validation.json,stable-artifact-verification.json,stable-security-summary.json,stable-image-scans-${env.BUILD_NUMBER}/*.json", allowEmptyArchive: true
         }
     }
 }
