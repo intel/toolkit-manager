@@ -212,6 +212,27 @@
     - name: "observability | olm | Take Grafana off the gateway"
       ansible.builtin.include_tasks: grafana_route_remove.yaml
 
+    # Before the exception goes, so its callers are never refused.
+    - name: "observability | olm | Take user-workload monitoring out of the mesh"
+      kubernetes.core.k8s:
+        state: patched
+        kind: Namespace
+        name: "{{ _observability_uwm_namespace }}"
+        definition:
+          metadata:
+            labels:
+              istio.io/dataplane-mode: null
+      failed_when: false
+
+    - name: "observability | olm | Delete the user-workload monitoring exception"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: security.istio.io/v1
+        kind: PeerAuthentication
+        name: out-of-mesh-callers
+        namespace: "{{ _observability_uwm_namespace }}"
+      failed_when: false
+
     - name: "observability | olm | Delete the operator instances"
       kubernetes.core.k8s:
         api_version: "{{ item.api_version }}"

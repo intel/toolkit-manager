@@ -1,11 +1,10 @@
 ---
 _observability_from_olm: true
+# Joins the mesh with istio_enabled, so its Prometheus scrapes the meshed metrics
+# ports with mTLS and no workload opens them to plain TCP.
+_observability_uwm_namespace: openshift-user-workload-monitoring
 # Workloads in observability_namespace that callers outside the mesh reach in plain TCP.
 _observability_olm_out_of_mesh_exceptions:
-  # Prometheus scrapes these.
-  - name: logging-loki
-    selector: {app.kubernetes.io/instance: logging-loki, app.kubernetes.io/managed-by: lokistack-controller}
-    ports: [3100, 8081, 8083]
   # The Grafana Operator calls Grafana's API.
   - name: "{{ observability_openshift_grafana_name }}"
     selector: {app: "{{ observability_openshift_grafana_name }}"}

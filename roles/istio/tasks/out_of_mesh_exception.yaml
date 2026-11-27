@@ -9,10 +9,32 @@
 #   istio_out_of_mesh_exception_state       present (default) or absent; absent ignores
 #                                           errors (a mesh already torn down)
 
+# A merge would keep the ports a list no longer has, so an existing exception is
+# replaced, which needs its resourceVersion. Its labels stay (ownership adds its own).
+- name: "istio | out-of-mesh exception | Read the current exceptions"
+  kubernetes.core.k8s_info:
+    api_version: security.istio.io/v1
+    kind: PeerAuthentication
+    name: "{{ item.name }}"
+    namespace: "{{ item.namespace | default(istio_out_of_mesh_exception_namespace) }}"
+  loop: "{{ istio_out_of_mesh_exception_workloads }}"
+  loop_control:
+    label: "{{ item.namespace | default(istio_out_of_mesh_exception_namespace) }}/{{ item.name }}"
+  register: _istio_oome_current
+  when: istio_out_of_mesh_exception_state | default('present') != 'absent'
+
 - name: "istio | out-of-mesh exception | Callers' ports (port-level mTLS): {{ istio_out_of_mesh_exception_state | default('present') }}"
   kubernetes.core.k8s:
     state: "{{ istio_out_of_mesh_exception_state | default('present') }}"
-    definition:
+    force: "{{ _current | length > 0 }}"
+    definition: >-
+      {{ _pa | combine({'metadata': {'resourceVersion': _current[0].metadata.resourceVersion,
+                                     'labels': _current[0].metadata.labels | default({}) | combine(_pa.metadata.labels)}},
+                       recursive=True)
+         if _current | length > 0 else _pa }}
+  vars:
+    _current: "{{ (_istio_oome_current.results | default([]))[_i].resources | default([]) if _istio_oome_current.results is defined else [] }}"
+    _pa:
       apiVersion: security.istio.io/v1
       kind: PeerAuthentication
       metadata:
@@ -27,6 +49,7 @@
         portLevelMtls: "{{ dict(item.ports | map('string') | product([{'mode': 'PERMISSIVE'}])) }}"
   loop: "{{ istio_out_of_mesh_exception_workloads }}"
   loop_control:
+    index_var: _i
     label: "{{ item.namespace | default(istio_out_of_mesh_exception_namespace) }}/{{ item.name }}: {{ item.ports | join(',') }}"
   register: _istio_oome
   failed_when:

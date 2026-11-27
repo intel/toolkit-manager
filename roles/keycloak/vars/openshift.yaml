@@ -6,9 +6,8 @@ _keycloak_pss_labels: false
 # The operator is the admin's (OLM): the role only creates the instance.
 _keycloak_from_olm: true
 # Ports the STRICT mesh lets out-of-mesh callers reach in plain TCP: Authorino (Red Hat
-# Connectivity Link) reads the inference realm's keys on 8080, the user-workload
-# Prometheus scrapes the management port 9000.
+# Connectivity Link) reads the inference realm's keys on 8080.
 _keycloak_out_of_mesh_exceptions:
   - name: keycloak
     selector: {app: keycloak, app.kubernetes.io/managed-by: keycloak-operator}
-    ports: [8080, 9000]
+    ports: [8080]
