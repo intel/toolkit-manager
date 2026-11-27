@@ -1,0 +1,20 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Validate
+# =============================================================================
+
+- name: "fabric_rdma | validate | RDMA nodes"
+  ansible.builtin.import_tasks: scope.yaml
+
+- name: "fabric_rdma | validate | Read back"
+  ansible.builtin.import_tasks: readback.yaml
+
+- name: "fabric_rdma | validate | Bandwidth"
+  ansible.builtin.include_tasks: bandwidth.yaml
+  when: _rdma_eval.errors | length == 0
+
+- name: "fabric_rdma | validate | Report"
+  ansible.builtin.import_tasks: report.yaml

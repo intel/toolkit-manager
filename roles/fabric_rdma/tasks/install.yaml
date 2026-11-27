@@ -1,0 +1,102 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Install
+# =============================================================================
+# Kernel modules stay loaded on teardown; only the file that loads them at
+# boot goes.
+
+- name: "fabric_rdma | install | RDMA nodes"
+  ansible.builtin.import_tasks: scope.yaml
+
+- name: "fabric_rdma | install | RDMA packages"
+  ansible.builtin.apt:
+    name: "{{ rack_scale_rdma_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_hosts }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: "fabric_rdma | install | NIC drivers"
+  ansible.builtin.shell: |
+    for nic in {{ hostvars[item].node_rdma_nics | map(attribute='nic') | map('quote') | join(' ') }}; do
+      basename "$(readlink -f "/sys/class/net/$nic/device/driver")"
+    done
+  args:
+    executable: /bin/bash
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_hosts }}"
+  loop_control:
+    label: "{{ item }}"
+  register: _rdma_drivers
+  changed_when: false
+  check_mode: false
+
+# A NIC whose driver has no RDMA driver here is reported by the read-back.
+# ib_umad: the umad devices that RDMA device plugins expect (rdma-core loads it
+# for InfiniBand only).
+- name: "fabric_rdma | install | RDMA modules per node"
+  ansible.builtin.set_fact:
+    _rdma_modules: >-
+      {%- set out = {} -%}
+      {%- for r in _rdma_drivers.results -%}
+      {%- set rdma = r.stdout_lines | select('in', rack_scale_rdma_drivers) | map('extract', rack_scale_rdma_drivers) | list -%}
+      {%- set _ = out.update({r.item: (['ib_uverbs', 'rdma_ucm', 'ib_umad'] + rdma) | unique | list}) -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: "fabric_rdma | install | Load the RDMA modules"
+  community.general.modprobe:
+    name: "{{ item.1 }}"
+    state: present
+  delegate_to: "{{ item.0.key }}"
+  become: true
+  loop: "{{ _rdma_modules | dict2items | subelements('value') }}"
+  loop_control:
+    label: "{{ item.0.key }}: {{ item.1 }}"
+
+- name: "fabric_rdma | install | Load them at boot"
+  ansible.builtin.copy:
+    content: "{{ _rdma_modules[item] | join('\n') }}\n"
+    dest: "{{ rack_scale_rdma_modules_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_hosts }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: "fabric_rdma | install | Netplan for dedicated NICs with rdma_ip"
+  ansible.builtin.import_tasks: netplan.yaml
+
+- name: "fabric_rdma | install | Read back before the RoCE settings"
+  ansible.builtin.import_tasks: readback.yaml
+
+- name: "fabric_rdma | install | RoCE settings"
+  ansible.builtin.import_tasks: qos.yaml
+
+- name: "fabric_rdma | install | Validate"
+  ansible.builtin.import_tasks: validate.yaml
+
+- name: "fabric_rdma | install | Label the RDMA nodes"
+  ansible.builtin.command:
+    cmd: >-
+      kubectl label node {{ item.key }}
+      {{ rack_scale_rdma_label }}={{ item.value | dict2items | selectattr('value.usable') | list | length }} --overwrite
+  environment:
+    KUBECONFIG: "{{ kubernetes_kubeconfig }}"
+  delegate_to: localhost
+  # an RDMA node that is etcd-only has no Kubernetes node to label
+  loop: "{{ _rdma_eval.record | dict2items | selectattr('key', 'in', groups['k8s_cluster'] | default([])) }}"
+  loop_control:
+    label: "{{ item.key }}"
+  changed_when: true

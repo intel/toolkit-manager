@@ -1,0 +1,18 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — The RDMA nodes this run covers (install and validate)
+# =============================================================================
+# _fabric_scope_nodes: add-node and remove-node set up or take down the
+# added or removed node(s) only.
+- name: "fabric_rdma | RDMA nodes in scope"
+  ansible.builtin.set_fact:
+    _rdma_hosts: >-
+      {{ groups['rdma_nodes'] | default([]) | intersect(_fabric_scope_nodes)
+         if _fabric_scope_nodes is defined else groups['rdma_nodes'] | default([]) }}
+
+- name: "fabric_rdma | Skip — no node lists rdma_nics"
+  ansible.builtin.meta: end_role
+  when: _rdma_hosts | length == 0

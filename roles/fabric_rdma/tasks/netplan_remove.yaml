@@ -1,0 +1,65 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Remove the RDMA netplan file: _rdma_netplan_remove_hosts
+# =============================================================================
+# netplan apply may leave an address in place once its definition is gone (on
+# Ubuntu 24.04 it removes it), so, as in fabric_netplan's teardown, the addresses
+# the file set are read first and deleted after if still there. Other addresses
+# on the NIC stay. Nothing happens on a node without the file.
+
+- name: "fabric_rdma | netplan | Read {{ rack_scale_rdma_netplan_dest }}"
+  ansible.builtin.slurp:
+    src: "{{ rack_scale_rdma_netplan_dest }}"
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_netplan_remove_hosts }}"
+  loop_control:
+    label: "{{ item }}"
+  register: _rdma_netplan_current
+  failed_when: false
+
+- name: "fabric_rdma | netplan | Addresses it set"
+  ansible.builtin.set_fact:
+    _rdma_netplan_addrs: >-
+      {%- set out = [] -%}
+      {%- for r in _rdma_netplan_current.results if r.content is defined -%}
+      {%- for nic, cfg in (((r.content | b64decode | from_yaml).network | default({})).ethernets | default({})).items() -%}
+      {%- for addr in cfg.addresses | default([]) -%}
+      {%- set _ = out.append({'node': r.item, 'nic': nic, 'addr': addr}) -%}
+      {%- endfor -%}{%- endfor -%}{%- endfor -%}
+      {{ out }}
+    _rdma_netplan_nodes: "{{ _rdma_netplan_current.results | selectattr('content', 'defined') | map(attribute='item') | list }}"
+
+- name: "fabric_rdma | netplan | Remove {{ rack_scale_rdma_netplan_dest }}"
+  ansible.builtin.file:
+    path: "{{ rack_scale_rdma_netplan_dest }}"
+    state: absent
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_netplan_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: "fabric_rdma | netplan | Apply netplan"
+  ansible.builtin.command: netplan apply
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_netplan_nodes }}"
+  loop_control:
+    label: "{{ item }}"
+  changed_when: true
+
+# rc 2: the address is already gone.
+- name: "fabric_rdma | netplan | Remove the addresses still on the NICs"
+  ansible.builtin.command: "ip addr del {{ item.addr }} dev {{ item.nic }}"
+  delegate_to: "{{ item.node }}"
+  become: true
+  loop: "{{ _rdma_netplan_addrs }}"
+  loop_control:
+    label: "{{ item.node }}: {{ item.addr }} on {{ item.nic }}"
+  register: _rdma_addr_removed
+  changed_when: _rdma_addr_removed.rc == 0
+  failed_when: _rdma_addr_removed.rc not in [0, 2]

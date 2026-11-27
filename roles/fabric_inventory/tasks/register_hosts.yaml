@@ -39,6 +39,7 @@
     access_ip: "{{ item.value.access_ip | default(omit) }}"
     node_hostname: "{{ item.value.node_hostname | default(item.key) }}"
     node_fabric_nics: "{{ item.value.node_fabric_nics | default(omit) }}"
+    node_rdma_nics: "{{ item.value.node_rdma_nics | default(omit) }}"
     node_family: "{{ item.value.node_family | default(omit) }}"
     node_sku: "{{ item.value.node_sku | default(omit) }}"
     node_accelerator: "{{ item.value.node_accelerator | default(omit) }}"

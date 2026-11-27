@@ -1,0 +1,59 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — One ib_write_bw run: _pair.client -> _pair.server
+# =============================================================================
+# The server takes one connection and exits. The client retries while the
+# server starts: RDMA-CM has no TCP port to wait for.
+
+- name: "fabric_rdma | Bandwidth | Start the server on {{ _pair.server }}"
+  ansible.builtin.command:
+    cmd: >-
+      {{ ('taskset -c ' ~ _pair.server_cpus) if _pair.server_cpus else '' }}
+      timeout {{ rack_scale_rdma_bw_seconds | int + 60 }} {{ _rdma_bw_cmd }} -d {{ _pair.server_dev }}
+  delegate_to: "{{ _pair.server }}"
+  become: true
+  async: "{{ rack_scale_rdma_bw_seconds | int + 90 }}"
+  poll: 0
+  register: _rdma_server
+  changed_when: false
+
+- name: "fabric_rdma | Bandwidth | Run the client on {{ _pair.client }}"
+  ansible.builtin.command:
+    cmd: >-
+      {{ ('taskset -c ' ~ _pair.client_cpus) if _pair.client_cpus else '' }}
+      timeout {{ rack_scale_rdma_bw_seconds | int + 30 }} {{ _rdma_bw_cmd }} -d {{ _pair.client_dev }} {{ _pair.server_ip }}
+  delegate_to: "{{ _pair.client }}"
+  become: true
+  register: _rdma_client
+  until: _rdma_client.rc == 0
+  retries: 5
+  delay: 2
+  failed_when: false
+  changed_when: false
+
+- name: "fabric_rdma | Bandwidth | Wait for the server on {{ _pair.server }}"
+  ansible.builtin.async_status:
+    jid: "{{ _rdma_server.ansible_job_id }}"
+  delegate_to: "{{ _pair.server }}"
+  become: true
+  register: _rdma_server_done
+  until: _rdma_server_done.finished
+  retries: "{{ rack_scale_rdma_bw_seconds | int + 90 }}"
+  delay: 1
+  failed_when: false
+  changed_when: false
+
+# perftest's first error lines name the cause; its last ones only say it gave up.
+- name: "fabric_rdma | Bandwidth | Record {{ _pair.client }} -> {{ _pair.server }}"
+  vars:
+    _lines: "{{ ((_rdma_client.stdout | default('')) ~ '\n' ~ (_rdma_client.stderr | default(''))).strip().splitlines() }}"
+  ansible.builtin.set_fact:
+    _rdma_bw: >-
+      {{ _rdma_bw + [_pair | combine({
+           'gbps': _rdma_client.stdout | default('') | rdma_bw_gbps,
+           'output': ((_lines | reject('search', '^libibverbs: Warning') | select('search', '(?i)couldn.t|unable|failed|error') | list)[:3]
+                      or _lines[-3:] or [_rdma_client.msg | default('no output')])
+                     + (['timed out'] if _rdma_client.rc | default(0) == 124 else [])})] }}

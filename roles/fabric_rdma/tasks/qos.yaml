@@ -1,0 +1,121 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — RoCE settings on the hosts (install)
+# =============================================================================
+# rdma_qos_plan takes on each setting the host leaves at its default (docs:
+# "which value wins"); its state file lets teardown take them back.
+
+- name: "fabric_rdma | qos | Plan"
+  ansible.builtin.set_fact:
+    _rdma_qos: "{{ _rdma_readback | rdma_qos_plan(_rdma_expected, _rdma_settings) }}"
+
+- name: "fabric_rdma | qos | Settings left to the site"
+  ansible.builtin.debug:
+    msg: "{{ item }}"
+  loop: "{{ _rdma_qos.kept }}"
+
+- name: "fabric_rdma | qos | Install rack-rdma-qos"
+  ansible.builtin.copy:
+    src: rdma_qos.py
+    dest: "{{ rack_scale_rdma_qos_bin }}"
+    owner: root
+    group: root
+    mode: "0755"
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_qos.plan.keys() | list }}"
+
+- name: "fabric_rdma | qos | Write the settings it applies"
+  ansible.builtin.copy:
+    content: "{{ {'nics': _rdma_qos.plan[item]} | to_nice_json(indent=2) }}\n"
+    dest: "{{ rack_scale_rdma_qos_state }}"
+    owner: root
+    group: root
+    mode: "0644"
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_qos.plan.keys() | list }}"
+
+# Best effort at boot, as the settings are: a NIC that refuses one is reported
+# by validate, not by a failed boot unit.
+- name: "fabric_rdma | qos | Apply them at boot"
+  ansible.builtin.copy:
+    content: |
+      # Written by the Toolkit Manager installer (fabric_rdma). Removed on teardown.
+      [Unit]
+      Description=RoCE settings the rack-scale installer applies (PFC, DSCP map, RDMA-CM ToS)
+      Wants=network.target
+      After=network.target systemd-modules-load.service
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=-{{ rack_scale_rdma_qos_bin }} apply
+
+      [Install]
+      WantedBy=multi-user.target
+    dest: "{{ rack_scale_rdma_qos_unit_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_qos.plan.keys() | list }}"
+
+- name: "fabric_rdma | qos | Enable rack-rdma-qos"
+  ansible.builtin.systemd_service:
+    name: "{{ rack_scale_rdma_qos_unit }}"
+    enabled: true
+    daemon_reload: true
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_qos.plan.keys() | list }}"
+
+- name: "fabric_rdma | qos | Apply them now"
+  ansible.builtin.command:
+    cmd: "{{ rack_scale_rdma_qos_bin }} apply"
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_qos.plan.keys() | list }}"
+  register: _rdma_qos_applied
+  changed_when: true
+  failed_when: false
+
+# Seen: the first PFC/DSCP apply resets an E810's link (down ~7 s, then a short
+# second flap), and a 400G link took 30 s to train after netplan brought it up.
+# A NIC that never comes up is reported by the read-back.
+- name: "fabric_rdma | qos | Wait until the RDMA NICs are up and stay up"
+  vars:
+    _nics: "{{ hostvars[item].node_rdma_nics | map(attribute='nic') | list }}"
+  ansible.builtin.shell: |
+    steady=0
+    for _ in $(seq 45); do
+      up=1
+      for nic in {{ _nics | map('quote') | join(' ') }}; do
+        [ "$(cat "/sys/class/net/$nic/carrier" 2>/dev/null)" = 1 ] && [ -n "$(ip -4 -o addr show dev "$nic")" ] || up=0
+      done
+      if [ "$up" = 1 ]; then steady=$((steady + 1)); [ "$steady" -ge 3 ] && exit 0; else steady=0; fi
+      sleep 2
+    done
+    exit 1
+  args:
+    executable: /bin/bash
+  delegate_to: "{{ item }}"
+  become: true
+  loop: >-
+    {{ _rdma_qos.plan.keys() | list
+       | union(_rdma_netplan_written.results | selectattr('changed') | map(attribute='item') | list) }}
+  loop_control:
+    label: "{{ item }}"
+  changed_when: false
+  failed_when: false
+
+- name: "fabric_rdma | qos | Settings a NIC refused"
+  ansible.builtin.debug:
+    msg: "WARNING: {{ item.item }}: {{ item.stdout_lines[:-1] | join('; ') }}"
+  loop: "{{ _rdma_qos_applied.results | default([]) | selectattr('rc', 'ne', 0) | list }}"
+  loop_control:
+    label: "{{ item.item }}"
