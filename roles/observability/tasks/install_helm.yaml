@@ -247,6 +247,14 @@
           # ── Node Exporter ───────────────────────────────────────────────────
           prometheus-node-exporter:
             affinity: "{{ _platform_affinity | default({}) }}"
+            # hostNetwork: the exporter binds this port on the node itself. 9100 is the
+            # upstream default, and hosts that already run their own node_exporter
+            # (systemd node-exporter.service) hold it, so the DaemonSet crash-loops with
+            # "bind: address already in use". In this chart, service.port also sets the
+            # container port and --web.listen-address; the ServiceMonitor follows it.
+            service:
+              port: "{{ observability_node_exporter_port | default(9101) | int }}"
+              targetPort: "{{ observability_node_exporter_port | default(9101) | int }}"
           # ── kube-state-metrics ──────────────────────────────────────────────
           kube-state-metrics:
             affinity: "{{ _platform_affinity | default({}) }}"

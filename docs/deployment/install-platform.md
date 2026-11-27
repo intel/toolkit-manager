@@ -22,10 +22,11 @@ The installer sets up these layers automatically, each on top of the one before:
 
 You run **one command** and it installs every layer the target needs. `./toolkit_manager.sh show` lists every layer and component.
 
-**Intel GPUs (Arc Pro B-Series / B70 and other Xe GPUs).** The `intel_gpu_plugin` platform
+**Intel GPUs (Arc Pro B-Series / B70, Crescent Island / CRI and other Xe GPUs).** The `intel_gpu_plugin` platform
 component installs the [Intel GPU device plugin](https://github.com/intel/intel-device-plugins-for-kubernetes)
 (v0.37.1) when Node Feature Discovery labels a node with an Intel GPU
-(`feature.node.kubernetes.io/pci-0300_8086.present` or `pci-0380_8086.present`). It runs
+(`feature.node.kubernetes.io/pci-0300_8086.present`, `pci-0380_8086.present`, or
+`pci-1200_8086.present` for CRI, which reports PCI class 1200, a processing accelerator). It runs
 only on those nodes (in its own `intel-gpu-plugin` namespace, tolerating their taints), waits until they advertise
 `gpu.intel.com/xe`, and is skipped on CPU-only clusters — so the inference layer's GPU runtimes
 (`vllm-xpu`) can schedule right after. It is never installed on OpenShift.

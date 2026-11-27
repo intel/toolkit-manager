@@ -13,3 +13,6 @@ env/
 
 # Helm subchart packages — rebuilt from Chart.lock by dependency_update
 *.tgz
+
+# Ansible local cache (collections/roles downloaded at install time)
+.ansible/

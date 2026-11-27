@@ -131,7 +131,7 @@ components:
     enabled: "{{ (kubernetes_cpu_policy | default('nri-balloons')) == 'nri-balloons' and (kubernetes_accelerator | default('cpu')) == 'cpu' }}"
     depends_on: []
 
-  # Intel GPUs (Arc Pro B-Series / B70 and other Xe GPUs): the device plugin that advertises
+  # Intel GPUs (Arc Pro B-Series / B70, Crescent Island / CRI and other Xe GPUs): the device plugin that advertises
   # gpu.intel.com/xe for the GPU model runtimes. Installs only where NFD labelled a node
   # with an Intel GPU, so CPU-only clusters are unchanged. Not on OpenShift: the Intel
   # Device Plugins Operator provides it there.

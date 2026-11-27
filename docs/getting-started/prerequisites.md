@@ -28,7 +28,7 @@ Everything needed before running the Toolkit Manager installer, whether you're d
 
 Intel® Xeon® processors are recommended for CPU-based inference. NUMA-aware pinning (NRI Balloons) and AMX acceleration are built into the platform for Xeon workloads.
 
-Intel® GPUs (Arc Pro B-Series) are optional. They need the `xe` kernel driver, which is in the Linux kernel; the platform installs the Intel GPU device plugin on those nodes: see [Intel GPUs](../deployment/install-platform.md).
+Intel® GPUs (Arc Pro B-Series, Crescent Island / CRI) are optional. They need the `xe` kernel driver, which is in the Linux kernel; the platform installs the Intel GPU device plugin on those nodes: see [Intel GPUs](../deployment/install-platform.md).
 
 ---
 
