@@ -283,6 +283,14 @@ The scanner uses an explicit empty ignore file and empty configuration,
 `--ignore-unfixed=false`, no severity exceptions, sequential image analysis,
 one image-layer analysis worker, and five minutes per image (six-minute process
 deadline). Identical immutable references are scanned once per run.
+Every image scan explicitly selects a temporary module directory, HOME,
+XDG cache/config/data directories and TMPDIR; it never loads modules or state
+from the container image's `/home/ubuntu`. Inherited `TRIVY_*` settings are
+removed from the scanner child environment so hidden configuration cannot
+redirect paths or weaken the approved policy. Proxy and trusted CA settings
+are preserved. Progress bars are disabled to keep errors readable; findings
+and execution failures are still reported separately. Temporary scanner state
+is removed after the run, while per-image reports remain archived.
 Database/download/tool/time-limit errors fail the gate. Scanning large inference
 images can take substantial ephemeral disk, memory and time; provision adequate
 Jenkins worker capacity. Do not interpret a timeout or missing DB as a clean image.

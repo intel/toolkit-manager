@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { evaluate, scan } = require('./scan-toolkit-images.cjs');
+const { evaluate, scan, scannerEnvironment, executeScan } = require('./scan-toolkit-images.cjs');
 
 const reference = `registry.example/image@sha256:${'a'.repeat(64)}`;
 const raw = {
@@ -42,6 +42,36 @@ const artifacts = {
 };
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'toolkit-scan-test-'));
 try {
+  const inherited = {
+    HOME: '/proc/inaccessible-home', XDG_CACHE_HOME: '/proc/inaccessible-cache',
+    XDG_CONFIG_HOME: '/proc/inaccessible-config', XDG_DATA_HOME: '/proc/inaccessible-data',
+    TMPDIR: '/proc/inaccessible-tmp', PATH: process.env.PATH,
+    HTTPS_PROXY: 'http://example.test:912', SSL_CERT_FILE: '/approved/ca.pem',
+    TRIVY_MODULE_DIR: '/home/ubuntu/.trivy/modules', TRIVY_IGNORE_STATUS: 'affected',
+    TRIVY_IGNORE_UNFIXED: 'true', TRIVY_CONFIG: '/proc/unreadable',
+  };
+  const env = scannerEnvironment(dir, inherited);
+  for (const key of ['HOME', 'XDG_CACHE_HOME', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'TMPDIR']) {
+    assert(env[key].startsWith(dir + path.sep));
+    assert(fs.statSync(env[key]).isDirectory());
+  }
+  assert(!Object.keys(env).some(key => key.startsWith('TRIVY_')));
+  assert.equal(env.HTTPS_PROXY, inherited.HTTPS_PROXY);
+  assert.equal(env.SSL_CERT_FILE, inherited.SSL_CERT_FILE);
+  const output = path.join(dir, 'test-image.json');
+  const ignorefile = path.join(dir, 'empty-ignorefile');
+  const executed = executeScan(reference, output, path.join(dir, 'cache'), ignorefile, (name, args, options) => {
+    assert.equal(name, 'trivy');
+    assert.equal(args[args.indexOf('--module-dir') + 1], path.join(dir, 'modules'));
+    assert(args.includes('--no-progress'));
+    assert(args.includes('--ignore-unfixed=false'));
+    assert.equal(args[args.indexOf('--severity') + 1], 'HIGH,CRITICAL');
+    assert.equal(args[args.indexOf('--ignorefile') + 1], ignorefile);
+    assert(!Object.keys(options.env).some(key => key.startsWith('TRIVY_')));
+    fs.writeFileSync(output, JSON.stringify(raw));
+    return { status: 0 };
+  });
+  assert.equal(executed.ArtifactName, reference);
   const report = scan(structuredClone(matrix), artifacts, dir, (ref, output, cache, ignorefile) => {
     assert.equal(fs.readFileSync(ignorefile, 'utf8'), '');
     assert.equal(ref, reference);

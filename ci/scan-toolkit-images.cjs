@@ -21,13 +21,30 @@ function evaluate(report, reference) {
   return { status: findings.length ? 'blocked-vulnerabilities' : 'passed', findings };
 }
 
-function executeScan(reference, output, cache, ignorefile) {
+function scannerEnvironment(root, inherited = process.env) {
+  const env = Object.fromEntries(Object.entries(inherited).filter(([key]) => !key.startsWith('TRIVY_')));
+  const directories = {
+    HOME: path.join(root, 'home'),
+    XDG_CACHE_HOME: path.join(root, 'xdg-cache'),
+    XDG_CONFIG_HOME: path.join(root, 'xdg-config'),
+    XDG_DATA_HOME: path.join(root, 'xdg-data'),
+    TMPDIR: path.join(root, 'tmp'),
+  };
+  for (const directory of Object.values(directories)) fs.mkdirSync(directory, { recursive: true });
+  return { ...env, ...directories };
+}
+
+function executeScan(reference, output, cache, ignorefile, execute = spawnSync) {
+  const root = path.dirname(ignorefile);
+  const env = scannerEnvironment(root);
+  const modules = path.join(root, 'modules');
+  fs.mkdirSync(modules, { recursive: true });
   const args = ['image', '--image-src', 'remote', '--platform', 'linux/amd64',
-    '--config', path.join(path.dirname(ignorefile), 'trivy.yaml'),
+    '--config', path.join(root, 'trivy.yaml'), '--module-dir', modules, '--no-progress',
     '--scanners', 'vuln', '--severity', 'HIGH,CRITICAL', '--ignore-unfixed=false',
     '--ignorefile', ignorefile, '--exit-code', '0', '--parallel', '1',
     '--timeout', '5m', '--cache-dir', cache, '--format', 'json', '--output', output, reference];
-  const result = spawnSync('trivy', args, { encoding: 'utf8', timeout: 360000, maxBuffer: 2 * 1024 * 1024 });
+  const result = execute('trivy', args, { env, encoding: 'utf8', timeout: 360000, maxBuffer: 2 * 1024 * 1024 });
   if (result.error || result.status !== 0) throw new Error(`Trivy execution failed: ${result.error?.message || result.stderr}`);
   return JSON.parse(fs.readFileSync(output, 'utf8'));
 }
@@ -98,7 +115,7 @@ function scan(matrix, artifactReport, outputDirectory, scanner = executeScan) {
   };
 }
 
-module.exports = { evaluate, scan };
+module.exports = { evaluate, scan, scannerEnvironment, executeScan };
 if (require.main === module) {
   try {
     if (process.argv.length !== 7) throw new Error('Usage: node scan-toolkit-images.cjs <matrix.json> <artifacts.json> <matrix-output-prefix> <summary.json> <image-report-directory>');
