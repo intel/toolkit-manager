@@ -2,7 +2,7 @@
 
 [← Docs index](../README.md)
 
-**[Overview](#overview)** | **[Quick Start](#quick-start)** | **[rack-profile.yaml](#writing-rack-profileyaml)** | **[Star](#star-topology)** | **[Clos](#clos-topology)** | **[L2](#l2-topology)** | **[None](#none-topology)** | **[GPU](#gpu-nodes)** | **[Validation](#validation)** | **[Troubleshooting](#troubleshooting)**
+**[Overview](#overview)** | **[Quick Start](#quick-start)** | **[rack-profile.yaml](#writing-rack-profileyaml)** | **[Topologies](rack-scale-topologies.md)** | **[GPU](#gpu-nodes)** | **[Validation](#validation)** | **[Troubleshooting](#troubleshooting)**
 
 ---
 
@@ -25,14 +25,18 @@ automatically configures:
 - **NVIDIA GPU operator** — auto-installs when an NVIDIA `accelerator:` is declared (no separate flag)
 - **Node labels** — CPU family, GPU vendor/model/form applied to K8s nodes
 
-Four topologies are supported from the same `rack-profile.yaml` schema:
+Four topologies share the same `rack-profile.yaml` schema. Each has its own
+section, with cabling and example keys, in [Rack-scale topologies](rack-scale-topologies.md):
 
 | Topology | Use Case | Switching | Calico Mode |
 |----------|----------|-----------|-------------|
-| **Star** | Pilots, POC, switchless (e.g. HPE B300 HGX) | None — direct cables | VXLAN |
-| **Clos** | Production, full HA, max throughput | Leaf/spine ToR switches | BGP |
-| **L2** | L2-only fabric switch, flat broadcast domain | Single L2 switch | VXLAN or BGP (node mesh) |
-| **None** | GPU-only, no fabric — inventory + labels only | N/A | VXLAN (forced) |
+| [**Star**](rack-scale-topologies.md#star-topology) | Pilots, POC, switchless (e.g. HPE B300 HGX). Not validated on hardware | None — direct cables | VXLAN |
+| [**Clos**](rack-scale-topologies.md#clos-topology) | Production, full HA, max throughput | Leaf/spine ToR switches | BGP |
+| [**L2**](rack-scale-topologies.md#l2-topology) | L2-only fabric switch, flat broadcast domain | Single L2 switch | VXLAN or BGP (node mesh) |
+| [**None**](rack-scale-topologies.md#none-topology) | GPU-only, no fabric — inventory + labels only | N/A | VXLAN (forced) |
+
+The fabric steps run before Kubespray, so the fabric is up when Kubernetes
+installs. The order is in [Architecture: rack-scale order](../reference/architecture.md#rack-scale-order).
 
 ## Prerequisites
 
@@ -65,19 +69,11 @@ another cluster. See
   configuration, an old `/etc/netplan/99-fabric.yaml` with its fabric
   addresses, and Ceph signatures on the storage disks. Re-image it, or clean
   that state first.
-- **Fabric NICs configured only by the fabric step:** `network.netplan_renderer`
-  sets the renderer for the fabric NICs on every node. Keep the default
-  `networkd`: it works whether or not NetworkManager runs for a node's other
-  NICs, because netplan then tells NetworkManager to leave the fabric NICs
-  alone. No saved NetworkManager profile may configure a fabric NIC; the
-  fabric step stops early and names the profile if one does. Use
-  `NetworkManager` only if it is enabled on every node. After netplan apply,
-  and in the validate action, each fabric NIC must have exactly the fabric
-  file's addresses (of the families it sets) and MTU, and no bond, bridge or
-  VRF. Anything else usually means another netplan file or NetworkManager
-  profile configures the NIC too, for example a cloud-init entry that gives it
-  its own address; the step stops and names the NIC and the difference.
-  A NIC without carrier is left to `fabric_validate`. Routes are not compared.
+- **Fabric NICs left to the installer:** no other netplan file (for example a
+  cloud-init entry) or saved NetworkManager profile may configure a fabric
+  NIC, and a fabric NIC may not be in a bond, bridge or VRF. The install stops
+  and names the NIC or the profile (see [Troubleshooting](#troubleshooting)).
+  NetworkManager can keep the node's other NICs.
 - **Storage disks:** the disks listed for Ceph must be empty, not mounted, and
   not the OS disk. NVMe device names can change across reboots, so check
   `lsblk` on each node right before deploying.
@@ -166,17 +162,27 @@ site:
 
 ```yaml
 network:
-  topology: star             # star | clos | l2 | none
-  calico_mode: vxlan         # vxlan (star/l2/none) | bgp (clos or l2 node-mesh)
-  pod_cidr: 10.244.0.0/16
-  service_cidr: 10.233.0.0/18
-  mtu: 9000                  # jumbo frames — must match switch and NIC config (none: 1500 by default)
-  fabric_prefix: 30          # /30 for star point-to-point, /16 for clos
-  netplan_renderer: networkd # or NetworkManager — only if it is enabled on every node
-  control_plane_on_fabric: true  # bind kubelet + etcd to fabric IP (recommended)
+  topology: clos
+  calico_mode: bgp
+  mtu: 9000
+  control_plane_on_fabric: true
+  # Clos also needs leafs and bgp: see Rack-scale topologies
 ```
 
-Defaults when a key is left out: `topology: clos`, `calico_mode: vxlan`, `pod_cidr: 10.244.0.0/16`, `service_cidr: 10.96.0.0/12`, `mtu: 9000` (`1500` with `none`), `vxlan_overhead: 50`, `fabric_prefix: 16`, `netplan_renderer: networkd`, `control_plane_on_fabric: false`. Set `topology` and `calico_mode` explicitly: left out, they give `clos` with `vxlan`, while a Clos fabric runs `bgp`.
+| Key | Default | Notes |
+|-----|---------|-------|
+| `topology` | `clos` | `clos`, `l2`, `none` or `star` (star is not validated on hardware). Set it explicitly |
+| `calico_mode` | `vxlan` | `bgp` on Clos, `bgp` or `vxlan` on L2, `vxlan` on star and `none`. Set it explicitly: a Clos fabric runs `bgp` |
+| `pod_cidr` | `10.244.0.0/16` | Pod CIDR |
+| `service_cidr` | `10.96.0.0/12` | Service CIDR |
+| `mtu` | `9000` (`1500` with `none`) | Must match every fabric NIC and switch port (with `none`, the management NICs) |
+| `vxlan_overhead` | `50` | Taken off `mtu` for Calico VXLAN |
+| `fabric_prefix` | `16` | Prefix of a fabric NIC that sets no `prefix:` (star: `30`) |
+| `netplan_renderer` | `networkd` | `networkd` works with or without NetworkManager on the node: netplan tells NetworkManager to leave the fabric NICs alone. `NetworkManager` only if it is enabled on every node |
+| `control_plane_on_fabric` | `false` | `true` (recommended) gives control-plane nodes their fabric IP for kubelet and etcd; `false` keeps their `mgmt_ip` |
+
+The keys each topology adds (`leafs`, `bgp`, `fabric_router`, `peer`) are in
+[Rack-scale topologies](rack-scale-topologies.md).
 
 ### SSH Access
 
@@ -220,10 +226,10 @@ racks:
         roles: [kube_control_plane, etcd, storage]
         fabric_nics:
           - nic: ens801f0             # NIC name from `ip link show`
-            fabric_ip: 10.201.1.1    # fabric IP address
-            prefix: 30               # on-link prefix (star: /30, clos: /16)
-            peer: worker1            # star: node at the other end of this cable
+            fabric_ip: 10.201.0.10   # fabric IP address
             # leaf: leaf-a           # clos, optional: the leaf whose fabric_subnet holds fabric_ip
+            # prefix: 30             # optional on-link prefix (default network.fabric_prefix; star: /30)
+            # peer: worker1          # star only: the node at the other end of this cable
 ```
 
 | Field | Required | Notes |
@@ -245,8 +251,8 @@ An unknown key is an error (`unknown field 'X' — typo?`).
 
 ```yaml
 storage:
-  ceph_public_network: 10.201.1.0/28    # client → OSD traffic
-  ceph_cluster_network: 10.201.1.0/28   # OSD → OSD replication
+  ceph_public_network: 10.201.0.0/16    # client → OSD traffic
+  ceph_cluster_network: 10.201.0.0/16   # OSD → OSD replication
 
   nodes:                                 # the Ceph storage nodes and their OSD devices
     - name: master1                      # the node's key under racks
@@ -264,240 +270,6 @@ place a mon on any storage node. The node IP is the first fabric NIC, or
 `mgmt_ip` on a control-plane node when `control_plane_on_fabric` is false. With
 topology `none` there is no fabric, so each storage node's `mgmt_ip` must be in
 the Ceph networks.
-
----
-
-## Star Topology
-
-Switchless hub-and-spoke. One node (the hub) forwards traffic between all
-others via point-to-point /30 links.
-
-**When to use:** pilots, POC, switchless hardware (HPE B300 HGX), 3–8 nodes.
-
-```
-master1 ──/30── worker1 (hub) ──/30── worker2
-master2 ──/30──┘     │
-master3 ──/30────────┘
-```
-
-**How it works:**
-- Each cable is its own /30 subnet — two usable IPs per link
-- The hub sets `fabric_router: true` → gets `ip_forward=1` and iptables FORWARD
-- Spokes route to the fabric supernet via the hub's cable-local IP
-- Calico runs in VXLAN mode (node-to-node mesh enabled)
-
-**Key fields:**
-
-```yaml
-network:
-  topology: star
-  calico_mode: vxlan
-  fabric_prefix: 30
-
-# On the hub node:
-worker1:
-  fabric_router: true
-  fabric_nics:
-    - nic: ens801f0
-      fabric_ip: 10.201.1.2
-      prefix: 30
-      peer: master1             # the node at the other end
-
-# On a spoke:
-master1:
-  fabric_nics:
-    - nic: ens801f0
-      fabric_ip: 10.201.1.1
-      prefix: 30
-      peer: worker1             # points to the hub
-```
-
-> [!Important]
-> Both ends of a cable **must** share the same /30 subnet. The parser validates
-> this — a mismatch is a hard error.
-
----
-
-## Clos Topology
-
-Leaf/spine switch fabric with native BGP peering. Nodes connect to ToR leaf
-switches; Calico peers directly with each leaf.
-
-**When to use:** production, full HA, maximum throughput, 10+ nodes, scale-out.
-
-**How it works:**
-- Nodes have 1–2 NICs, each attached to a leaf switch
-- Per-node BGPPeer CRDs tell Calico to peer with the leaf's SVI IP
-- Dual-homed nodes get ECMP (multipath hash across both uplinks)
-- Calico runs in BGP mode (bird backend, node-to-node mesh OFF)
-
-**Key fields:**
-
-```yaml
-network:
-  topology: clos
-  calico_mode: bgp
-  fabric_prefix: 16
-  leafs:
-    - name: leaf-a
-      asn: 65001
-      peer_ip: 10.201.0.1
-      fabric_subnet: 10.201.0.0/16
-    - name: leaf-b
-      asn: 65002
-      peer_ip: 10.202.0.1
-      fabric_subnet: 10.202.0.0/16
-  bgp:
-    cluster_asn: 65100
-
-# Dual-homed worker:
-worker1:
-  fabric_nics:
-    - nic: ens801f0
-      fabric_ip: 10.201.0.10
-      leaf: leaf-a
-    - nic: ens801f1
-      fabric_ip: 10.202.0.10
-      leaf: leaf-b              # ECMP across both uplinks
-```
-
-`leaf:` is optional: each NIC's leaf is the one whose `fabric_subnet` holds
-its `fabric_ip`. If you set it, it must name a defined leaf and agree with the
-subnet. A `fabric_ip` in no leaf's subnet, or in two overlapping ones, is an
-error. A NIC on a leaf with `fabric_subnet: TBD` must name the leaf.
-
----
-
-## L2 Topology
-
-Flat L2 fabric switch — all nodes on one broadcast domain, no BGP peering
-with the switch. Simpler than Clos (no leaf/spine, no per-node BGPPeer CRDs)
-but limited to a single switch domain.
-
-**When to use:** single L2 switch connecting all nodes, no multi-rack spine.
-
-**How it works:**
-- All nodes share one L2 broadcast domain (single VLAN/subnet)
-- Netplan assigns fabric addresses only — no routes needed (all on-link)
-- No leafs, no hub, no peer declarations
-
-**Calico mode options:**
-
-| Mode | Backend | Encapsulation | MTU | Use when |
-|------|---------|--------------|-----|----------|
-| `bgp` (recommended) | bird | None (native) | full fabric MTU | Default for L2 — nodes exchange pod routes directly over the segment |
-| `vxlan` | VXLAN | Always | fabric MTU - `network.vxlan_overhead` (50) | The switch drops traffic from IPs it did not assign (e.g. IP source guard), or you otherwise need an overlay |
-
-With `calico_mode: bgp` on L2, Calico uses **node-to-node mesh** (all nodes peer with each other) instead of the Clos model (per-node ToR peering). BGP runs only between the nodes — the switch is never a peer, so no `BGPPeer` CRDs are generated and `ecmp_nodes` is empty. The mesh is one session per node pair, which is fine at rack scale; past roughly 100 nodes, move to Clos with ToR peering. No `leafs:` block needed.
-
-```
-   ┌────────────── L2 fabric switch (one VLAN, MTU 9000) ──────────────┐
-   └─────────┬─────────────────────┬─────────────────────┬─────────────┘
-             │                     │                     │
-     master1 ens786f0np0   master2 ens786f0np0   worker1 ens786f0np0
-       10.201.1.1/16          10.201.1.2/16          10.201.1.3/16
-
-  routes:   none — 10.201.0.0/16 is on-link on every node
-  pod CIDR: 10.244.x.0/24 via 10.201.1.x (learned from the Calico node mesh)
-```
-
-> [!Note]
-> **One fabric NIC per node on the segment.** Two NICs on the same node in the
-> same subnet give the kernel two connected routes to one prefix, and the
-> parser rejects the profile as ambiguous. The generated netplan configures
-> plain `ethernets:` only — host bonds are not generated, so L2 has no
-> multi-uplink redundancy today. If you need dual uplinks, use Clos.
-
-**Key fields:**
-
-```yaml
-network:
-  topology: l2
-  calico_mode: bgp         # or vxlan when the switch needs an overlay
-  fabric_prefix: 16
-  mtu: 9000
-  control_plane_on_fabric: true
-  bgp:
-    cluster_asn: 65100     # only needed when calico_mode: bgp
-
-# All nodes — single NIC, no leaf/peer:
-master1:
-  fabric_nics:
-    - nic: ens786f0np0
-      fabric_ip: 10.201.1.1
-```
-
-> [!Note]
-> L2 rejects `leafs:`, `fabric_router:`, `peer:`, and `leaf:` on NICs, and
-> every `fabric_ip` must be inside the one segment. The parser enforces these
-> as hard errors.
-
----
-
-## None Topology
-
-No fabric network at all. `rack-profile.yaml` is used purely for inventory
-generation, node labels (CPU family, GPU vendor/model), and GPU Operator
-auto-enablement. All traffic runs on the management network.
-
-**When to use:** existing network is sufficient, but you want rack-profile.yaml
-for GPU operator auto-install, node labeling, and structured inventory — without
-deploying fabric networking.
-
-**How it works:**
-- All nodes use `mgmt_ip` as their Kubernetes `ip`/`access_ip`
-- No netplan files generated — fabric roles skip entirely
-- Calico forced to VXLAN on the management network, at its MTU (`network.mtu`, 1500 by default) less `network.vxlan_overhead` (50 by default)
-- The install stops if the NIC holding a node's `mgmt_ip` carries less than `network.mtu`: the installer does not configure that NIC. A node whose NIC MTU cannot be read is named in a warning and not checked
-- GPU operator still auto-enables from `accelerator:` field
-- `metallb_ip_range` auto-detection works (mgmt IPs are reachable)
-
-**Key fields:**
-
-```yaml
-network:
-  topology: none
-  calico_mode: vxlan       # forced — bgp rejected by parser
-  # mtu: 1500             # the management network's MTU; 1500 by default
-  pod_cidr: 10.244.0.0/16
-  service_cidr: 10.96.0.0/12
-
-# Nodes — mgmt_ip only, NO fabric_nics:
-master1:
-  hostname: node-cp1
-  mgmt_ip: 10.0.0.10
-  roles: [kube_control_plane, etcd]
-
-worker1:
-  hostname: node-gpu1
-  mgmt_ip: 10.0.0.30
-  profile: gpu-b300-hgx       # GPU operator auto-enables
-  roles: [kube_node]
-```
-
-> [!Important]
-> `topology: none` rejects `fabric_nics`, `calico_mode: bgp`, `leafs:`, and
-> `fabric_router:`. The parser enforces these as hard errors.
-
----
-
-## Upgrading Star → Clos
-
-The topology of an installed cluster can't be changed in place. Re-running
-`install` on a running cluster skips Kubespray, so Calico's mode (VXLAN to BGP)
-never changes. Tear the cluster down and install it again. Teardown removes
-Ceph too, so back up what you need first.
-
-1. Tear down: `./toolkit_manager.sh teardown infrastructure --env <env>`
-2. Install the ToR leaf switches and cable the nodes to them
-3. Edit `rack-profile.yaml`:
-   - Change `topology: star` → `topology: clos`
-   - Change `calico_mode: vxlan` → `calico_mode: bgp`
-   - Change `fabric_prefix: 30` → `fabric_prefix: 16`
-   - Remove `fabric_router: true` and `peer:` from nodes
-   - Add `leafs:` definitions and `leaf:` on each fabric NIC
-   - Add `bgp: cluster_asn:`
-4. Install: `./toolkit_manager.sh install inference --env <env>`
 
 ---
 
@@ -523,9 +295,7 @@ racks:
         profile: gpu-b300-hgx        # references the profile above
         fabric_nics:
           - nic: ens801f0
-            fabric_ip: 10.201.1.14
-            prefix: 30
-            peer: master1
+            fabric_ip: 10.201.0.30     # Clos: inside a leaf's fabric_subnet
 ```
 
 **What happens automatically:**
@@ -572,6 +342,8 @@ and continue. Every check is listed per node as `OK:` or `FAIL:`; any `FAIL` fai
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `rack_scale_enabled is true but rack-profile.yaml not found` | Missing profile | Copy `configs/defaults/rack-profile.yaml.example` to `env/<env>/rack-profile.yaml` |
+| `a saved NetworkManager profile configures a fabric NIC` | A NetworkManager profile also configures a fabric NIC (checked before netplan apply) | Delete the named profile (`nmcli connection delete '<profile>'`, or remove the file if NetworkManager is not running) and re-run. NetworkManager can keep the node's other NICs |
+| `the fabric NICs are not as ... sets them` | Checked after netplan apply and in validate: another netplan file (for example cloud-init) or NetworkManager profile also configures the NIC, an old address is left, or the NIC is in a bond, bridge or VRF | Remove or narrow that entry, delete the old address (`ip addr del`), run `netplan apply` on the node, and re-run. A NIC without carrier is left to the fabric checks in [Validation](#validation); routes are not compared |
 | `rack_scale_enabled is true but metallb_ip_range is not set` | Missing VIP | Set `metallb_ip_range` in `global_config.yaml` to free management-subnet addresses (e.g. `172.18.168.240-172.18.168.250`), not a node's own IP |
 | `metallb_ip_range ... overlaps the fabric subnet` | VIP range on the fabric | Move `metallb_ip_range` to free management-subnet addresses; fabric IPs are not reachable from outside the rack |
 | Kubespray can't SSH to workers | Star hub not forwarding | Check hub: `sysctl net.ipv4.ip_forward` (must be 1), `iptables -S FORWARD` (must have ACCEPT rules) |
@@ -600,41 +372,6 @@ and continue. Every check is listed per node as `OK:` or `FAIL:`; any `FAIL` fai
 
 ## Reference
 
-### Execution Order
-
-**Star (rack_scale_enabled=true, no BGP):**
-```
-fabric_inventory → fabric_netplan → fabric_sysctl → kubernetes → fabric_validate → storage
-```
-
-**Clos (rack_scale_enabled=true, BGP on):**
-```
-fabric_inventory → fabric_netplan → fabric_sysctl → kubernetes → fabric_bgp → fabric_validate → storage
-```
-
-**L2 (rack_scale_enabled=true, topology=l2):**
-```
-fabric_inventory → fabric_netplan → kubernetes → fabric_validate → storage
-```
-fabric_sysctl and fabric_bgp are no-ops (no hub, no ToR peers).
-
-**None (rack_scale_enabled=true, topology=none):**
-```
-fabric_inventory → kubernetes → fabric_validate (labels only) → storage
-```
-fabric_netplan, fabric_sysctl, fabric_bgp all skip. No fabric network — rack-profile used for inventory and GPU labels only.
-
-**Platform layer**, after the infrastructure layer: NFD comes first on every cluster, and on a rack-scale env
-**with NVIDIA GPU nodes** (any topology) the GPU operator follows it:
-```
-node_feature_discovery → nvidia_gpu_operator → nri_cpu_balloons → cert_manager → …
-```
-
-**Default (rack_scale_enabled=false):**
-```
-kubernetes → storage
-```
-
 ### Parser Output Artifacts
 
 | File | Purpose |
@@ -655,3 +392,11 @@ kubernetes → storage
 | `metallb_ip_range` | (auto-detect) | `global_config.yaml` | **Required for rack-scale** (except `topology: none`, where auto-detection picks reachable management addresses). Free management-subnet addresses for LoadBalancer VIPs (e.g. `172.18.168.240-172.18.168.250`). Not a fabric address: auto-detection picks fabric IPs, which are unreachable from outside the rack, and install stops if the range overlaps a fabric subnet. Not a node's own IP: with more than one control-plane node, MetalLB can announce it from another node, which then answers ARP for that node's address. |
 | `storage_backend` | `local-path` | `global_config.yaml` | Set to `ceph` for fabric-attached storage |
 | `rack-profile.yaml` | (none) | `env/<env>/` | Hardware profile — see above |
+
+---
+
+## Next steps
+
+- [Rack-scale topologies](rack-scale-topologies.md) — cabling, routing and keys for star, Clos, L2 and `none`
+- [Node scaling](node-scaling.md#rack-scale) — add or remove a worker on a rack
+- [Architecture: rack-scale order](../reference/architecture.md#rack-scale-order) — the order the fabric steps run in
