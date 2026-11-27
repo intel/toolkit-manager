@@ -18,19 +18,23 @@ pipeline does not currently provide one.
 
 Renovate reads the default branch of each configured repository. It inspects
 recognized Helm charts, Helm values, Dockerfiles, Docker Compose files, and pip
-requirements. Custom rules cover Agent Sandbox, the vendored Redis Stack server
-image tag, CloudNativePG, MetalLB, KEDA, Metrics Server, SeaweedFS, Langfuse,
-and Node Feature Discovery. Some rules may not match if the monitored branch
+requirements and GitHub Actions. Custom rules cover Agent Sandbox, KubeRay
+operator, the vendored Redis Stack server image tag, vLLM CPU and OpenVINO Model
+Server image variables, and the yq installer utility. Additional rules for
+CloudNativePG, MetalLB, KEDA, Metrics Server, SeaweedFS, Langfuse,
+and Node Feature Discovery apply only where those role paths exist; these
+inherited roles are not present in the current Agent Toolkit repository.
+Some rules may not match if the monitored branch
 uses a different file layout or variable name. Matching files in a repository can
 include disabled components and dependencies unrelated to the deployed stack.
 The discovery report is not an inventory of what is actually running.
 
-Agent Toolkit-specific rules for KubeRay and its version references are defined
-in the target repository's `renovate.json`. That file must be present on the
-scanned default branch for the self-hosted run to apply those rules. Until
-[PR #41](https://github.com/intel/agent-toolkit/pull/41) is merged, do not treat
-the Jenkins discovery as covering those custom version fields.
-The self-hosted configuration groups Langfuse web and worker image updates and
+The self-hosted configuration now discovers both KubeRay operator version
+references without requiring the unmerged
+[PR #41](https://github.com/intel/agent-toolkit/pull/41). If that PR merges,
+review duplicate custom rules in the effective Renovate config.
+The self-hosted configuration groups Langfuse web and worker image updates,
+groups OpenVINO Model Server image variants, and
 disables Ray image updates until the image and chart application versions can
 be updated consistently. Verify these safeguards in the discovery report before
 enabling PR creation; they do not prove compatibility.
@@ -43,6 +47,57 @@ Kubernetes installations, models, external services, or versions hidden in
 unrecognized templates and runtime environment overrides. For complete
 coverage, compare the discovery report to your deployment inventory and add
 verified managers or rules for each missing component.
+
+### Explicit repository component report
+
+Before Renovate runs, `ci/discover-toolkit-releases.cjs` uses the read-only
+discovery credential to resolve Agent Toolkit's `main` commit and inspect
+the exact references declared in `ci/toolkit-components.json`. It queries
+upstream GitHub releases for these 13 runtime products:
+
+- Agent Sandbox
+- KubeRay operator
+- Ray
+- OpenShell
+- pgvector
+- Redis Stack
+- LiteLLM
+- Flowise
+- ClickHouse
+- MinIO
+- Langfuse (web and worker)
+- vLLM (CPU image reference)
+- OpenVINO Model Server (plain and Python image references)
+
+The yq installer utility is reported separately as a fourteenth entry.
+`stable-components.json` includes the source commit, observation timestamp,
+current references, latest upstream stable release, source URL, status and
+component-specific limitations. `stable-components.tsv` is the readable table.
+GitHub's designated latest published non-prerelease is used for release-based
+sources; this is not necessarily the numerically highest version of every
+maintained release line. pgvector has no GitHub releases, so its explicit source
+is all paginated tags and its highest stable `vMAJOR.MINOR.PATCH` tag.
+
+The pgvector `pg16` image tag and `pgvector_version: "16"` identify the
+PostgreSQL major, not the extension version. The report does not pretend the
+installed extension version is known. Similarly, a source release is not proof
+that a Bitnami legacy, LiteLLM stable-channel, CPU, Python or Helm artifact
+exists. Consult Renovate's separate registry candidate report for those checks.
+Ray and OpenShell are informational detections, not authorization for standalone
+updates. OpenShell chart/image/CLI compatibility and registry migration require
+review.
+
+Missing expected references, failed upstream lookups (including HTTP 403/rate
+limits), and invalid/draft/prerelease responses fail the component stage. Per-
+component failures are written into the archived reports rather than skipped.
+A failure to resolve the source commit is fatal before a component report can
+be produced. Partial reports are never a successful coverage gate. This is a
+curated inventory: additions to the toolkit require a reviewed manifest entry;
+it does not automatically classify new components.
+
+Keycloak deployment, Istio, inherited inference/platform services, and versions
+in other repositories or existing environment overrides remain outside this
+repository-only scope. This report does not claim whole-platform coverage.
 
 Agent-toolkit and inference files under `ext/` and environment files under
 `env/` are ignored by this checkout. Pull requests against the source
@@ -92,6 +147,13 @@ environments.
    Check the
    `stable-discovery.jsonl` artifact and reconcile its
    extracted dependencies with the intended component inventory.
+   The `stable-inventory.tsv` artifact summarizes extracted versions, proposed
+   updates and skip reasons. It lists only dependencies Renovate recognized,
+   not all files, missing components, or deployed versions.
+   Also require all 14 entries in `stable-components.tsv` to have status `ok`;
+   inspect `stable-components.json` for source commit and compatibility notes.
+   That upstream-source report is separate from the registry candidates and
+   skipped dependencies in `stable-inventory.tsv`.
    To test the approved Agent Sandbox patch in dry-run mode only, set
    `PILOT_DRY_RUN=true`, leave `CREATE_PRS=false`, and use
    `REPOSITORIES=intel/agent-toolkit`. The pilot requires exactly one proposal
@@ -119,7 +181,7 @@ environments.
    discovery only. Confirm the job is authorized to run this trusted branch and that
    Jenkins honors the explicit UTC schedule.
 
-Both stages fail if Renovate logs warnings or errors, or if its report does not
+Renovate report gates fail if Renovate logs warnings or errors, or if its report does not
 show extracted dependencies for every requested repository. The report check
 also fails if it finds a proposed Ray image update for Agent Toolkit. Investigate
 the archived log instead of treating an incomplete scan as a successful run.

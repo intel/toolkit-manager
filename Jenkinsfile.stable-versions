@@ -69,7 +69,7 @@ spec:
     }
 
     stages {
-        stage('Identify stable versions') {
+        stage('Prepare discovery') {
             steps {
                 script {
                     if ((params.PILOT_DRY_RUN || params.CREATE_PRS) && params.REPOSITORIES != 'intel/agent-toolkit') {
@@ -86,8 +86,28 @@ spec:
                     id
                     echo "Workspace ownership and permissions (numeric uid:gid mode path):"
                     stat -c '%u:%g %a %n' "$WORKSPACE" "${WORKSPACE}@tmp"
-                    rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl stable-pilot.jsonl
+                    rm -f -- stable-discovery.jsonl stable-pull-requests.jsonl stable-pilot.jsonl stable-inventory.tsv stable-components.json stable-components.tsv
                 '''
+            }
+        }
+
+        stage('Identify toolkit upstream stable releases') {
+            when { expression { params.REPOSITORIES.split(',').contains('intel/agent-toolkit') } }
+            steps {
+                container('renovate') {
+                    withCredentials([string(credentialsId: 'renovate-github-token', variable: 'RENOVATE_TOKEN')]) {
+                        sh '''#!/usr/bin/env bash
+                            set -euo pipefail
+                            set +x
+                            node ci/discover-toolkit-releases.cjs ci/toolkit-components.json stable-components
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Identify stable versions') {
+            steps {
                 container('renovate') {
                     sh '''#!/usr/bin/env bash
                         set -euo pipefail
@@ -113,7 +133,11 @@ spec:
                     }
                 }
                 withEnv(["RENOVATE_REPOSITORIES=${params.REPOSITORIES}"]) {
-                    sh 'bash ci/check-renovate-report.sh stable-discovery.jsonl'
+                    sh '''#!/usr/bin/env bash
+                        set -euo pipefail
+                        bash ci/summarize-renovate-report.sh stable-discovery.jsonl stable-inventory.tsv
+                        bash ci/check-renovate-report.sh stable-discovery.jsonl
+                    '''
                 }
             }
         }
@@ -190,7 +214,7 @@ spec:
 
     post {
         always {
-            archiveArtifacts artifacts: 'stable-*.jsonl', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'stable-*.jsonl,stable-*.tsv,stable-components.json', allowEmptyArchive: true
         }
     }
 }
