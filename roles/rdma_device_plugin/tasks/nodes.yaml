@@ -1,0 +1,23 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Sets _rdma_dp_nics ({host: node_rdma_nics} of the inventory's RDMA nodes) and
+# _rdma_dp_labelled (the nodes fabric_rdma labelled). Shared by install and validate.
+
+- name: "rdma_device_plugin | RDMA NICs from rack-profile.yaml"
+  ansible.builtin.set_fact:
+    _rdma_dp_nics: "{{ dict(_hosts | zip(_hosts | map('extract', hostvars, 'node_rdma_nics'))) }}"
+  vars:
+    _hosts: "{{ groups['rdma_nodes'] | default([]) }}"
+
+- name: "rdma_device_plugin | Find the nodes fabric_rdma labelled"
+  kubernetes.core.k8s_info:
+    kind: Node
+    label_selectors:
+      - "{{ rdma_device_plugin_node_label }}"
+  register: _rdma_dp_labelled_nodes
+
+- name: "rdma_device_plugin | Record the labelled nodes"
+  ansible.builtin.set_fact:
+    _rdma_dp_labelled: "{{ _rdma_dp_labelled_nodes.resources | map(attribute='metadata.name') | sort }}"

@@ -1,0 +1,48 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# The DaemonSet runs on every labelled node, and each advertises the RDMA resources
+# of its NICs. Install waits; validate checks twice (with retries 0 ansible-core
+# never evaluates until).
+
+- name: "rdma_device_plugin | Wait for the DaemonSet to roll out"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    name: rdma-shared-dp-ds
+    namespace: "{{ rdma_device_plugin_namespace }}"
+  register: _rdma_dp_ds
+  until: _rdma_dp_ds.resources | default([]) | rdma_daemonset_ready(_rdma_dp_labelled | length)
+  retries: "{{ rdma_device_plugin_ready_retries if component_action == 'install' else 1 }}"
+  delay: 10
+
+- name: "rdma_device_plugin | Read the RDMA resources each node advertises"
+  kubernetes.core.k8s_info:
+    kind: Node
+    name: "{{ item }}"
+  loop: "{{ _rdma_dp_labelled }}"
+  register: _rdma_dp_node
+  until: >-
+    _rdma_dp_nics.get(item, []) | rdma_missing_resources(
+      (_rdma_dp_node.resources | default([{}], true)).0.status.allocatable | default({})) | length == 0
+  retries: "{{ rdma_device_plugin_ready_retries if component_action == 'install' else 0 }}"
+  delay: 10
+  failed_when: false
+
+- name: "rdma_device_plugin | Check every RDMA node advertises its RDMA resources"
+  ansible.builtin.assert:
+    that: _rdma_dp_missing | length == 0
+    fail_msg: >-
+      Not advertised: {{ _rdma_dp_missing | join('; ') }}. Check the plugin's log
+      (kubectl logs -n {{ rdma_device_plugin_namespace }} ds/rdma-shared-dp-ds) and the NICs'
+      RDMA devices (validate fabric_rdma); the plugin needs each NIC's uverbs, rdma_cm and umad devices.
+    quiet: true
+  vars:
+    _rdma_dp_missing: >-
+      {%- set out = [] -%}
+      {%- for r in _rdma_dp_node.results -%}
+      {%- set lack = _rdma_dp_nics.get(r.item, []) | rdma_missing_resources(
+            (r.resources | default([{}], true)).0.status.allocatable | default({})) -%}
+      {%- if lack -%}{%- set _ = out.append(r.item ~ ' ' ~ lack | join(', ')) -%}{%- endif -%}
+      {%- endfor -%}{{ out }}

@@ -23,6 +23,17 @@
       ansible.builtin.set_fact:
         _removed_nodes_list: "{{ _removed_nodes | split(',') | reject('equalto', '') | list }}"
 
+    # Not for --node-lost, whose node cannot be reached.
+    - name: "kubernetes | remove-node | Rack-scale | RDMA of the removed node(s)"
+      ansible.builtin.include_role:
+        name: fabric_rdma
+        tasks_from: teardown.yaml
+      vars:
+        _fabric_scope_nodes: "{{ _removed_nodes_list }}"
+      when:
+        - rack_scale_enabled | default(false) | bool
+        - not (_node_lost | default(false) | bool)
+
     # While the inventory still has the removed node(s): their address and
     # netplan file. Not for --node-lost, whose node cannot be reached.
     - name: "kubernetes | remove-node | Rack-scale | Fabric netplan of the removed node(s)"

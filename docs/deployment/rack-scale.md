@@ -541,6 +541,222 @@ to install.
 
 ---
 
+## RDMA (RoCE v2)
+
+RDMA runs on the nodes that list `rdma_nics`, with any topology, `none`
+included. Each RDMA NIC is one of:
+
+- **Dedicated** (the default): a NIC of its own, on its own network. GPU
+  backend NICs (one per GPU) are always dedicated.
+- **Shared**: a NIC that is also in `fabric_nics`. RDMA runs on its
+  `fabric_ip` and `network.mtu`. Supported for CPU, storage and KV-cache RDMA.
+
+```yaml
+network:
+  rdma:                        # every key is optional; the defaults are shown
+    mtu: 9000                  # dedicated RDMA NICs
+    dscp: 26                   # how RoCE traffic is marked
+    priority: 3                # the priority DSCP 26 maps to: the one lossless priority
+    pfc: true                  # PFC on that priority only
+    ecn: true                  # warn when the NIC's ECN is off (read on ConnectX only)
+    subnet: 192.168.40.0/24    # no default: needed only when an rdma_nics entry has rdma_ip
+    pod_range: 192.168.40.128/26  # no default: pods' addresses on the dedicated RDMA NICs (below)
+
+racks:
+  rack-01:
+    nodes:
+      worker1:
+        rdma_nics:
+          - nic: ens28np0          # dedicated: the installer writes /etc/netplan/99-rdma.yaml
+            rdma_ip: 192.168.40.20
+          - nic: ens29np0          # dedicated, no rdma_ip: the site configures it; checked only
+          - nic: ens801f0          # also in fabric_nics: shared
+```
+
+`rdma_nics: [ens28np0]` (names only) is the same as entries without `rdma_ip`.
+
+**What the installer does** (`fabric_rdma`, after `kubernetes`; nothing when no
+node lists `rdma_nics`):
+
+- Installs rdma-core, ibverbs-providers, ibverbs-utils, perftest and ethtool,
+  and loads the NICs' RDMA drivers (`bnxt_re`, `irdma`, `mlx5_ib`), also at boot.
+- Writes netplan for dedicated NICs with `rdma_ip` (`/etc/netplan/99-rdma.yaml`).
+  `rdma_ip` means the installer configures the NIC: no other netplan file may.
+  Before writing it, install refuses an `rdma_ip` NIC that carries an address
+  outside `network.rdma.subnet` (the management NIC, say) or that a bond, bridge
+  or VLAN is built on: the file would take that configuration away.
+- Applies the RoCE settings on the hosts that have none (below).
+- Reads back every RDMA NIC and measures it node to node (Validation).
+- Labels the RDMA nodes `rdma-nics=<count>`; RDMA workloads select on it.
+- With `network.rdma.pod_range`, sets up the pods' networks on the dedicated RDMA
+  NICs ([RDMA for pods](#rdma-for-pods)).
+
+**RoCE settings on the hosts: which value wins.**
+
+1. What the site already applies on the host (PFC, a DSCP map, the RDMA-CM
+   default ToS) is kept and checked. A difference from `network.rdma` is a
+   warning; it is never overwritten. So is a NIC whose firmware takes its
+   DCB settings from the switch (DCBX, e.g. the E810's `fw-lldp-agent`).
+2. Otherwise `network.rdma`: PFC on `priority` only, DSCP `dscp` mapped to
+   `priority`, and the RDMA-CM default ToS (DSCP × 4), applied now and at
+   every boot by `rack-rdma-qos.service`. On dedicated RDMA NICs also
+   `arp_ignore 1` and `arp_announce 2`: a node with two NICs on one network
+   would otherwise answer ARP for one NIC's address from the other, and RDMA
+   sent there finds no connection.
+3. The defaults, for keys `network.rdma` leaves out.
+
+These settings do no harm while the switches lack PFC or ECN, and RoCE works
+on a lossy network. Lossless RoCE needs the switches to match them. The
+installer never configures switches: give your network team this table.
+
+| Switch setting | Value with the defaults | Why |
+|---|---|---|
+| QoS trust | DSCP | RoCE traffic is classified by its DSCP |
+| DSCP to traffic class | 26 → 3 | The RoCE class |
+| PFC | On priority 3 only | PFC on other priorities can pause TCP traffic (Calico, Ceph, etcd) |
+| ECN | On the queue of priority 3 | Congestion control slows senders before PFC has to pause them |
+| PFC watchdog | On | Stops a pause storm |
+| MTU | At least `network.rdma.mtu` plus headers (9214 for 9000) | RDMA frames at the NIC MTU must pass |
+
+**Limits:**
+
+- RoCE v2 on Ethernet only: InfiniBand ports are refused. IPv4 only.
+- ECN is read back on NVIDIA ConnectX (mlx5) NICs only.
+- A shared NIC on `star`: traffic between spokes is forwarded by the hub's
+  kernel, without PFC.
+- To change `network.rdma` or a node's `rdma_nics`, tear down `fabric_rdma`, then
+  install it again, then `install rdma_device_plugin`.
+- One `network.rdma.subnet`: give a node at most one dedicated NIC with `rdma_ip`.
+  Several NICs of a node on one subnet (one per GPU) need per-rail subnets, which
+  are not supported yet: the kernel sends to the subnet through one of the NICs,
+  and RDMA-CM picks the NIC by route.
+- Teardown removes the RDMA netplan file and its addresses but leaves the NIC up
+  at its MTU; reboot, or `ip link set <nic> down`.
+- The first PFC and DSCP settings on an Intel E810 reset its link for about 10 s.
+  On a shared NIC that interrupts the fabric (BGP, Ceph, the API) once, at
+  install, add-node and boot.
+- Ubuntu 22.04's in-tree E810 driver (kernel 5.15) may not run RDMA at all
+  (dmesg: "Couldn't create ib_mad QP1"; validate: "ib_write_bw measured
+  nothing"), and keeps the DSCP map after teardown until a reboot. Intel's
+  ice/irdma driver package works.
+- The RDMA user library (rdma-core) must work with the kernel's RDMA driver. A
+  Broadcom Thor 2 NIC (bnxt_re) on kernel 6.12 or later, such as Ubuntu 24.04's
+  HWE kernel 7.0, needs rdma-core 53 or later (65 is tested). Ubuntu 24.04 ships
+  50, and install and validate then fail with "could not create an RDMA queue
+  pair": install a newer rdma-core on the nodes. When a node runs an rdma-core
+  that no OS package installed, the install warns: RDMA app images for those
+  nodes need a matching rdma-core too.
+
+**Nodes:** `add-node` sets up RDMA on the added node(s) only and checks their
+RDMA NICs; with one added node there is no second node to measure against.
+It also writes their pod networks' CNI configs; the device plugin, Multus and
+whereabouts follow the `rdma-nics` label. `remove-node` takes RDMA down on the
+removed node(s). `./toolkit_manager.sh validate fabric_rdma --env <env>` measures
+the whole rack again, between pods too.
+
+### RDMA for pods
+
+Two pieces, both a no-op when no node lists `rdma_nics`:
+
+- **`rdma_device_plugin`** (platform layer): the cluster's one RDMA device plugin,
+  [k8s-rdma-shared-dev-plugin](https://github.com/Mellanox/k8s-rdma-shared-dev-plugin)
+  (NVIDIA's build `network-operator-v26.10.0`; it works with Broadcom, Intel and NVIDIA
+  NICs). It runs on the nodes labelled `rdma-nics`, in the `rdma-device-plugin`
+  namespace, and advertises:
+
+  | Resource | The node's RDMA devices of | For |
+  |---|---|---|
+  | `rdma/hca` | every RDMA NIC, shared or dedicated | `hostNetwork` pods (the only way to use a shared NIC) |
+  | `rdma/net<i>` | its i-th dedicated RDMA NIC | pods on pod network `rdma-net<i>` |
+
+  Each node advertises 64 of each, shared by its pods. A pod gets the RDMA devices
+  (`/dev/infiniband`) only with the resource; the resource also places it on a node
+  that has the network.
+- **Pod networks** (`fabric_rdma`, with `network.rdma.pod_range`): network `rdma-net<i>`
+  is each node's i-th dedicated RDMA NIC, so a NIC name must be on the same network on
+  every node (the parser checks it). Pods get a second interface, `net1`, as an ipvlan
+  L2 child of the NIC, with a `pod_range` address and the `subnet` prefix, so they reach
+  the nodes' `rdma_ip` on the link. `fabric_rdma` installs thin
+  [Multus](https://github.com/k8snetworkplumbingwg/multus-cni) v4.3.2 and
+  [whereabouts](https://github.com/k8snetworkplumbingwg/whereabouts) v0.9.4 (unique
+  addresses across the rack) on the RDMA nodes, in the `rdma-network` namespace, a
+  NetworkAttachmentDefinition `rdma-network/rdma-net<i>` per network, and on each node
+  `/etc/cni/multus/net.d/rdma-net<i>.conf` naming its own NIC. Pods without the
+  annotation are unchanged.
+
+A pod on a dedicated RDMA network:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rdma-app
+  annotations:
+    k8s.v1.cni.cncf.io/networks: rdma-network/rdma-net0
+spec:
+  containers:
+    - name: app
+      image: <image with rdma-core and your RDMA application>
+      resources:
+        limits:
+          rdma/net0: 1
+      env:
+        - {name: NCCL_IB_TC, value: "104"}           # network.rdma.dscp x 4
+        - {name: UCX_IB_TRAFFIC_CLASS, value: "104"}
+```
+
+On a shared NIC use `hostNetwork: true` and `rdma/hca: 1` instead of the annotation;
+`hostNetwork` needs a namespace with the `privileged` Pod Security level.
+
+- **Marking:** PFC and the DSCP map are the NIC's, so they apply to pod traffic too.
+  RDMA-CM applications inherit the node's default ToS. Verbs applications set their
+  own: `NCCL_IB_TC` and `UCX_IB_TRAFFIC_CLASS` = DSCP x 4 (104 with the defaults);
+  without them their traffic is not on the RoCE priority. If the library picks the
+  wrong RoCE GID, set `NCCL_IB_GID_INDEX` or `UCX_IB_GID_INDEX` to the GID of the
+  pod's `net1` address.
+- **Pod Security:** a pod on `net1` needs no capability and can run as non-root
+  (`/dev/infiniband/uverbs*` and `rdma_cm` are world-accessible; containerd gives
+  containers unlimited locked memory).
+- **Image:** its rdma-core must work with the node's kernel RDMA driver, as the
+  node's own does: on a Broadcom Thor 2 NIC with kernel 6.12 or later, rdma-core
+  53 or later (see RDMA limits). An image with Ubuntu 24.04's rdma-core 50 fails
+  there with "Couldn't create QP – Bad address"; rdma-core 65 is tested. The
+  install warns when a node runs an rdma-core that no OS package installed. Its
+  pod check below uses the node's own tools, so it does not test your image: run
+  `ib_write_bw` from the image between two pods once.
+- **Validation:** install and `validate fabric_rdma` start two busybox pods per pod
+  network on its first two nodes and run `ib_write_bw` between their `net1` addresses,
+  inside the pods' network namespaces, and print the results (the record holds the
+  node-to-node runs only).
+  `validate rdma_device_plugin` checks that every labelled node advertises its resources.
+
+**Limits:**
+
+- Pod networks are on dedicated NICs only, and without `network.rdma.pod_range`
+  there are none (`rdma/net<i>` is still advertised, for `hostNetwork` pods).
+- The plugin selects NICs by name on every RDMA node: a node that has a NIC of a
+  name another node lists, without listing it itself, gets that NIC brought up and
+  advertised.
+- `add-node` of a node with NIC names, or more dedicated RDMA NICs, than the other
+  nodes: run `install rdma_device_plugin` after it.
+- All pod networks share `subnet`: give a pod one RDMA network. An ipvlan pod cannot
+  reach its own node's address on that NIC.
+- `pod_range` must hold addresses nothing else on the RDMA network uses; whereabouts
+  frees a removed node's pod addresses at its daily reconcile.
+- Calico NetworkPolicy does not apply to `net1` or to RDMA.
+- RDMA devices are shared: a pod with an RDMA resource can use any GID of the device,
+  other pods' included. Fine for a single-tenant rack.
+- The RDMA network namespace mode must be `shared`, the kernel default: the plugin
+  refuses `exclusive`.
+- `fabric_rdma` owns Multus on the cluster: with `pod_range`, install stops if
+  another Multus runs (Kubespray's `kube_network_plugin_multus`, a network operator).
+  Its teardown removes the NetworkAttachmentDefinition CRD and the nodes' Multus
+  files, unless another install's Multus runs or the API does not answer (the
+  Kubernetes reset removes the node files); running pods keep their `net1` until
+  deleted.
+
+---
+
 ## Validation
 
 ```bash
@@ -564,6 +780,30 @@ The `fabric_validate` role checks (read-only; with `topology: none` only the nod
 
 Quorum members (etcd/control-plane) fail hard if unreachable. Worker nodes warn
 and continue. Every check is listed per node as `OK:` or `FAIL:`; any `FAIL` fails the run.
+
+With RDMA NICs, `fabric_rdma` reads back each one and fails, naming the node
+and NIC, when it cannot work: no RDMA device (driver not loaded), an InfiniBand
+port, link down, no IPv4 address or RoCE v2 GID, the wrong MTU where the
+installer sets it, or the management NIC. Settings that differ from
+`network.rdma` are warnings.
+
+It then runs `ib_write_bw` over RDMA-CM, marked with the RoCE DSCP and pinned to
+each NIC's NUMA node, in a ring over the NICs of each subnet: each NIC sends to
+the next NIC in the ring on another node, so every NIC is tested. On Clos that
+is each leaf's subnet: RoCE across the spines is not measured. Each run is reported against the lower of the
+link speed and the PCIe link (a 400G NIC on PCIe Gen4 x16 tops out near
+250 Gb/s); one under half of it is a warning. The NIC counters before and after
+show how the network behaved:
+
+| Counter | Means |
+|---|---|
+| PFC pauses received | The switch paused the NIC: switch PFC is working |
+| ECN-marked | The switch marked congestion: switch ECN is working |
+| Retransmitted | Packets were dropped: the network is lossy for RoCE (PFC or ECN off on the hosts or the switches), a warning |
+
+Everything is recorded in `inventory/metadata/rdma-readback.yaml`: per RDMA NIC
+its driver, RDMA device, RoCE v2 GID, link speed, PCIe link, NUMA node, MTU,
+PFC, DSCP, ECN and ToS, the bandwidth runs and the counters.
 
 ---
 
@@ -624,6 +864,9 @@ fabric_inventory → kubernetes → fabric_validate (labels only) → storage
 ```
 fabric_netplan, fabric_sysctl, fabric_bgp all skip. No fabric network — rack-profile used for inventory and GPU labels only.
 
+**With RDMA NICs** (any topology), `fabric_rdma` runs after `kubernetes`, and
+`rdma_device_plugin` in the platform layer.
+
 **Platform layer**, after the infrastructure layer: NFD comes first on every cluster, and on a rack-scale env
 **with NVIDIA GPU nodes** (any topology) the GPU operator follows it:
 ```
@@ -646,6 +889,7 @@ kubernetes → storage
 | `inventory/metadata/bgp-peers/<name>.yaml` | Per-node BGPPeer CRDs (Clos only) |
 | `inventory/metadata/vars/ceph-storage.yml` | Ceph fabric network + OSD devices |
 | `inventory/metadata/rack-scale-flags.env` | Shell-sourceable derived flags |
+| `inventory/metadata/rdma-readback.yaml` | RDMA NICs, bandwidth and counters (written by `fabric_rdma` on install and validate) |
 
 ### Config Variables
 

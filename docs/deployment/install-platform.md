@@ -14,7 +14,8 @@ The installer sets up these layers automatically, each on top of the one before:
 1. Infrastructure                — Kubernetes (built with Kubespray), storage (local-path / NFS / Ceph / NetApp)
 2. Platform                      — cert-manager, Istio, MetalLB, Envoy Gateway, PostgreSQL, Keycloak, SeaweedFS, Observability
                                    (Grafana, Prometheus, Loki, Tempo), NRI CPU Balloons, Node Feature Discovery, metrics-server,
-                                   Intel GPU device plugin (only on nodes with an Intel GPU); optional: Headlamp, KEDA, Velero
+                                   Intel GPU device plugin (only on nodes with an Intel GPU), RDMA device plugin (only on
+                                   rack-scale nodes with rdma_nics); optional: Headlamp, KEDA, Velero
 3. Intel® Inference Toolkit     — from the inference repository: KServe, the Envoy AI Gateway and the model services
                                    (LiteLLM and Langfuse too in LiteLLM mode)
 4. Intel® Chatbot Toolkit   — opt-in (vector DB, ingestion, chat, UI) — requires init erag + install erag

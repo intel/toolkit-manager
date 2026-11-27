@@ -147,3 +147,34 @@ storage:
 #           - nic: ens801f1
 #             fabric_ip: 10.202.0.10
 #             leaf: leaf-b             # dual-homed for ECMP
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RDMA (optional, any topology): RoCE v2 NICs, on the nodes that need them
+# ─────────────────────────────────────────────────────────────────────────────
+# A dedicated RDMA NIC is the default. A NIC that is also in fabric_nics is
+# shared: RDMA runs on its fabric_ip and network.mtu, for CPU, storage and
+# KV-cache traffic. network.rdma has one subnet, so give a node at most one
+# dedicated NIC with rdma_ip: several NICs of a node on one subnet (one per GPU)
+# need per-rail subnets, which are not supported yet.
+#
+# network:
+#   rdma:                    # every key is optional; the defaults are shown
+#     mtu: 9000              # dedicated RDMA NICs; the switch ports must carry it
+#     dscp: 26               # how RoCE traffic is marked
+#     priority: 3            # the priority DSCP 26 maps to: the one lossless priority
+#     pfc: true              # PFC on that priority only
+#     ecn: true              # warn when the NIC's ECN is off (read on ConnectX only)
+#     subnet: 192.168.40.0/24   # no default: needed only when an rdma_nics entry has rdma_ip
+#     pod_range: 192.168.40.128/26  # no default: pods' addresses on the dedicated RDMA NICs,
+#                                   # inside subnet; free of nodes and any other host
+#
+# Match the switches to these values (trust DSCP, PFC and ECN on the same
+# priority); the installer does not configure switches.
+#
+#       worker1:
+#         rdma_nics:
+#           - nic: ens28np0            # dedicated; the installer writes its netplan
+#             rdma_ip: 192.168.40.20
+#           - nic: ens29np0            # dedicated; no rdma_ip: the site configures the
+#                                      # NIC and the installer checks it
+#           - nic: ens801f0            # also a fabric NIC above: shared

@@ -1,0 +1,24 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+- name: "rdma_device_plugin | validate"
+  environment:
+    KUBECONFIG: "{{ kubernetes_kubeconfig }}"
+  block:
+    - name: "rdma_device_plugin | validate | RDMA nodes"
+      ansible.builtin.import_tasks: nodes.yaml
+
+    - name: "rdma_device_plugin | validate | PASS — no node lists rdma_nics"
+      ansible.builtin.debug:
+        msg: "No node lists rdma_nics; nothing to validate."
+      when: _rdma_dp_nics | length == 0
+
+    - name: "rdma_device_plugin | validate | Plugin and resources"
+      ansible.builtin.include_tasks: check.yaml
+      when: _rdma_dp_nics | length > 0
+
+    - name: "rdma_device_plugin | validate | PASS"
+      ansible.builtin.debug:
+        msg: "RDMA device plugin ready on {{ _rdma_dp_labelled | join(', ') or 'no node (none labelled rdma-nics)' }}."
+      when: _rdma_dp_nics | length > 0

@@ -1,0 +1,48 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Record, report and fail (install and validate)
+# =============================================================================
+
+- name: "fabric_rdma | Report | Bandwidth and counters"
+  ansible.builtin.set_fact:
+    _rdma_bw_report: "{{ _rdma_bw | default([]) | rdma_bw_report(_rdma_deltas | default({}), rack_scale_rdma_bw_low | float) }}"
+
+- name: "fabric_rdma | Report | Write {{ rack_scale_rdma_record_path }}"
+  ansible.builtin.copy:
+    content: >-
+      {{ {'settings': _rdma_settings,
+          'nics': _rdma_eval.record,
+          'bandwidth': _rdma_bw | default([]),
+          'counters': _rdma_deltas | default({}),
+          'errors': _rdma_eval.errors + _rdma_bw_report.errors,
+          'warnings': _rdma_eval.warnings + _rdma_bw_report.warnings} | to_nice_yaml(indent=2) }}
+    dest: "{{ rack_scale_rdma_record_path }}"
+    mode: "0644"
+  # add-node measures the added node(s) only: the record stays the whole rack's.
+  when: _fabric_scope_nodes is not defined
+
+- name: "fabric_rdma | Report | RDMA NICs"
+  ansible.builtin.debug:
+    msg: >-
+      {{ _rdma_eval.record.values() | map('length') | sum }} RDMA NICs
+      on {{ _rdma_eval.record | length }} nodes; record in {{ rack_scale_rdma_record_path }}.
+      {{ _rdma_bw_report.lines | join(' | ') if not _rdma_eval.errors
+         else 'Bandwidth not measured: the RDMA NICs have errors.' }}
+
+- name: "fabric_rdma | Report | Warnings"
+  ansible.builtin.debug:
+    msg: "WARNING: {{ item }}"
+  loop: "{{ _rdma_eval.warnings + _rdma_bw_report.warnings }}"
+  loop_control:
+    label: "{{ item | truncate(60) }}"
+
+- name: "fabric_rdma | Report | Fail if RDMA does not work"
+  ansible.builtin.fail:
+    msg: >-
+      RDMA does not work on every RDMA NIC listed in rack-profile.yaml:
+      {{ (_rdma_eval.errors + _rdma_bw_report.errors) | join('; ') }}.
+      The record is in {{ rack_scale_rdma_record_path }}.
+  when: (_rdma_eval.errors + _rdma_bw_report.errors) | length > 0

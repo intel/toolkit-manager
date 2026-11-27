@@ -49,6 +49,14 @@
             name: fabric_validate
             tasks_from: install.yaml
 
+        # The new node(s) only: the other nodes' RoCE settings stay as they are.
+        - name: "kubernetes | add-node | Rack-scale | RDMA on the new node(s)"
+          ansible.builtin.include_role:
+            name: fabric_rdma
+            tasks_from: install.yaml
+          vars:
+            _fabric_scope_nodes: "{{ _added_nodes_list }}"
+
     # storage_backend, not _resolved_storage_backend: preflight skips
     # storage/resolve.yaml for add-node and remove-node.
     - name: "kubernetes | add-node | NFS exports for new node(s)"

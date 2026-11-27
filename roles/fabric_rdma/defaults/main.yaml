@@ -1,0 +1,19 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Images of the pod networks (network.rdma.pod_range)
+# =============================================================================
+# Thin Multus and whereabouts give pods an interface on the dedicated RDMA NICs.
+# Each is the amd64 digest of its tag; replace both together when bumping, with
+# the vendored manifest in files/.
+
+rack_scale_rdma_multus_version: "v4.3.2"
+rack_scale_rdma_multus_digest: "sha256:5650fddaf5c1ef3ba573ee3dd7df136dee4db56d2da9e94c759f7d9143b9c9b1"
+rack_scale_rdma_multus_image: "ghcr.io/k8snetworkplumbingwg/multus-cni:{{ rack_scale_rdma_multus_version }}@{{ rack_scale_rdma_multus_digest }}"
+rack_scale_rdma_whereabouts_version: "v0.9.4"
+rack_scale_rdma_whereabouts_digest: "sha256:a8bc50c6a0499584a2d4206b56970e8c8933051090b8658c0d0791b6aa249817"
+rack_scale_rdma_whereabouts_image: "ghcr.io/k8snetworkplumbingwg/whereabouts:{{ rack_scale_rdma_whereabouts_version }}@{{ rack_scale_rdma_whereabouts_digest }}"
+# The two pods of the pod-to-pod check per network: the busybox the installer uses elsewhere.
+rack_scale_rdma_check_image: "busybox:1.36"

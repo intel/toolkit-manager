@@ -1,0 +1,122 @@
+---
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# =============================================================================
+# fabric_rdma — Pod networks on the dedicated RDMA NICs (install)
+# =============================================================================
+# With network.rdma.pod_range: on each RDMA node a CNI config per network naming
+# the node's own NIC, thin Multus and whereabouts on the RDMA nodes (they follow
+# the rdma-nics label; add-node applies them again unchanged), and a
+# NetworkAttachmentDefinition rdma-net<i> per network. Shared NICs get none:
+# their pods use hostNetwork.
+
+# fabric_rdma owns the cluster's Multus, like rdma_device_plugin its plugin: another
+# one (Kubespray's kube_network_plugin_multus, a network operator) shares its CRD
+# and node files, which this install would replace.
+# app=multus: upstream's, Kubespray's (kube-multus-ds-<arch>) and ours.
+- name: "fabric_rdma | pods | Multus from another install"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    label_selectors:
+      - app=multus
+    kubeconfig: "{{ kubernetes_kubeconfig }}"
+  register: _rdma_multus_existing
+
+- name: "fabric_rdma | pods | Stop on Multus from another install"
+  ansible.builtin.fail:
+    msg: >-
+      Multus already runs in {{ _rdma_multus_elsewhere | map(attribute='metadata.namespace') | unique | join(', ') }}.
+      The RDMA pod networks bring their own Multus, which would replace that one's objects and node files.
+      Remove the other Multus (for Kubespray's, kube_network_plugin_multus), or remove network.rdma.pod_range
+      and use hostNetwork RDMA pods.
+  vars:
+    _rdma_multus_elsewhere: >-
+      {{ _rdma_multus_existing.resources | rejectattr('metadata.namespace', 'equalto', rack_scale_rdma_namespace) | list }}
+  when: _rdma_multus_elsewhere | length > 0
+
+- name: "fabric_rdma | pods | CNI configs of the nodes in this run"
+  ansible.builtin.set_fact:
+    _rdma_cni_files: >-
+      {{ dict(_rdma_hosts | zip(_rdma_hosts | map('extract', hostvars, 'node_rdma_nics')))
+         | rdma_cni_files(rack_scale_rdma_subnet, rack_scale_rdma_pod_range) }}
+
+- name: "fabric_rdma | pods | Create {{ rack_scale_rdma_cni_dir }}"
+  ansible.builtin.file:
+    path: "{{ rack_scale_rdma_cni_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  delegate_to: "{{ item }}"
+  become: true
+  loop: "{{ _rdma_cni_files | map(attribute='host') | unique | list }}"
+
+- name: "fabric_rdma | pods | Write the CNI configs"
+  ansible.builtin.copy:
+    content: "{{ item.conf | to_nice_json(indent=2) }}\n"
+    dest: "{{ rack_scale_rdma_cni_dir }}/{{ item.name }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  delegate_to: "{{ item.host }}"
+  become: true
+  loop: "{{ _rdma_cni_files }}"
+  loop_control:
+    label: "{{ item.host }}: {{ item.name }} on {{ item.conf.master }}"
+
+- name: "fabric_rdma | pods | Render Multus and whereabouts"
+  ansible.builtin.set_fact:
+    _rdma_pod_objects: >-
+      {%- set out = [] -%}
+      {%- for d in rack_scale_rdma_pod_docs -%}
+      {%- set _ = out.append(d | rdma_daemonset(rack_scale_rdma_images[d.metadata.name], rack_scale_rdma_label)
+                             if d.kind == 'DaemonSet' else d) -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: "fabric_rdma | pods | Apply Multus and whereabouts"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ item }}"
+    kubeconfig: "{{ kubernetes_kubeconfig }}"
+  loop: "{{ _rdma_pod_objects }}"
+  loop_control:
+    label: "{{ item.kind }}/{{ item.metadata.name }}"
+
+# An empty spec: Multus reads the node's CNI config of the same name. Retried while
+# the API server starts serving the CRD applied above.
+- name: "fabric_rdma | pods | NetworkAttachmentDefinitions"
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ kubernetes_kubeconfig }}"
+    definition:
+      apiVersion: k8s.cni.cncf.io/v1
+      kind: NetworkAttachmentDefinition
+      metadata:
+        name: "{{ item.name }}"
+        namespace: "{{ rack_scale_rdma_namespace }}"
+      spec: {}
+  loop: "{{ _rdma_networks }}"
+  loop_control:
+    label: "{{ rack_scale_rdma_namespace }}/{{ item.name }}"
+  register: _rdma_nad
+  until: _rdma_nad is succeeded
+  retries: 5
+  delay: 3
+
+# add-node waits for every DaemonSet pod on the new node(s) itself.
+- name: "fabric_rdma | pods | Wait for Multus and whereabouts on the RDMA nodes"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: DaemonSet
+    name: "{{ item }}"
+    namespace: "{{ rack_scale_rdma_namespace }}"
+    kubeconfig: "{{ kubernetes_kubeconfig }}"
+  loop: "{{ rack_scale_rdma_images.keys() | list }}"
+  register: _rdma_pod_ds
+  until: _rdma_pod_ds.resources | default([]) | rdma_daemonset_ready(1)
+  retries: "{{ rack_scale_rdma_ready_retries }}"
+  delay: 10
+  when: _fabric_scope_nodes is not defined

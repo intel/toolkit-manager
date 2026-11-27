@@ -1,0 +1,75 @@
+# Vendored from Mellanox/k8s-rdma-shared-dev-plugin network-operator-v26.10.0
+# (deployment/k8s/base/daemonset.yaml, Apache-2.0), so installs do not fetch from
+# GitHub. Differences from upstream:
+#   - its own namespace, rdma-device-plugin, created here with the privileged Pod
+#     Security label (upstream uses kube-system)
+#   - the image is NVIDIA's build on nvcr.io, pinned by digest (the role overrides it
+#     from rdma_device_plugin_image)
+#   - automountServiceAccountToken: false: the plugin talks to the kubelet only
+# The role also renders the rdma-devices ConfigMap (the NIC names from rack-profile.yaml),
+# and sets the tolerations, the rdma-nics node affinity and a hash of the config, so a
+# changed config restarts the plugin.
+# The plugin runs privileged with hostNetwork: it reads the PCI and RDMA devices, brings
+# the selected NICs up, and writes its sockets into the kubelet's directories.
+# Bumping: replace this file and rdma_device_plugin_version/_image_digest in defaults/main.yaml.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rdma-device-plugin
+  labels:
+    # hostNetwork, hostPath and privileged are refused by the baseline and restricted levels.
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: rdma-shared-dp-ds
+  namespace: rdma-device-plugin
+spec:
+  selector:
+    matchLabels:
+      name: rdma-shared-dp-ds
+  template:
+    metadata:
+      labels:
+        name: rdma-shared-dp-ds
+    spec:
+      hostNetwork: true
+      priorityClassName: system-node-critical
+      automountServiceAccountToken: false
+      containers:
+      - image: nvcr.io/nvidia/mellanox/k8s-rdma-shared-dev-plugin:network-operator-v26.10.0@sha256:75cbcfeb6a0e2c1efa53a74bad1e4fcd673e12a5bdeeb584a9079f6055c76f08
+        name: k8s-rdma-shared-dp-ds
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: device-plugin
+            mountPath: /var/lib/kubelet/device-plugins
+            readOnly: false
+          - name: plugins-registry
+            mountPath: /var/lib/kubelet/plugins_registry
+            readOnly: false
+          - name: config
+            mountPath: /k8s-rdma-shared-dev-plugin
+          - name: devs
+            mountPath: /dev/
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: plugins-registry
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry
+        - name: config
+          configMap:
+            name: rdma-devices
+            items:
+            - key: config.json
+              path: config.json
+        - name: devs
+          hostPath:
+            path: /dev/

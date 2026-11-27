@@ -48,6 +48,13 @@
             rack_scale_gpu_model: "{{ _rack_parsed.summary.gpu_model }}"
             rack_scale_gpu_form: "{{ _rack_parsed.summary.gpu_form }}"
             rack_scale_site: "{{ _rack_parsed.summary.site }}"
+            rack_scale_rdma_dscp: "{{ _rack_parsed.summary.rdma.dscp }}"
+            rack_scale_rdma_priority: "{{ _rack_parsed.summary.rdma.priority }}"
+            rack_scale_rdma_pfc: "{{ _rack_parsed.summary.rdma.pfc }}"
+            rack_scale_rdma_ecn: "{{ _rack_parsed.summary.rdma.ecn }}"
+            rack_scale_rdma_subnet: "{{ _rack_parsed.summary.rdma.subnet }}"
+            rack_scale_rdma_pod_range: "{{ _rack_parsed.summary.rdma.pod_range }}"
+            rack_scale_netplan_renderer: "{{ _rack_parsed.summary.netplan_renderer }}"
             rook_ceph_public_network: "{{ (_rack_parsed.ceph_yml | regex_search('ceph_public_network:\\s*\"([^\"]+)\"', '\\1') | default([''], true)) | first | default('') }}"
             rook_ceph_cluster_network: "{{ (_rack_parsed.ceph_yml | regex_search('ceph_cluster_network:\\s*\"([^\"]+)\"', '\\1') | default([''], true)) | first | default('') }}"
 
